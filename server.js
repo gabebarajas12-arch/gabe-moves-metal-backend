@@ -5,7 +5,7 @@
  * "Gabe Moves Metal" (facebook.com/Gabemovesmetal1)
  *
  * Connects to Meta's APIs for:
- * - Facebook Messenger (auto-reply + conversation management)
+ * - Facebook Messenger (auto-reply + cnversation management)
  * - Instagram DMs (auto-reply + conversation management)
  * - Facebook Lead Ads (instant lead capture)
  * - Page comments (lead detection)
@@ -47,7 +47,7 @@ const CONFIG = {
 // ==================== MIDDLEWARE ====================
 app.use(cors());
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf.toString(); } }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ==================== IN-MEMORY DATA STORE ====================
 // In production, replace with a database (SQLite, PostgreSQL, etc.)
