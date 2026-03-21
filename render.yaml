@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: gabe-moves-metal
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_PAGE_ACCESS_TOKEN
+        sync: false
+      - key: META_VERIFY_TOKEN
+        value: gabe_moves_metal_2025
+      - key: PAGE_ID
+        value: "61575074716398"
+      - key: PORT
+        value: "3000"
