@@ -1,0 +1,20 @@
+{
+  "name": "gabe-moves-metal-lead-engine",
+  "version": "1.0.0",
+  "description": "Facebook & Instagram lead capture + auto-reply engine for Gabe Moves Metal",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
