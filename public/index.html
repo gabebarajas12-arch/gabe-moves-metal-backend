@@ -9,6 +9,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        
         }
 
         :root {
@@ -1628,6 +1629,32 @@
 
                         <!-- Platform Selection + Language -->
                         <div style="border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 16px;">
+                            <div class="form-group" style="margin-top:12px;">
+                                <label class="form-label">Customer Story (helps AI write better captions)</label>
+                                <textarea id="postCustomerContext" class="form-input" rows="3" placeholder="e.g. Repeat customer - 3rd vehicle from me. First-time buyer. Drove from LA. Trading in a Honda. Family of 5 needed more room. Birthday surprise..." style="resize:vertical;"></textarea>
+                                <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+                                    <button type="button" onclick="addContextTag('Repeat customer')" style="background:var(--card-bg);border:1px solid var(--border-color);color:var(--gold);padding:4px 10px;border-radius:12px;font-size:0.75rem;cursor:pointer;">Repeat buyer</button>
+                                    <button type="button" onclick="addContextTag('First-time buyer')" style="background:var(--card-bg);border:1px solid var(--border-color);color:var(--gold);padding:4px 10px;border-radius:12px;font-size:0.75rem;cursor:pointer;">First-time buyer</button>
+                                    <button type="button" onclick="addContextTag('Referral from previous customer')" style="background:var(--card-bg);border:1px solid var(--border-color);color:var(--gold);padding:4px 10px;border-radius:12px;font-size:0.75rem;cursor:pointer;">Referral</button>
+                                    <button type="button" onclick="addContextTag('Drove from out of town')" style="background:var(--card-bg);border:1px solid var(--border-color);color:var(--gold);padding:4px 10px;border-radius:12px;font-size:0.75rem;cursor:pointer;">Out of town</button>
+                                    <button type="button" onclick="addContextTag('Upgrade from previous vehicle')" style="background:var(--card-bg);border:1px solid var(--border-color);color:var(--gold);padding:4px 10px;border-radius:12px;font-size:0.75rem;cursor:pointer;">Upgrade</button>
+                                    <button type="button" onclick="addContextTag('Young/first car')" style="background:var(--card-bg);border:1px solid var(--border-color);color:var(--gold);padding:4px 10px;border-radius:12px;font-size:0.75rem;cursor:pointer;">First car</button>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-top:12px;">
+                                <label class="form-label">Schedule Post</label>
+                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                                    <select id="postSchedule" class="form-input" style="max-width:220px;" onchange="updateScheduleInfo()">
+                                        <option value="next_best">Auto-schedule (best day)</option>
+                                        <option value="now">Post now</option>
+                                        <option value="custom">Pick a date</option>
+                                    </select>
+                                    <input type="date" id="postScheduleDate" class="form-input" style="max-width:180px;display:none;">
+                                    <span id="scheduleInfo" style="color:var(--gold);font-size:0.85rem;"></span>
+                                </div>
+                            </div>
+
                             <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 12px;">
                                 <label class="form-label" style="margin-bottom: 0; font-weight: 700;">Publish to:</label>
                                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
@@ -2033,7 +2060,8 @@
             setupNavigation();
             setupEventListeners();
             checkAuth(); // This will show login or load dashboard
-            setInterval(() => { if (authToken) loadDashboard(); renderContentSuggestion(); }, 30000);
+            setInterval(() => { if (authToken) loadDashboard(); renderContentSuggestion();
+            updateScheduleInfo(); }, 30000);
         });
 
         function setupNavigation() {
@@ -2855,7 +2883,7 @@
                 const response = await fetch(`${API_BASE}/api/posts/preview`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ type: currentPostType, data, language }),
+                    body: JSON.stringify({ type: currentPostType, data, language, customerContext: document.getElementById("postCustomerContext")?.value || "" }),
                 });
                 const result = await response.json();
                 const preview = document.getElementById('captionPreview');
@@ -2872,6 +2900,62 @@
 
         // Get image URL from the active post form
         // Track uploaded photo file
+        function addContextTag(tag) {
+            const textarea = document.getElementById('postCustomerContext');
+            const current = textarea.value.trim();
+            if (current.includes(tag)) return; // already added
+            textarea.value = current ? current + '. ' + tag : tag;
+        }
+
+        function updateScheduleInfo() {
+            const schedule = document.getElementById('postSchedule').value;
+            const dateInput = document.getElementById('postScheduleDate');
+            const info = document.getElementById('scheduleInfo');
+            
+            if (schedule === 'now') {
+                dateInput.style.display = 'none';
+                info.textContent = '';
+            } else if (schedule === 'next_best') {
+                dateInput.style.display = 'none';
+                const suggestion = getNextBestPostDay();
+                dateInput.value = suggestion.date;
+                info.textContent = suggestion.label;
+            } else {
+                dateInput.style.display = '';
+                info.textContent = '';
+            }
+        }
+
+        function getNextBestPostDay() {
+            const today = new Date();
+            const currentType = document.querySelector('input[name="postType"]:checked')?.value || 'customer_delivery';
+            // Best days for each type based on the content calendar
+            const bestDays = {
+                'customer_delivery': [2, 6], // Tue, Sat
+                'promo_event': [3],          // Wed
+                'inventory': [1, 4],         // Mon, Thu
+                'personal_brand': [0, 5]     // Sun, Fri
+            };
+            const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            const targetDays = bestDays[currentType] || [2, 6];
+            
+            // Find the next occurrence of a target day
+            for (let i = 1; i <= 7; i++) {
+                const candidate = new Date(today);
+                candidate.setDate(today.getDate() + i);
+                if (targetDays.includes(candidate.getDay())) {
+                    const dateStr = candidate.toISOString().split('T')[0];
+                    const dayName = dayNames[candidate.getDay()];
+                    const monthDay = candidate.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+                    return { date: dateStr, label: dayName + ' ' + monthDay + ' (best for this post type)' };
+                }
+            }
+            // Fallback: tomorrow
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+            return { date: tomorrow.toISOString().split('T')[0], label: 'Tomorrow' };
+        }
+
         let pendingPhotoFile = null;
 
         function handlePhotoSelect(input) {
