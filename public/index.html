@@ -1618,7 +1618,10 @@
                             <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 16px;">
                                 <label class="form-label" style="margin-bottom: 0; font-weight: 700;">Language:</label>
                                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                    <input type="radio" name="postLang" value="en" checked> <span style="font-size: 13px;">English</span>
+                                    <input type="radio" name="postLang" value="bilingual" checked> <span style="font-size: 13px;">Bilingual EN/ES (Recommended)</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="radio" name="postLang" value="en"> <span style="font-size: 13px;">English</span>
                                 </label>
                                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                     <input type="radio" name="postLang" value="es"> <span style="font-size: 13px;">Español</span>
@@ -1626,15 +1629,21 @@
                             </div>
                         </div>
 
-                        <!-- Caption Preview -->
+                        <!-- Caption Generation -->
                         <div style="margin-bottom: 16px;">
-                            <button class="btn btn-secondary" onclick="previewPost()" style="margin-bottom: 10px;">👁️ Preview Caption</button>
+                            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                <button class="btn btn-primary" onclick="aiGenerateCaption()" id="aiGenBtn" style="padding: 10px 20px; font-weight: 700;">🤖 AI Generate Caption</button>
+                                <button class="btn btn-secondary" onclick="previewPost()" style="padding: 10px 16px;">⚡ Quick Preview</button>
+                                <button class="btn btn-secondary" onclick="copyCaption()" id="copyBtn" style="padding: 10px 16px; display: none;">📋 Copy</button>
+                            </div>
+                            <div id="captionSource" style="display: none; font-size: 10px; color: var(--text-secondary); margin-bottom: 6px;"></div>
                             <div id="captionPreview" style="display: none; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: var(--text-primary);"></div>
                         </div>
 
                         <!-- Publish Button -->
                         <div style="display: flex; gap: 10px;">
                             <button class="btn btn-primary" onclick="publishPost()" style="flex: 1; padding: 12px; font-size: 15px; font-weight: 700;">🚀 Publish Now</button>
+                            <button class="btn btn-secondary" onclick="publishWithAI()" style="padding: 12px 20px; font-size: 15px; font-weight: 700;">🤖🚀 AI + Publish</button>
                         </div>
 
                         <!-- Status Message -->
@@ -2820,15 +2829,69 @@
             try {
                 const response = await fetch(`${API_BASE}/api/posts/preview`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
                     body: JSON.stringify({ type: currentPostType, data, language }),
                 });
                 const result = await response.json();
                 const preview = document.getElementById('captionPreview');
                 preview.textContent = result.caption;
                 preview.style.display = 'block';
+                document.getElementById('captionSource').textContent = '⚡ Quick preview (template)';
+                document.getElementById('captionSource').style.display = 'block';
+                document.getElementById('copyBtn').style.display = 'inline-flex';
+                window._lastCaption = result.caption;
             } catch (error) {
                 console.error('Preview error:', error);
+            }
+        }
+
+        async function aiGenerateCaption() {
+            const data = getPostData();
+            const language = getSelectedLanguage();
+            const btn = document.getElementById('aiGenBtn');
+            const origText = btn.textContent;
+            btn.textContent = '🤖 Generating...';
+            btn.disabled = true;
+            try {
+                const response = await fetch(`${API_BASE}/api/posts/ai-generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
+                    body: JSON.stringify({ type: currentPostType, data, language }),
+                });
+                const result = await response.json();
+                const preview = document.getElementById('captionPreview');
+                preview.textContent = result.caption;
+                preview.style.display = 'block';
+                const sourceEl = document.getElementById('captionSource');
+                sourceEl.textContent = result.source === 'ai' ? '🤖 AI-generated (Claude) — unique & algorithm-optimized' : '⚡ Template fallback (set ANTHROPIC_API_KEY for AI)';
+                sourceEl.style.display = 'block';
+                document.getElementById('copyBtn').style.display = 'inline-flex';
+                window._lastCaption = result.caption;
+            } catch (error) {
+                console.error('AI generate error:', error);
+                showPostStatus('Error generating caption: ' + error.message, false);
+            } finally {
+                btn.textContent = origText;
+                btn.disabled = false;
+            }
+        }
+
+        async function publishWithAI() {
+            // First generate with AI, then publish
+            await aiGenerateCaption();
+            if (window._lastCaption) {
+                // Small delay so user can see the caption
+                setTimeout(() => publishPost(), 500);
+            }
+        }
+
+        function copyCaption() {
+            if (window._lastCaption) {
+                navigator.clipboard.writeText(window._lastCaption).then(() => {
+                    const btn = document.getElementById('copyBtn');
+                    btn.textContent = '✅ Copied!';
+                    setTimeout(() => { btn.textContent = '📋 Copy'; }, 2000);
+                });
             }
         }
 
