@@ -1537,8 +1537,19 @@
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Photo URL (for Instagram, include an image)</label>
-                                <input type="text" class="form-input" id="postImageUrl" placeholder="https://example.com/photo.jpg">
+                                <label class="form-label">Photo (snap a pic or choose from gallery)</label>
+                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                                    <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--gold);color:#000;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.9rem;">
+                                        📸 Choose Photo
+                                        <input type="file" id="postImageFile" accept="image/*" style="display:none;" onchange="handlePhotoSelect(this)">
+                                    </label>
+                                    <span id="photoFileName" style="color:var(--text-secondary);font-size:0.85rem;">No photo selected</span>
+                                </div>
+                                <div id="photoPreview" style="display:none;margin-top:8px;">
+                                    <img id="photoPreviewImg" style="max-width:200px;max-height:150px;border-radius:8px;border:1px solid var(--border-color);">
+                                    <button onclick="clearPhoto()" style="display:block;margin-top:4px;background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.8rem;">✕ Remove photo</button>
+                                </div>
+                                <input type="hidden" id="postImageUrl" value="">
                             </div>
                         </div>
 
@@ -2843,7 +2854,7 @@
             try {
                 const response = await fetch(`${API_BASE}/api/posts/preview`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify({ type: currentPostType, data, language }),
                 });
                 const result = await response.json();
@@ -2860,6 +2871,53 @@
         }
 
         // Get image URL from the active post form
+        // Track uploaded photo file
+        let pendingPhotoFile = null;
+
+        function handlePhotoSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+            pendingPhotoFile = file;
+            document.getElementById('photoFileName').textContent = file.name;
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('photoPreviewImg').src = e.target.result;
+                document.getElementById('photoPreview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearPhoto() {
+            pendingPhotoFile = null;
+            document.getElementById('postImageFile').value = '';
+            document.getElementById('photoFileName').textContent = 'No photo selected';
+            document.getElementById('photoPreview').style.display = 'none';
+            document.getElementById('postImageUrl').value = '';
+        }
+
+        async function uploadPhoto() {
+            if (!pendingPhotoFile) return '';
+            const formData = new FormData();
+            formData.append('photo', pendingPhotoFile);
+            try {
+                const resp = await fetch('/api/upload-photo', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken },
+                    body: formData
+                });
+                const data = await resp.json();
+                if (data.url) {
+                    document.getElementById('postImageUrl').value = data.url;
+                    return data.url;
+                }
+                throw new Error(data.error || 'Upload failed');
+            } catch(e) {
+                showNotification('Photo upload failed: ' + e.message, 'error');
+                return '';
+            }
+        }
+
         function getPostImageUrl() {
             const type = document.querySelector('input[name="postType"]:checked')?.value;
             if (type === 'promo_event') return document.getElementById('postDealImageUrl')?.value?.trim() || '';
@@ -2957,7 +3015,7 @@
             try {
                 const response = await fetch(`${API_BASE}/api/posts/ai-generate`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify({ type: currentPostType, data, language }),
                 });
                 const result = await response.json();
@@ -3036,7 +3094,7 @@
                 const response = await fetch(`${API_BASE}/api/posts/publish`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: currentPostType, data, platforms, language, imageUrl: getPostImageUrl() }),
+                    body: JSON.stringify({ type: currentPostType, data, platforms, language, imageUrl: (await uploadPhoto()) || getPostImageUrl() }),
                 });
                 const result = await response.json();
 
