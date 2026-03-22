@@ -1731,6 +1731,149 @@ app.post('/data-deletion', (req, res) => {
 });
 
 
+// ==================== DEALS TRACKER (SECURE) ====================
+// All deal data behind requireAuth — must be logged in to access
+const DEALS_FILE = path.join(__dirname, 'deals.json');
+
+function loadDeals() {
+  try {
+    if (fs.existsSync(DEALS_FILE)) {
+      return JSON.parse(fs.readFileSync(DEALS_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.error('Error loading deals:', e.message);
+  }
+  return { deals: [], monthlyStats: [], totals: [], yearTotal: {}, lists: {}, nextId: 1, employeeNumber: '' };
+}
+
+function saveDeals(data) {
+  fs.writeFileSync(DEALS_FILE, JSON.stringify(data, null, 2));
+}
+
+// Recalculate monthly stats from deal data
+function recalcMonth(data, month) {
+  const monthDeals = data.deals.filter(d => d.month === month);
+  const units = monthDeals.length;
+  const totalGross = monthDeals.reduce((s, d) => s + (d.totalGross || 0), 0);
+  const commission = monthDeals.reduce((s, d) => s + (d.commission || 0), 0);
+  const spiffs = monthDeals.reduce((s, d) => s + (d.dealSpiff || 0), 0);
+  const spiffsPaid = monthDeals.filter(d => d.spiffPaid === 'PAID').reduce((s, d) => s + (d.dealSpiff || 0), 0);
+  const spiffsPending = spiffs - spiffsPaid;
+  const grossPaidOn = monthDeals.reduce((s, d) => s + (d.grossPaidOn || 0), 0);
+  const effectiveComm = grossPaidOn > 0 ? commission / grossPaidOn : 0;
+
+  let stat = data.monthlyStats.find(s => s.month === month);
+  if (!stat) {
+    stat = { month };
+    data.monthlyStats.push(stat);
+  }
+  stat.units = units;
+  stat.totalGrossEntered = totalGross;
+  stat.commissionTotal = commission;
+  stat.spiffsAuto = spiffs;
+  stat.spiffsPaid = spiffsPaid;
+  stat.spiffsPendingCalc = spiffsPending;
+  stat.effectiveCommPct = effectiveComm;
+
+  // Update totals row
+  const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  const mi = MONTHS.indexOf(month);
+  if (mi >= 0 && data.totals[mi]) {
+    data.totals[mi].totalDealCount = units;
+    data.totals[mi].frontGross = totalGross;
+    data.totals[mi].commission = commission;
+    data.totals[mi].spiffs = spiffs;
+  }
+}
+
+// GET all deals (optionally filter by month)
+app.get('/api/deals', (req, res) => {
+  const data = loadDeals();
+  let deals = data.deals;
+  if (req.query.month) {
+    deals = deals.filter(d => d.month === req.query.month.toUpperCase());
+  }
+  deals.sort((a, b) => new Date(a.date) - new Date(b.date));
+  res.json({ deals, lists: data.lists });
+});
+
+// GET monthly stats & totals
+app.get('/api/deals/stats', (req, res) => {
+  const data = loadDeals();
+  res.json({
+    monthlyStats: data.monthlyStats,
+    totals: data.totals,
+    yearTotal: data.yearTotal,
+    employeeNumber: data.employeeNumber,
+  });
+});
+
+// GET single deal
+app.get('/api/deals/:id', (req, res) => {
+  const data = loadDeals();
+  const deal = data.deals.find(d => d.id === parseInt(req.params.id));
+  if (!deal) return res.status(404).json({ error: 'Deal not found' });
+  res.json(deal);
+});
+
+// POST new deal
+app.post('/api/deals', (req, res) => {
+  const data = loadDeals();
+  const deal = {
+    id: data.nextId++,
+    month: req.body.month || new Date().toLocaleString('en-US', { month: 'long' }).toUpperCase(),
+    date: req.body.date || new Date().toISOString().split('T')[0],
+    dealNumber: req.body.dealNumber || null,
+    stockNumber: req.body.stockNumber || '',
+    keyInfo: req.body.keyInfo || '',
+    vehicle: req.body.vehicle || '',
+    cpo: (req.body.cpo || 'NO').toUpperCase(),
+    newUsed: (req.body.newUsed || '').toUpperCase(),
+    source: (req.body.source || '').toUpperCase(),
+    customerName: req.body.customerName || '',
+    splitAmount: parseFloat(req.body.splitAmount) || 1,
+    splitWith: req.body.splitWith || '',
+    totalGross: parseFloat(req.body.totalGross) || 0,
+    commission: parseFloat(req.body.commission) || 0,
+    dealSpiff: parseFloat(req.body.dealSpiff) || 0,
+    spiffPaid: (req.body.spiffPaid || '').toUpperCase(),
+    grossPaidOn: parseFloat(req.body.grossPaidOn) || 0,
+    billedFunded: (req.body.billedFunded || '').toUpperCase(),
+    dealFlag: (req.body.dealFlag || '').toUpperCase(),
+    dealStatus: (req.body.dealStatus || '').toUpperCase(),
+  };
+  data.deals.push(deal);
+  recalcMonth(data, deal.month);
+  saveDeals(data);
+  res.json({ success: true, deal });
+});
+
+// PUT update deal
+app.put('/api/deals/:id', (req, res) => {
+  const data = loadDeals();
+  const idx = data.deals.findIndex(d => d.id === parseInt(req.params.id));
+  if (idx === -1) return res.status(404).json({ error: 'Deal not found' });
+  const oldMonth = data.deals[idx].month;
+  Object.assign(data.deals[idx], req.body, { id: data.deals[idx].id });
+  recalcMonth(data, data.deals[idx].month);
+  if (oldMonth !== data.deals[idx].month) recalcMonth(data, oldMonth);
+  saveDeals(data);
+  res.json({ success: true, deal: data.deals[idx] });
+});
+
+// DELETE deal
+app.delete('/api/deals/:id', (req, res) => {
+  const data = loadDeals();
+  const idx = data.deals.findIndex(d => d.id === parseInt(req.params.id));
+  if (idx === -1) return res.status(404).json({ error: 'Deal not found' });
+  const month = data.deals[idx].month;
+  data.deals.splice(idx, 1);
+  recalcMonth(data, month);
+  saveDeals(data);
+  res.json({ success: true });
+});
+
+
 // ==================== START SERVER ====================
 app.listen(PORT, () => {
   // Start inventory auto-refresh

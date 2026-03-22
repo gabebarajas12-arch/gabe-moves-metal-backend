@@ -1279,6 +1279,10 @@
                     <div class="icon">📝</div>
                     <span>Post Creator</span>
                 </div>
+                <div class="nav-item" data-page="deals">
+                    <div class="icon">💰</div>
+                    <span>Deals</span>
+                </div>
                 <div class="nav-item" data-page="notifications">
                     <div class="icon">🔔</div>
                     <span>Notifications</span>
@@ -1653,7 +1657,109 @@
 
                     <div id="notificationsList"></div>
                 </div>
+
+                <!-- Deals Tracker Page -->
+                <div class="page" id="deals">
+                    <!-- Month selector & stats bar -->
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <h2 style="font-size:20px;font-weight:700;margin:0;">Deal Tracker</h2>
+                            <select id="dealMonthSelect" onchange="loadDeals()" style="padding:8px 12px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:13px;">
+                                <option value="JANUARY">January</option><option value="FEBRUARY">February</option><option value="MARCH">March</option>
+                                <option value="APRIL">April</option><option value="MAY">May</option><option value="JUNE">June</option>
+                                <option value="JULY">July</option><option value="AUGUST">August</option><option value="SEPTEMBER">September</option>
+                                <option value="OCTOBER">October</option><option value="NOVEMBER">November</option><option value="DECEMBER">December</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn" onclick="showDealModal()" style="background:var(--gold);color:#000;font-weight:700;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;">+ New Deal</button>
+                            <button class="btn btn-secondary" onclick="showYTDView()" style="padding:8px 16px;font-size:13px;">YTD Summary</button>
+                        </div>
+                    </div>
+
+                    <!-- Stats cards -->
+                    <div id="dealStatsBar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;"></div>
+
+                    <!-- Deals table -->
+                    <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border-color);">
+                        <table id="dealsTable" style="width:100%;border-collapse:collapse;font-size:12px;">
+                            <thead>
+                                <tr style="background:var(--card-bg);border-bottom:2px solid var(--border-color);">
+                                    <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Date</th>
+                                    <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Deal #</th>
+                                    <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Vehicle</th>
+                                    <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Customer</th>
+                                    <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">N/U</th>
+                                    <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Split</th>
+                                    <th style="padding:10px 8px;text-align:right;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Gross</th>
+                                    <th style="padding:10px 8px;text-align:right;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Comm</th>
+                                    <th style="padding:10px 8px;text-align:right;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Spiff</th>
+                                    <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Status</th>
+                                    <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dealsTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- YTD overlay (hidden by default) -->
+                    <div id="ytdOverlay" style="display:none;margin-top:20px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                            <h3 style="font-size:16px;font-weight:700;">Year-To-Date Summary</h3>
+                            <button onclick="document.getElementById('ytdOverlay').style.display='none'" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px;">✕</button>
+                        </div>
+                        <div id="ytdContent"></div>
+                    </div>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Deal Modal -->
+    <div class="modal" id="dealModal" style="display:none;">
+        <div class="modal-content" style="max-width:560px;">
+            <div class="modal-header">
+                <span id="dealModalTitle">Add New Deal</span>
+                <span class="modal-close" onclick="closeDealModal()">✕</span>
+            </div>
+            <form id="dealForm" onsubmit="saveDeal(event)" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px;">
+                <div class="form-group"><label class="form-label">Date *</label><input type="date" class="form-input" id="dealDate" required></div>
+                <div class="form-group"><label class="form-label">Deal #</label><input type="number" class="form-input" id="dealDealNumber"></div>
+                <div class="form-group"><label class="form-label">Stock #</label><input type="text" class="form-input" id="dealStockNumber"></div>
+                <div class="form-group"><label class="form-label">Vehicle *</label><input type="text" class="form-input" id="dealVehicle" required placeholder="e.g. Silverado 1500"></div>
+                <div class="form-group"><label class="form-label">Customer Name *</label><input type="text" class="form-input" id="dealCustomer" required></div>
+                <div class="form-group"><label class="form-label">Source</label>
+                    <select class="form-select" id="dealSource"><option value="FLOOR">Floor</option><option value="INTERNET">Internet</option><option value="SERVICE DRIVE">Service Drive</option><option value="REFERRAL">Referral</option><option value="PHONE/CALL">Phone/Call</option><option value="REPEAT/ORPHAN">Repeat/Orphan</option></select>
+                </div>
+                <div class="form-group"><label class="form-label">New / Used</label>
+                    <select class="form-select" id="dealNewUsed"><option value="NEW">New</option><option value="USED">Used</option></select>
+                </div>
+                <div class="form-group"><label class="form-label">CPO</label>
+                    <select class="form-select" id="dealCPO"><option value="NO">No</option><option value="YES">Yes</option></select>
+                </div>
+                <div class="form-group"><label class="form-label">Split</label>
+                    <select class="form-select" id="dealSplitAmount"><option value="1">Full (1)</option><option value="0.5">Half (0.5)</option></select>
+                </div>
+                <div class="form-group"><label class="form-label">Split With</label><input type="text" class="form-input" id="dealSplitWith" placeholder="Partner name"></div>
+                <div class="form-group"><label class="form-label">Total Gross</label><input type="number" step="0.01" class="form-input" id="dealTotalGross" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Commission</label><input type="number" step="0.01" class="form-input" id="dealCommission" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Deal Spiff</label><input type="number" step="0.01" class="form-input" id="dealSpiff" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Spiff Paid?</label>
+                    <select class="form-select" id="dealSpiffPaid"><option value="">--</option><option value="PAID">Paid</option><option value="PENDING">Pending</option></select>
+                </div>
+                <div class="form-group"><label class="form-label">Gross Paid On</label><input type="number" step="0.01" class="form-input" id="dealGrossPaidOn" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Billed / Funded</label>
+                    <select class="form-select" id="dealBilledFunded"><option value="">--</option><option value="FUNDED">Funded</option><option value="PAID">Paid</option><option value="PENDING">Pending</option></select>
+                </div>
+                <div class="form-group"><label class="form-label">Deal Flag</label><input type="text" class="form-input" id="dealFlag" placeholder="e.g. FLAT"></div>
+                <div class="form-group"><label class="form-label">Deal Status</label>
+                    <select class="form-select" id="dealStatus"><option value="">--</option><option value="FUNDED">Funded</option><option value="PAID">Paid</option><option value="PENDING">Pending</option></select>
+                </div>
+                <div style="grid-column:1/-1;text-align:right;margin-top:8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeDealModal()" style="margin-right:8px;">Cancel</button>
+                    <button type="submit" class="btn" style="background:var(--gold);color:#000;font-weight:700;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;">Save Deal</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1955,7 +2061,8 @@
                 inventory: 'Inventory',
                 templates: 'Auto-Reply Templates',
                 posting: 'Post Creator',
-                notifications: 'Notifications'
+                notifications: 'Notifications',
+                deals: 'Deal Tracker'
             };
             document.getElementById('pageTitle').textContent = titles[page];
 
@@ -1971,6 +2078,9 @@
                 // Post Creator page — no initial load needed
             } else if (page === 'notifications') {
                 loadNotifications();
+            } else if (page === 'deals') {
+                initDealsMonth();
+                loadDeals();
             }
         }
 
@@ -2847,6 +2957,202 @@
             const defaultCard = document.querySelector('[data-posttype="sold_customer"]');
             if (defaultCard) defaultCard.style.border = '2px solid var(--gold)';
         });
+
+        // ==================== DEALS TRACKER ====================
+        let editingDealId = null;
+        let dealsListCache = [];
+
+        function initDealsMonth() {
+            const now = new Date();
+            const months = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+            document.getElementById('dealMonthSelect').value = months[now.getMonth()];
+        }
+
+        function fmt$(v) {
+            if (v == null || isNaN(v)) return '$0';
+            const neg = v < 0;
+            const s = '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+            return neg ? `(${s})` : s;
+        }
+
+        function fmtDate(d) {
+            if (!d) return '';
+            return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'});
+        }
+
+        async function loadDeals() {
+            const month = document.getElementById('dealMonthSelect').value;
+            try {
+                const [dealsRes, statsRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/deals?month=${month}`),
+                    fetch(`${API_BASE}/api/deals/stats`)
+                ]);
+                const dealsData = await dealsRes.json();
+                const statsData = await statsRes.json();
+                dealsListCache = dealsData.deals || [];
+
+                const ms = statsData.monthlyStats?.find(s => s.month === month) || {};
+                const bar = document.getElementById('dealStatsBar');
+                bar.innerHTML = [
+                    {label:'Units', value: ms.units || dealsListCache.length, color:'#4fc3f7'},
+                    {label:'Tier', value: ms.tier || '--', color:'#ce93d8'},
+                    {label:'Total Gross', value: fmt$(ms.totalGrossEntered || 0), color: (ms.totalGrossEntered||0) >= 0 ? '#81c784':'#ef5350'},
+                    {label:'Commission', value: fmt$(ms.commissionTotal || 0), color:'#ffd54f'},
+                    {label:'Spiffs', value: fmt$(ms.spiffsAuto || 0), color:'#4db6ac'},
+                    {label:'Net After Draw', value: fmt$(ms.netAfterDraw || 0), color: (ms.netAfterDraw||0) >= 0 ? '#81c784':'#ef5350'},
+                ].map(c => `<div style="background:var(--card-bg);border-radius:10px;padding:12px;border:1px solid var(--border-color);">
+                    <div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px;">${c.label}</div>
+                    <div style="font-size:18px;font-weight:700;color:${c.color};">${c.value}</div>
+                </div>`).join('');
+
+                const tbody = document.getElementById('dealsTableBody');
+                if (dealsListCache.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-secondary);">No deals this month. Click "+ New Deal" to add one.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = dealsListCache.map(d => {
+                    const statusColor = d.dealStatus === 'PAID' ? '#81c784' : d.dealStatus === 'FUNDED' ? '#4fc3f7' : '#ffa726';
+                    const grossColor = (d.totalGross || 0) >= 0 ? 'var(--text-primary)' : '#ef5350';
+                    return `<tr style="border-bottom:1px solid var(--border-color);transition:background 0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'">
+                        <td style="padding:10px 8px;white-space:nowrap;">${fmtDate(d.date)}</td>
+                        <td style="padding:10px 8px;font-family:monospace;font-size:11px;">${d.dealNumber || ''}</td>
+                        <td style="padding:10px 8px;font-weight:600;">${d.vehicle || ''}</td>
+                        <td style="padding:10px 8px;">${d.customerName || ''}</td>
+                        <td style="padding:10px 8px;text-align:center;"><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${d.newUsed==='NEW'?'rgba(79,195,247,0.15)':'rgba(206,147,216,0.15)'};color:${d.newUsed==='NEW'?'#4fc3f7':'#ce93d8'}">${d.newUsed||''}</span></td>
+                        <td style="padding:10px 8px;text-align:center;">${d.splitAmount === 0.5 ? '<span style="font-size:10px;color:#ffa726;">½ '+( d.splitWith||'')+'</span>' : '<span style="font-size:10px;color:#81c784;">Full</span>'}</td>
+                        <td style="padding:10px 8px;text-align:right;color:${grossColor};font-weight:600;">${fmt$(d.totalGross)}</td>
+                        <td style="padding:10px 8px;text-align:right;color:#ffd54f;font-weight:600;">${fmt$(d.commission)}</td>
+                        <td style="padding:10px 8px;text-align:right;">${d.dealSpiff ? fmt$(d.dealSpiff) : '-'}${d.spiffPaid === 'PENDING' ? ' <span style="color:#ffa726;font-size:9px;">PEND</span>' : ''}</td>
+                        <td style="padding:10px 8px;text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${statusColor}22;color:${statusColor};font-weight:600;">${d.dealStatus||'--'}</span></td>
+                        <td style="padding:10px 8px;text-align:center;">
+                            <button onclick="editDeal(${d.id})" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:14px;" title="Edit">✏️</button>
+                            <button onclick="deleteDeal(${d.id})" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:14px;" title="Delete">🗑️</button>
+                        </td>
+                    </tr>`;
+                }).join('');
+            } catch(e) {
+                console.error('Error loading deals:', e);
+                document.getElementById('dealsTableBody').innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:#ef5350;">Error loading deals</td></tr>';
+            }
+        }
+
+        function showDealModal(deal) {
+            editingDealId = deal ? deal.id : null;
+            document.getElementById('dealModalTitle').textContent = deal ? 'Edit Deal' : 'Add New Deal';
+            const f = document.getElementById('dealForm');
+            document.getElementById('dealDate').value = deal ? deal.date : new Date().toISOString().split('T')[0];
+            document.getElementById('dealDealNumber').value = deal?.dealNumber || '';
+            document.getElementById('dealStockNumber').value = deal?.stockNumber || '';
+            document.getElementById('dealVehicle').value = deal?.vehicle || '';
+            document.getElementById('dealCustomer').value = deal?.customerName || '';
+            document.getElementById('dealSource').value = deal?.source || 'FLOOR';
+            document.getElementById('dealNewUsed').value = deal?.newUsed || 'NEW';
+            document.getElementById('dealCPO').value = deal?.cpo || 'NO';
+            document.getElementById('dealSplitAmount').value = deal?.splitAmount ?? 1;
+            document.getElementById('dealSplitWith').value = deal?.splitWith || '';
+            document.getElementById('dealTotalGross').value = deal?.totalGross || '';
+            document.getElementById('dealCommission').value = deal?.commission || '';
+            document.getElementById('dealSpiff').value = deal?.dealSpiff || '';
+            document.getElementById('dealSpiffPaid').value = deal?.spiffPaid || '';
+            document.getElementById('dealGrossPaidOn').value = deal?.grossPaidOn || '';
+            document.getElementById('dealBilledFunded').value = deal?.billedFunded || '';
+            document.getElementById('dealFlag').value = deal?.dealFlag || '';
+            document.getElementById('dealStatus').value = deal?.dealStatus || '';
+            document.getElementById('dealModal').style.display = 'flex';
+        }
+
+        function closeDealModal() {
+            document.getElementById('dealModal').style.display = 'none';
+            editingDealId = null;
+        }
+
+        async function saveDeal(e) {
+            e.preventDefault();
+            const month = document.getElementById('dealMonthSelect').value;
+            const body = {
+                month,
+                date: document.getElementById('dealDate').value,
+                dealNumber: parseInt(document.getElementById('dealDealNumber').value) || null,
+                stockNumber: document.getElementById('dealStockNumber').value,
+                vehicle: document.getElementById('dealVehicle').value,
+                customerName: document.getElementById('dealCustomer').value,
+                source: document.getElementById('dealSource').value,
+                newUsed: document.getElementById('dealNewUsed').value,
+                cpo: document.getElementById('dealCPO').value,
+                splitAmount: parseFloat(document.getElementById('dealSplitAmount').value),
+                splitWith: document.getElementById('dealSplitWith').value,
+                totalGross: parseFloat(document.getElementById('dealTotalGross').value) || 0,
+                commission: parseFloat(document.getElementById('dealCommission').value) || 0,
+                dealSpiff: parseFloat(document.getElementById('dealSpiff').value) || 0,
+                spiffPaid: document.getElementById('dealSpiffPaid').value,
+                grossPaidOn: parseFloat(document.getElementById('dealGrossPaidOn').value) || 0,
+                billedFunded: document.getElementById('dealBilledFunded').value,
+                dealFlag: document.getElementById('dealFlag').value,
+                dealStatus: document.getElementById('dealStatus').value,
+            };
+            try {
+                const url = editingDealId ? `${API_BASE}/api/deals/${editingDealId}` : `${API_BASE}/api/deals`;
+                const method = editingDealId ? 'PUT' : 'POST';
+                await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                closeDealModal();
+                loadDeals();
+            } catch(e) { alert('Error saving deal: ' + e.message); }
+        }
+
+        function editDeal(id) {
+            const deal = dealsListCache.find(d => d.id === id);
+            if (deal) showDealModal(deal);
+        }
+
+        async function deleteDeal(id) {
+            if (!confirm('Delete this deal? This cannot be undone.')) return;
+            try {
+                await fetch(`${API_BASE}/api/deals/${id}`, { method: 'DELETE' });
+                loadDeals();
+            } catch(e) { alert('Error deleting deal: ' + e.message); }
+        }
+
+        async function showYTDView() {
+            try {
+                const res = await fetch(`${API_BASE}/api/deals/stats`);
+                const data = await res.json();
+                const months = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+                const content = document.getElementById('ytdContent');
+                let html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border-color);">';
+                html += '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:var(--card-bg);">';
+                ['Month','Units','Front Gross','Commission','Spiffs','Total Pay','Net After Draw'].forEach(h => {
+                    html += `<th style="padding:10px 8px;text-align:${h==='Month'?'left':'right'};font-size:10px;text-transform:uppercase;color:var(--text-secondary);font-weight:700;">${h}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+                let ytdUnits=0, ytdGross=0, ytdComm=0, ytdSpiffs=0, ytdPay=0, ytdNet=0;
+                data.totals.forEach((t,i) => {
+                    if (t.totalDealCount === 0 && i > 2) return; // skip empty future months
+                    ytdUnits += t.totalDealCount; ytdGross += t.frontGross; ytdComm += t.commission;
+                    ytdSpiffs += t.spiffs; ytdPay += t.totalPay; ytdNet += t.netAfterDraw;
+                    html += `<tr style="border-bottom:1px solid var(--border-color);">
+                        <td style="padding:8px;font-weight:600;">${t.month.charAt(0)+t.month.slice(1).toLowerCase()}</td>
+                        <td style="padding:8px;text-align:right;">${t.totalDealCount}</td>
+                        <td style="padding:8px;text-align:right;color:${t.frontGross>=0?'var(--text-primary)':'#ef5350'}">${fmt$(t.frontGross)}</td>
+                        <td style="padding:8px;text-align:right;color:#ffd54f;">${fmt$(t.commission)}</td>
+                        <td style="padding:8px;text-align:right;">${fmt$(t.spiffs)}</td>
+                        <td style="padding:8px;text-align:right;font-weight:600;">${fmt$(t.totalPay)}</td>
+                        <td style="padding:8px;text-align:right;color:${t.netAfterDraw>=0?'#81c784':'#ef5350'};font-weight:600;">${fmt$(t.netAfterDraw)}</td>
+                    </tr>`;
+                });
+                html += `<tr style="background:var(--card-bg);font-weight:700;">
+                    <td style="padding:10px 8px;">YTD TOTAL</td>
+                    <td style="padding:10px 8px;text-align:right;">${ytdUnits}</td>
+                    <td style="padding:10px 8px;text-align:right;">${fmt$(ytdGross)}</td>
+                    <td style="padding:10px 8px;text-align:right;color:#ffd54f;">${fmt$(ytdComm)}</td>
+                    <td style="padding:10px 8px;text-align:right;">${fmt$(ytdSpiffs)}</td>
+                    <td style="padding:10px 8px;text-align:right;">${fmt$(ytdPay)}</td>
+                    <td style="padding:10px 8px;text-align:right;color:${ytdNet>=0?'#81c784':'#ef5350'};">${fmt$(ytdNet)}</td>
+                </tr>`;
+                html += '</tbody></table></div>';
+                content.innerHTML = html;
+                document.getElementById('ytdOverlay').style.display = 'block';
+            } catch(e) { alert('Error loading YTD: ' + e.message); }
+        }
     </script>
 </body>
 </html>
