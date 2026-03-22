@@ -1377,7 +1377,21 @@
                 </div>
 
                 <!-- Leads Page -->
-                <div class="page" id="leads">
+                
+                <!-- Content Suggestion Widget -->
+                <div class="card" style="margin-top:20px; border-left:3px solid var(--gold);">
+                    <div class="card-header" style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:18px;">💡</span>
+                        <span>TODAY'S CONTENT SUGGESTION</span>
+                    </div>
+                    <div id="contentSuggestion" style="padding:16px;">
+                        Loading suggestion...
+                    </div>
+                </div>
+
+            </div>
+
+        <div class="page" id="leads">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h2 style="font-size: 20px; font-weight: 700;">All Leads</h2>
                         <button class="btn btn-primary" id="addLeadBtn">+ New Lead</button>
@@ -2008,7 +2022,7 @@
             setupNavigation();
             setupEventListeners();
             checkAuth(); // This will show login or load dashboard
-            setInterval(() => { if (authToken) loadDashboard(); }, 30000);
+            setInterval(() => { if (authToken) loadDashboard(); renderContentSuggestion(); }, 30000);
         });
 
         function setupNavigation() {
@@ -2845,6 +2859,94 @@
             }
         }
 
+        // Get image URL from the active post form
+        function getPostImageUrl() {
+            const type = document.querySelector('input[name="postType"]:checked')?.value;
+            if (type === 'promo_event') return document.getElementById('postDealImageUrl')?.value?.trim() || '';
+            return document.getElementById('postImageUrl')?.value?.trim() || '';
+        }
+
+        // Create a delivery post from a deal - auto-fills Post Creator
+        function createDeliveryPost(dealData) {
+            // Switch to Post Creator page
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+            const postNav = document.querySelector('[data-page="posts"]');
+            if (postNav) { postNav.classList.add('active'); }
+            const postPage = document.getElementById('posts');
+            if (postPage) postPage.style.display = 'block';
+            
+            // Select "Customer Delivery" post type
+            const deliveryRadio = document.querySelector('input[name="postType"][value="customer_delivery"]');
+            if (deliveryRadio) { deliveryRadio.checked = true; deliveryRadio.dispatchEvent(new Event('change')); }
+            
+            // Parse customer first name only
+            const firstName = (dealData.customer || '').split(' ')[0];
+            
+            // Fill in vehicle details
+            const yearEl = document.getElementById('postYear');
+            const modelEl = document.getElementById('postModel');
+            const stockEl = document.getElementById('postStock');
+            const customerEl = document.getElementById('postCustomer');
+            
+            if (yearEl) yearEl.value = dealData.year || '';
+            if (modelEl) modelEl.value = dealData.vehicle || '';
+            if (stockEl) stockEl.value = dealData.stockNumber || '';
+            if (customerEl) customerEl.value = firstName;
+            
+            // Show notification
+            showNotification('Deal loaded into Post Creator! Add a photo and generate your caption.', 'success');
+        }
+
+        // Content suggestion engine - suggests what to post today
+        function getContentSuggestion() {
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const dayOfMonth = today.getDate();
+            
+            // Posting schedule strategy for lead generation
+            const suggestions = {
+                0: { type: 'personal_brand', title: 'Sunday Motivation', desc: 'Share a personal story or car life moment. People buy from people they connect with.' },
+                1: { type: 'inventory', title: 'Monday New Arrival', desc: 'Spotlight a fresh unit on the lot. Start the week with something eye-catching.' },
+                2: { type: 'customer_delivery', title: 'Happy Customer Tuesday', desc: 'Post a recent delivery. Social proof drives leads.' },
+                3: { type: 'promo_event', title: 'Midweek Deal', desc: 'Highlight current incentives or special pricing. Create urgency.' },
+                4: { type: 'inventory', title: 'Thursday Test Drive', desc: 'Feature a vehicle with a CTA to come test drive this weekend.' },
+                5: { type: 'personal_brand', title: 'Friday at Findlay', desc: 'Show the energy on the lot. Behind-the-scenes content builds trust.' },
+                6: { type: 'customer_delivery', title: 'Saturday Delivery Day', desc: 'Busiest delivery day - capture those moments!' }
+            };
+            
+            return suggestions[dayOfWeek] || suggestions[1];
+        }
+
+        // Render content suggestion on dashboard
+        function renderContentSuggestion() {
+            const suggestion = getContentSuggestion();
+            const container = document.getElementById('contentSuggestion');
+            if (!container) return;
+            
+            container.innerHTML = `
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                    <div>
+                        <div style="font-weight:700; color:var(--gold); font-size:15px;">${suggestion.title}</div>
+                        <div style="color:var(--text-secondary); font-size:13px; margin-top:4px;">${suggestion.desc}</div>
+                    </div>
+                    <button class="btn btn-primary" onclick="goToPostCreator('${suggestion.type}')" style="white-space:nowrap; padding:8px 16px; font-size:13px;">Create Post</button>
+                </div>
+            `;
+        }
+
+        // Navigate to Post Creator with a specific type selected
+        function goToPostCreator(type) {
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+            const postNav = document.querySelector('[data-page="posts"]');
+            if (postNav) { postNav.classList.add('active'); }
+            const postPage = document.getElementById('posts');
+            if (postPage) postPage.style.display = 'block';
+            const radio = document.querySelector(`input[name="postType"][value="${type}"]`);
+            if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change')); }
+        }
+
         async function aiGenerateCaption() {
             const data = getPostData();
             const language = getSelectedLanguage();
@@ -2934,7 +3036,7 @@
                 const response = await fetch(`${API_BASE}/api/posts/publish`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: currentPostType, data, platforms, language }),
+                    body: JSON.stringify({ type: currentPostType, data, platforms, language, imageUrl: getPostImageUrl() }),
                 });
                 const result = await response.json();
 
@@ -3155,6 +3257,7 @@
                         <td style="padding:10px 8px;text-align:center;">
                             <button onclick="editDeal(${d.id})" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:14px;" title="Edit">✏️</button>
                             <button onclick="deleteDeal(${d.id})" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:14px;" title="Delete">🗑️</button>
+                    <button onclick="createDeliveryPost({customer: '${deal.customer}', vehicle: '${deal.vehicle}', stockNumber: '${deal.stockNumber || ''}', year: ''})" style="background:var(--gold); color:#000; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:600;" title="Create delivery post">📸 Post</button>
                         </td>
                     </tr>`;
                 }).join('');
