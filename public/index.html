@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gabe Moves Metal - CRM Dashboard</title>
     <style>
-        * {
+        * 
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -1678,7 +1678,10 @@
                     </div>
 
                     <!-- Stats cards -->
-                    <div id="dealStatsBar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;"></div>
+                    <div id="dealStatsBar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px;"></div>
+
+                    <!-- Pay Schedule Bar -->
+                    <div id="payScheduleBar" style="background:var(--card-bg);border-radius:10px;padding:12px 16px;border:1px solid var(--border-color);margin-bottom:16px;"></div>
 
                     <!-- Deals table -->
                     <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border-color);">
@@ -3005,6 +3008,67 @@
                     <div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px;">${c.label}</div>
                     <div style="font-size:18px;font-weight:700;color:${c.color};">${c.value}</div>
                 </div>`).join('');
+
+                // Pay Schedule Info
+                const drawAmount = 1500;
+                const commissionCheck = (ms.netAfterDraw || 0);
+                const today = new Date();
+                const currentDay = today.getDate();
+                const currentMonth = today.getMonth();
+                const currentYear = today.getFullYear();
+                let nextPayDate, nextPayType, nextPayAmount;
+                if (currentDay < 1 || (currentDay === 1 && today.getHours() < 12)) {
+                    nextPayDate = new Date(currentYear, currentMonth, 1);
+                    nextPayType = 'Draw';
+                    nextPayAmount = drawAmount;
+                } else if (currentDay < 15) {
+                    nextPayDate = new Date(currentYear, currentMonth, 15);
+                    nextPayType = 'Commission';
+                    nextPayAmount = commissionCheck;
+                } else {
+                    nextPayDate = new Date(currentYear, currentMonth + 1, 1);
+                    nextPayType = 'Draw';
+                    nextPayAmount = drawAmount;
+                }
+                const daysUntilPay = Math.ceil((nextPayDate - today) / (1000*60*60*24));
+                const payScheduleEl = document.getElementById('payScheduleBar');
+                if (payScheduleEl) {
+                    payScheduleEl.innerHTML = `
+                        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:16px;">&#128176;</span>
+                                <div>
+                                    <div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;">Next Check</div>
+                                    <div style="font-size:14px;font-weight:700;color:#ffd54f;">${nextPayType} — ${nextPayDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}</div>
+                                </div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:16px;">&#128197;</span>
+                                <div>
+                                    <div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;">Days Until Pay</div>
+                                    <div style="font-size:14px;font-weight:700;color:${daysUntilPay <= 3 ? '#81c784' : '#4fc3f7'};">${daysUntilPay} day${daysUntilPay !== 1 ? 's' : ''}</div>
+                                </div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:16px;">&#127974;</span>
+                                <div>
+                                    <div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;">1st — Draw</div>
+                                    <div style="font-size:14px;font-weight:700;color:#81c784;">${fmt$(drawAmount)}</div>
+                                </div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:16px;">&#128202;</span>
+                                <div>
+                                    <div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;">15th — Commission</div>
+                                    <div style="font-size:14px;font-weight:700;color:${commissionCheck >= 0 ? '#ffd54f' : '#ef5350'};">${fmt$(commissionCheck)}</div>
+                                </div>
+                            </div>
+                            <div style="font-size:10px;color:var(--text-secondary);margin-left:auto;max-width:200px;text-align:right;">
+                                $1,500 draw on the 1st is deducted from the 15th commission check
+                            </div>
+                        </div>
+                    `;
+                }
 
                 const tbody = document.getElementById('dealsTableBody');
                 if (dealsListCache.length === 0) {
