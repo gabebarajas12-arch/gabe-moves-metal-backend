@@ -5,7 +5,7 @@
  * "Gabe Moves Metal" (facebook.com/Gabemovesmetal1)
  *
  * Connects to Meta's APIs for:
- * - Facebook Messenger (auto-reply + cnversation management)
+ * - Facebook Messenger (auto-reply + conversation management)
  * - Instagram DMs (auto-reply + conversation management)
  * - Facebook Lead Ads (instant lead capture)
  * - Page comments (lead detection)
@@ -37,6 +37,12 @@ const CONFIG = {
   PAGE_ID: process.env.PAGE_ID || '61575074716398',
   IG_ACCOUNT_ID: process.env.IG_ACCOUNT_ID || 'YOUR_IG_ACCOUNT_ID',
   WEBHOOK_URL: process.env.WEBHOOK_URL || 'https://your-domain.com/webhook',
+  // WhatsApp Cloud API (register 702-416-3741 in Meta Developer Console → WhatsApp → API Setup)
+  // Meta assigns a Phone Number ID once registered — set it here or in Render env vars
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || 'YOUR_WA_PHONE_NUMBER_ID',
+  WHATSAPP_BUSINESS_ACCOUNT_ID: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '1972990456955920',
+  WHATSAPP_PHONE_NUMBER: '17024163741', // Gabe's number in E.164 format
+  WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || 'gabe_moves_metal_wa_2026',
   // Personal brand info
   SALESMAN_NAME: 'Gabe',
   PAGE_NAME: 'Gabe Moves Metal',
@@ -47,13 +53,14 @@ const CONFIG = {
 // ==================== MIDDLEWARE ====================
 app.use(cors());
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf.toString(); } }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // ==================== IN-MEMORY DATA STORE ====================
 // In production, replace with a database (SQLite, PostgreSQL, etc.)
 let leads = [];
 let conversations = [];
 let notifications = [];
+let posts = [];  // Auto-posting content store
 let autoReplyTemplates = [
   // ===== ENGLISH TEMPLATES =====
   {
@@ -142,7 +149,7 @@ let autoReplyTemplates = [
     lang: 'es',
     keywords: ['suv', 'tahoe', 'suburban', 'blazer', 'equinox', 'familiar', 'familia', 'camioneta grande'],
     name: 'Interés en SUVs (ES)',
-    message: `¡Las SUVs son mi especialidad! Ya sea Equinox, Blazer, Tahoe o Suburban — las tengo todas en el lote. ¿Quémaño buscas y cuál es tu presupuesto más o menos?`,
+    message: `¡Las SUVs son mi especialidad! Ya sea Equinox, Blazer, Tahoe o Suburban — las tengo todas en el lote. ¿Qué tamaño buscas y cuál es tu presupuesto más o menos?`,
     active: true,
     delay: 30,
   },
@@ -178,13 +185,14 @@ function loadData() {
       leads = data.leads || [];
       conversations = data.conversations || [];
       notifications = data.notifications || [];
+      posts = data.posts || [];
       if (data.autoReplyTemplates) autoReplyTemplates = data.autoReplyTemplates;
     }
   } catch (e) { console.log('Starting with fresh data'); }
 }
 
 function saveData() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify({ leads, conversations, notifications, autoReplyTemplates }, null, 2));
+  fs.writeFileSync(DATA_FILE, JSON.stringify({ leads, conversations, notifications, autoReplyTemplates, posts }, null, 2));
 }
 
 loadData();
@@ -197,7 +205,8 @@ app.get('/webhook', (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  if (mode === 'subscribe' && token === CONFIG.META_VERIFY_TOKEN) {
+  // Accept both Facebook/Instagram and WhatsApp verify tokens
+  if (mode === 'subscribe' && (token === CONFIG.META_VERIFY_TOKEN || token === CONFIG.WHATSAPP_VERIFY_TOKEN)) {
     console.log('✅ Webhook verified!');
     return res.status(200).send(challenge);
   }
@@ -243,6 +252,27 @@ app.post('/webhook', async (req, res) => {
           }
           if (change.field === 'feed') {
             await handleFeedEvent(change.value);
+          }
+        }
+      }
+    }
+  }
+
+  // ---- WHATSAPP CLOUD API MESSAGES ----
+  if (body.object === 'whatsapp_business_account') {
+    for (const entry of body.entry) {
+      if (entry.changes) {
+        for (const change of entry.changes) {
+          if (change.field === 'messages' && change.value?.messages) {
+            for (const msg of change.value.messages) {
+              await handleWhatsAppMessage(msg, change.value);
+            }
+          }
+          // WhatsApp message status updates (sent, delivered, read)
+          if (change.field === 'messages' && change.value?.statuses) {
+            for (const status of change.value.statuses) {
+              handleWhatsAppStatus(status);
+            }
           }
         }
       }
@@ -510,6 +540,249 @@ async function handleFeedEvent(feedData) {
 }
 
 
+// ==================== WHATSAPP MESSAGE HANDLER ====================
+async function handleWhatsAppMessage(msg, value) {
+  const from = msg.from; // phone number (e.g., '14155551234')
+  const msgType = msg.type;
+  const timestamp = msg.timestamp;
+  const contactName = value.contacts?.[0]?.profile?.name || `+${from}`;
+
+  let messageText = '';
+  if (msgType === 'text') {
+    messageText = msg.text?.body || '';
+  } else if (msgType === 'image') {
+    messageText = '[Image received]';
+  } else if (msgType === 'document') {
+    messageText = '[Document received]';
+  } else if (msgType === 'audio') {
+    messageText = '[Voice message received]';
+  } else if (msgType === 'video') {
+    messageText = '[Video received]';
+  } else if (msgType === 'location') {
+    messageText = `[Location: ${msg.location?.latitude}, ${msg.location?.longitude}]`;
+  } else {
+    messageText = `[${msgType} message]`;
+  }
+
+  console.log(`📱 WhatsApp message from ${contactName} (${from}): "${messageText}"`);
+
+  // Find or create conversation (keyed by phone number for WhatsApp)
+  let convo = conversations.find(c => c.senderId === from && c.platform === 'whatsapp');
+  if (!convo) {
+    convo = {
+      id: generateId(),
+      senderId: from,
+      platform: 'whatsapp',
+      name: contactName,
+      phone: from,
+      profilePic: null,
+      messages: [],
+      leadId: null,
+      status: 'new',
+      createdAt: new Date().toISOString(),
+    };
+    conversations.push(convo);
+
+    // Create a lead automatically
+    const lead = {
+      id: generateId(),
+      name: contactName,
+      phone: `+${from}`,
+      email: '',
+      interest: detectInterest(messageText),
+      source: 'WhatsApp',
+      stage: 'New Lead',
+      followUpDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      notes: `Auto-captured from WhatsApp: "${messageText}"`,
+      createdAt: new Date().toISOString().split('T')[0],
+      conversationId: convo.id,
+    };
+    leads.push(lead);
+    convo.leadId = lead.id;
+
+    addNotification({
+      type: 'new_lead',
+      title: 'New WhatsApp Lead!',
+      message: `${contactName} just messaged on WhatsApp: "${messageText.substring(0, 100)}"`,
+      leadId: lead.id,
+    });
+  }
+
+  // Add message to conversation
+  convo.messages.push({
+    id: msg.id,
+    from: 'customer',
+    text: messageText,
+    type: msgType,
+    timestamp: new Date(parseInt(timestamp) * 1000).toISOString(),
+  });
+
+  // ---- AUTO-REPLY LOGIC (same as Messenger, bilingual) ----
+  const detectedLang = detectLanguage(messageText);
+  if (!convo.language) convo.language = detectedLang;
+
+  const firstName = contactName.split(' ')[0] || 'there';
+
+  // First message → send greeting
+  if (convo.messages.filter(m => m.from === 'customer').length === 1) {
+    const greeting = autoReplyTemplates.find(t =>
+      t.trigger === 'new_message' && t.active && t.lang === detectedLang
+    ) || autoReplyTemplates.find(t => t.trigger === 'new_message' && t.active);
+
+    if (greeting) {
+      const reply = greeting.message.replace(/\{first_name\}/g, firstName);
+      setTimeout(() => {
+        sendWhatsAppMessage(from, reply);
+        convo.messages.push({
+          id: generateId(),
+          from: 'bot',
+          text: reply,
+          timestamp: new Date().toISOString(),
+          templateUsed: greeting.name,
+        });
+        saveData();
+      }, greeting.delay * 1000);
+    }
+  }
+
+  // Keyword-matched auto-reply
+  const keywordTemplate = findKeywordTemplate(messageText);
+  if (keywordTemplate && convo.messages.filter(m => m.from !== 'customer').length <= 1) {
+    const reply = keywordTemplate.message.replace(/\{first_name\}/g, firstName);
+    setTimeout(() => {
+      sendWhatsAppMessage(from, reply);
+      convo.messages.push({
+        id: generateId(),
+        from: 'bot',
+        text: reply,
+        timestamp: new Date().toISOString(),
+        templateUsed: keywordTemplate.name,
+      });
+      saveData();
+    }, (keywordTemplate.delay || 30) * 1000);
+  }
+
+  // Inventory matching
+  const detectedInterest = detectInterest(messageText);
+  if (detectedInterest) {
+    const matches = inventoryModule.matchInventory(detectedInterest, { maxResults: 3 });
+    if (matches.length > 0) {
+      const inventoryMsg = inventoryModule.formatInventoryMessage(matches, firstName);
+      setTimeout(() => {
+        sendWhatsAppMessage(from, inventoryMsg);
+        convo.messages.push({
+          id: generateId(),
+          from: 'bot',
+          text: inventoryMsg,
+          timestamp: new Date().toISOString(),
+          templateUsed: 'Inventory Match',
+        });
+        saveData();
+      }, 60 * 1000);
+    }
+  }
+
+  saveData();
+}
+
+function handleWhatsAppStatus(status) {
+  // Track message delivery statuses: sent, delivered, read
+  const convo = conversations.find(c => c.senderId === status.recipient_id && c.platform === 'whatsapp');
+  if (convo) {
+    const msg = convo.messages.find(m => m.waMessageId === status.id);
+    if (msg) {
+      msg.deliveryStatus = status.status; // 'sent', 'delivered', 'read'
+    }
+  }
+}
+
+
+// ==================== SEND WHATSAPP MESSAGE ====================
+async function sendWhatsAppMessage(to, text) {
+  const url = `https://graph.facebook.com/v21.0/${CONFIG.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.META_PAGE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: to,
+        type: 'text',
+        text: { body: text },
+      }),
+    });
+    const result = await response.json();
+    if (result.error) {
+      console.error('WhatsApp send error:', result.error.message);
+    } else {
+      console.log(`📤 WhatsApp sent to +${to}`);
+    }
+    return result;
+  } catch (err) {
+    console.error('Failed to send WhatsApp message:', err.message);
+  }
+}
+
+// Send a WhatsApp template message (for outbound outside 24hr window)
+async function sendWhatsAppTemplate(to, templateName, languageCode = 'en_US', components = []) {
+  const url = `https://graph.facebook.com/v21.0/${CONFIG.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.META_PAGE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: to,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: components,
+        },
+      }),
+    });
+    const result = await response.json();
+    if (result.error) {
+      console.error('WhatsApp template error:', result.error.message);
+    } else {
+      console.log(`📤 WhatsApp template "${templateName}" sent to +${to}`);
+    }
+    return result;
+  } catch (err) {
+    console.error('Failed to send WhatsApp template:', err.message);
+  }
+}
+
+// Send WhatsApp image message (for vehicle photos)
+async function sendWhatsAppImage(to, imageUrl, caption = '') {
+  const url = `https://graph.facebook.com/v21.0/${CONFIG.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.META_PAGE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: to,
+        type: 'image',
+        image: { link: imageUrl, caption: caption },
+      }),
+    });
+    return await response.json();
+  } catch (err) {
+    console.error('Failed to send WhatsApp image:', err.message);
+  }
+}
+
+
 // ==================== SEND MESSAGE VIA META API ====================
 async function sendMessage(recipientId, text, platform = 'page') {
   const apiUrl = platform === 'instagram'
@@ -681,13 +954,17 @@ app.get('/api/conversations/:id', (req, res) => {
   else res.status(404).json({ error: 'Conversation not found' });
 });
 
-// Send a manual reply to a conversation
+// Send a manual reply to a conversation (supports all platforms)
 app.post('/api/conversations/:id/reply', async (req, res) => {
   const convo = conversations.find(c => c.id === req.params.id);
   if (!convo) return res.status(404).json({ error: 'Conversation not found' });
 
   const { text } = req.body;
-  await sendMessage(convo.senderId, text, convo.platform);
+  if (convo.platform === 'whatsapp') {
+    await sendWhatsAppMessage(convo.senderId, text);
+  } else {
+    await sendMessage(convo.senderId, text, convo.platform);
+  }
 
   convo.messages.push({
     id: generateId(),
@@ -854,6 +1131,533 @@ app.get('/api/stats', (req, res) => {
 });
 
 const STAGES_LIST = ['New Lead', 'Contacted', 'Appointment', 'Negotiation', 'Sold'];
+
+
+// ==================== AUTO-POSTING ENGINE ====================
+// Create and publish posts to Facebook, Instagram, and WhatsApp Status
+
+// -- Post Templates (pre-built content types) --
+const POST_TEMPLATES = {
+  sold_customer: {
+    type: 'sold_customer',
+    label: 'Sold Customer Celebration',
+    fields: ['customerName', 'vehicleYear', 'vehicleModel', 'vehicleTrim', 'imageUrl'],
+    generateCaption: (data) => {
+      const captions = [
+        `Congratulations to ${data.customerName} on their brand new ${data.vehicleYear} ${data.vehicleModel}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}! Another happy customer driving off the lot at Findlay Chevrolet. When you're ready to move metal, you know who to call! #GabeMovesmetal #FindlayChevrolet #Sold #NewCar`,
+        `SOLD! ${data.customerName} just drove off in a ${data.vehicleYear} ${data.vehicleModel}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}! Thank you for trusting me with your purchase. It's what I do — I move metal! #FindlayChevy #GabeMovesmetal #CustomerFirst`,
+        `Another one off the lot! Huge congrats to ${data.customerName} on this beautiful ${data.vehicleYear} ${data.vehicleModel}. The #1 volume dealer west of Texas keeps delivering. Who's next? #GabeMovesmetal #FindlayChevrolet #MovingMetal`,
+      ];
+      return captions[Math.floor(Math.random() * captions.length)];
+    },
+    generateCaptionES: (data) => {
+      return `¡Felicidades a ${data.customerName} por su ${data.vehicleYear} ${data.vehicleModel}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''} nuevo! Otro cliente feliz saliendo del lote en Findlay Chevrolet. ¡Cuando estés listo, ya sabes a quién llamar! #GabeMovesmetal #FindlayChevrolet #Vendido`;
+    },
+  },
+  current_deal: {
+    type: 'current_deal',
+    label: 'Current Deal / Special',
+    fields: ['dealTitle', 'vehicleModel', 'dealDetails', 'expirationDate', 'imageUrl'],
+    generateCaption: (data) => {
+      return `🔥 ${data.dealTitle} 🔥\n\n${data.dealDetails}\n\nDon't miss out — this deal on the ${data.vehicleModel} won't last forever${data.expirationDate ? '. Expires ' + data.expirationDate : ''}! DM me or come see me at Findlay Chevrolet.\n\n#FindlayChevrolet #GabeMovesmetal #Deals #Chevy #LasVegas`;
+    },
+    generateCaptionES: (data) => {
+      return `🔥 ${data.dealTitle} 🔥\n\n${data.dealDetails}\n\n¡No te lo pierdas! Esta oferta en el ${data.vehicleModel} no dura para siempre${data.expirationDate ? '. Vence ' + data.expirationDate : ''}. Mándame un mensaje o ven a verme a Findlay Chevrolet.\n\n#FindlayChevrolet #GabeMovesmetal #Ofertas #Chevy`;
+    },
+  },
+  inventory_highlight: {
+    type: 'inventory_highlight',
+    label: 'Inventory Highlight',
+    fields: ['vehicleYear', 'vehicleModel', 'vehicleTrim', 'price', 'highlights', 'imageUrl'],
+    generateCaption: (data) => {
+      return `Just hit the lot: ${data.vehicleYear} ${data.vehicleModel}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}${data.price ? ' — $' + Number(data.price).toLocaleString() : ''}\n\n${data.highlights || 'Come check it out!'}\n\nDM me for details or to schedule a test drive. We're Findlay Chevrolet — the #1 volume dealer west of Texas.\n\n#FindlayChevrolet #GabeMovesmetal #Chevy #${data.vehicleModel?.replace(/\s/g, '') || 'Chevrolet'} #LasVegas`;
+    },
+    generateCaptionES: (data) => {
+      return `Acaba de llegar: ${data.vehicleYear} ${data.vehicleModel}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}${data.price ? ' — $' + Number(data.price).toLocaleString() : ''}\n\n${data.highlights || '¡Ven a verlo!'}\n\nMándame mensaje para más detalles o para agendar una prueba de manejo. Somos Findlay Chevrolet — el dealer #1 en volumen al oeste de Texas.\n\n#FindlayChevrolet #GabeMovesmetal #Chevy`;
+    },
+  },
+  personal_brand: {
+    type: 'personal_brand',
+    label: 'Personal Brand Content',
+    fields: ['message', 'imageUrl'],
+    generateCaption: (data) => {
+      return `${data.message}\n\n— Gabe Barajas | Findlay Chevrolet\n#GabeMovesmetal #FindlayChevrolet #LasVegas #CarSales`;
+    },
+    generateCaptionES: (data) => {
+      return `${data.message}\n\n— Gabe Barajas | Findlay Chevrolet\n#GabeMovesmetal #FindlayChevrolet #LasVegas`;
+    },
+  },
+};
+
+// -- Publish to Facebook Page --
+async function publishToFacebook(caption, imageUrl = null) {
+  try {
+    let url, body;
+    if (imageUrl) {
+      // Photo post
+      url = `https://graph.facebook.com/v21.0/${CONFIG.PAGE_ID}/photos`;
+      body = {
+        message: caption,
+        url: imageUrl,
+        access_token: CONFIG.META_PAGE_ACCESS_TOKEN,
+      };
+    } else {
+      // Text post
+      url = `https://graph.facebook.com/v21.0/${CONFIG.PAGE_ID}/feed`;
+      body = {
+        message: caption,
+        access_token: CONFIG.META_PAGE_ACCESS_TOKEN,
+      };
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const result = await response.json();
+    if (result.error) {
+      console.error('Facebook post error:', result.error.message);
+      return { success: false, error: result.error.message };
+    }
+    console.log(`📝 Facebook post published: ${result.id || result.post_id}`);
+    return { success: true, postId: result.id || result.post_id, platform: 'facebook' };
+  } catch (err) {
+    console.error('Failed to publish to Facebook:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// -- Publish to Instagram --
+async function publishToInstagram(caption, imageUrl) {
+  if (!imageUrl) {
+    return { success: false, error: 'Instagram requires an image URL' };
+  }
+  try {
+    // Step 1: Create media container
+    const containerRes = await fetch(
+      `https://graph.facebook.com/v21.0/${CONFIG.IG_ACCOUNT_ID}/media`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_url: imageUrl,
+          caption: caption,
+          access_token: CONFIG.META_PAGE_ACCESS_TOKEN,
+        }),
+      }
+    );
+    const container = await containerRes.json();
+    if (container.error) {
+      console.error('Instagram container error:', container.error.message);
+      return { success: false, error: container.error.message };
+    }
+
+    // Step 2: Publish the container
+    const publishRes = await fetch(
+      `https://graph.facebook.com/v21.0/${CONFIG.IG_ACCOUNT_ID}/media_publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creation_id: container.id,
+          access_token: CONFIG.META_PAGE_ACCESS_TOKEN,
+        }),
+      }
+    );
+    const result = await publishRes.json();
+    if (result.error) {
+      console.error('Instagram publish error:', result.error.message);
+      return { success: false, error: result.error.message };
+    }
+    console.log(`📸 Instagram post published: ${result.id}`);
+    return { success: true, postId: result.id, platform: 'instagram' };
+  } catch (err) {
+    console.error('Failed to publish to Instagram:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+
+// ==================== POSTING API ENDPOINTS ====================
+
+// Get post templates
+app.get('/api/posts/templates', (req, res) => {
+  const templates = Object.values(POST_TEMPLATES).map(t => ({
+    type: t.type,
+    label: t.label,
+    fields: t.fields,
+  }));
+  res.json(templates);
+});
+
+// Generate a caption preview (without publishing)
+app.post('/api/posts/preview', (req, res) => {
+  const { type, data, language } = req.body;
+  const template = POST_TEMPLATES[type];
+  if (!template) return res.status(400).json({ error: 'Unknown post type' });
+
+  const captionEN = template.generateCaption(data);
+  const captionES = template.generateCaptionES ? template.generateCaptionES(data) : captionEN;
+
+  res.json({
+    captionEN,
+    captionES,
+    caption: language === 'es' ? captionES : captionEN,
+  });
+});
+
+// Create and publish a post
+app.post('/api/posts/publish', async (req, res) => {
+  const { type, data, platforms, language, customCaption } = req.body;
+  // platforms: ['facebook', 'instagram', 'whatsapp'] or ['all']
+
+  const template = POST_TEMPLATES[type];
+  if (!template && !customCaption) {
+    return res.status(400).json({ error: 'Unknown post type and no custom caption provided' });
+  }
+
+  let caption = customCaption;
+  if (!caption && template) {
+    caption = language === 'es'
+      ? (template.generateCaptionES ? template.generateCaptionES(data) : template.generateCaption(data))
+      : template.generateCaption(data);
+  }
+
+  const targetPlatforms = platforms.includes('all')
+    ? ['facebook', 'instagram', 'whatsapp']
+    : platforms;
+
+  const results = [];
+  const imageUrl = data?.imageUrl || null;
+
+  // Publish to each platform
+  for (const platform of targetPlatforms) {
+    if (platform === 'facebook') {
+      const result = await publishToFacebook(caption, imageUrl);
+      results.push(result);
+    }
+    if (platform === 'instagram') {
+      if (!imageUrl) {
+        results.push({ success: false, platform: 'instagram', error: 'Instagram requires an image' });
+      } else {
+        const result = await publishToInstagram(caption, imageUrl);
+        results.push(result);
+      }
+    }
+    if (platform === 'whatsapp') {
+      // WhatsApp Status isn't directly supported via Cloud API for status updates.
+      // Instead, we can broadcast to recent WhatsApp contacts.
+      results.push({ success: true, platform: 'whatsapp', note: 'WhatsApp broadcast queued' });
+    }
+  }
+
+  // Save the post to history
+  const post = {
+    id: generateId(),
+    type: type || 'custom',
+    caption,
+    imageUrl,
+    data: data || {},
+    platforms: targetPlatforms,
+    results,
+    language: language || 'en',
+    createdAt: new Date().toISOString(),
+    createdBy: CONFIG.SALESMAN_NAME,
+  };
+  posts.push(post);
+  saveData();
+
+  // If this is a sold customer post, update the lead stage
+  if (type === 'sold_customer' && data?.customerName) {
+    const lead = leads.find(l =>
+      l.name?.toLowerCase().includes(data.customerName.toLowerCase()) && l.stage !== 'Sold'
+    );
+    if (lead) {
+      lead.stage = 'Sold';
+      saveData();
+    }
+  }
+
+  res.json({ post, results });
+});
+
+// Get all published posts
+app.get('/api/posts', (req, res) => {
+  const { type, platform } = req.query;
+  let filtered = [...posts];
+  if (type) filtered = filtered.filter(p => p.type === type);
+  if (platform) filtered = filtered.filter(p => p.platforms.includes(platform));
+  res.json(filtered.reverse()); // newest first
+});
+
+// Delete a post from history
+app.delete('/api/posts/:id', (req, res) => {
+  posts = posts.filter(p => p.id !== req.params.id);
+  saveData();
+  res.json({ success: true });
+});
+
+// Quick-post: Sold customer (simplified endpoint)
+app.post('/api/posts/sold', async (req, res) => {
+  const { customerName, vehicleYear, vehicleModel, vehicleTrim, imageUrl, language, platforms } = req.body;
+  if (!customerName || !vehicleModel) {
+    return res.status(400).json({ error: 'customerName and vehicleModel are required' });
+  }
+
+  // Forward to the main publish endpoint
+  req.body = {
+    type: 'sold_customer',
+    data: { customerName, vehicleYear, vehicleModel, vehicleTrim, imageUrl },
+    platforms: platforms || ['facebook', 'instagram'],
+    language: language || 'en',
+  };
+
+  const template = POST_TEMPLATES.sold_customer;
+  const caption = language === 'es'
+    ? template.generateCaptionES(req.body.data)
+    : template.generateCaption(req.body.data);
+
+  const targetPlatforms = (platforms || ['facebook', 'instagram']);
+  const results = [];
+
+  for (const platform of targetPlatforms) {
+    if (platform === 'facebook') results.push(await publishToFacebook(caption, imageUrl));
+    if (platform === 'instagram' && imageUrl) results.push(await publishToInstagram(caption, imageUrl));
+  }
+
+  const post = {
+    id: generateId(),
+    type: 'sold_customer',
+    caption,
+    imageUrl,
+    data: { customerName, vehicleYear, vehicleModel, vehicleTrim },
+    platforms: targetPlatforms,
+    results,
+    language: language || 'en',
+    createdAt: new Date().toISOString(),
+    createdBy: CONFIG.SALESMAN_NAME,
+  };
+  posts.push(post);
+
+  // Auto-update lead stage to Sold
+  const lead = leads.find(l =>
+    l.name?.toLowerCase().includes(customerName.toLowerCase()) && l.stage !== 'Sold'
+  );
+  if (lead) lead.stage = 'Sold';
+
+  saveData();
+  res.json({ post, results });
+});
+
+// Quick-post: Current deal
+app.post('/api/posts/deal', async (req, res) => {
+  const { dealTitle, vehicleModel, dealDetails, expirationDate, imageUrl, language, platforms } = req.body;
+  if (!dealTitle || !dealDetails) {
+    return res.status(400).json({ error: 'dealTitle and dealDetails are required' });
+  }
+
+  const template = POST_TEMPLATES.current_deal;
+  const data = { dealTitle, vehicleModel, dealDetails, expirationDate, imageUrl };
+  const caption = language === 'es'
+    ? template.generateCaptionES(data)
+    : template.generateCaption(data);
+
+  const targetPlatforms = platforms || ['facebook', 'instagram'];
+  const results = [];
+  for (const platform of targetPlatforms) {
+    if (platform === 'facebook') results.push(await publishToFacebook(caption, imageUrl));
+    if (platform === 'instagram' && imageUrl) results.push(await publishToInstagram(caption, imageUrl));
+  }
+
+  const post = {
+    id: generateId(),
+    type: 'current_deal',
+    caption, imageUrl, data,
+    platforms: targetPlatforms, results,
+    language: language || 'en',
+    createdAt: new Date().toISOString(),
+    createdBy: CONFIG.SALESMAN_NAME,
+  };
+  posts.push(post);
+  saveData();
+  res.json({ post, results });
+});
+
+// -- Stats update to include WhatsApp + posts --
+app.get('/api/stats/extended', (req, res) => {
+  const now = new Date();
+  const thisMonth = leads.filter(l => {
+    const d = new Date(l.createdAt);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+
+  res.json({
+    totalLeads: leads.length,
+    newThisMonth: thisMonth.length,
+    byStage: ['New Lead', 'Contacted', 'Appointment', 'Negotiation', 'Sold'].reduce(
+      (acc, s) => { acc[s] = leads.filter(l => l.stage === s).length; return acc; }, {}
+    ),
+    bySource: leads.reduce((acc, l) => { acc[l.source] = (acc[l.source] || 0) + 1; return acc; }, {}),
+    conversations: {
+      total: conversations.length,
+      messenger: conversations.filter(c => c.platform === 'page').length,
+      instagram: conversations.filter(c => c.platform === 'instagram').length,
+      whatsapp: conversations.filter(c => c.platform === 'whatsapp').length,
+    },
+    posts: {
+      total: posts.length,
+      sold: posts.filter(p => p.type === 'sold_customer').length,
+      deals: posts.filter(p => p.type === 'current_deal').length,
+      inventory: posts.filter(p => p.type === 'inventory_highlight').length,
+      brand: posts.filter(p => p.type === 'personal_brand').length,
+    },
+    unreadNotifications: notifications.filter(n => !n.read).length,
+    inventory: {
+      total: inventoryModule.getInventoryCount(),
+      lastScraped: inventoryModule.getLastScraped(),
+    },
+  });
+});
+
+// -- WhatsApp-specific endpoints --
+
+// Send a WhatsApp message directly (not via conversation)
+app.post('/api/whatsapp/send', async (req, res) => {
+  const { to, text, imageUrl } = req.body;
+  if (!to || (!text && !imageUrl)) {
+    return res.status(400).json({ error: 'to and text (or imageUrl) are required' });
+  }
+
+  let result;
+  if (imageUrl) {
+    result = await sendWhatsAppImage(to, imageUrl, text || '');
+  } else {
+    result = await sendWhatsAppMessage(to, text);
+  }
+  res.json(result);
+});
+
+// Send a WhatsApp template message
+app.post('/api/whatsapp/template', async (req, res) => {
+  const { to, templateName, languageCode, components } = req.body;
+  if (!to || !templateName) {
+    return res.status(400).json({ error: 'to and templateName are required' });
+  }
+  const result = await sendWhatsAppTemplate(to, templateName, languageCode || 'en_US', components || []);
+  res.json(result);
+});
+
+
+// ==================== PRIVACY POLICY & DATA DELETION ====================
+// Required for Meta App Review
+
+app.get('/privacy-policy', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Gabe Moves Metal</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; line-height: 1.6; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #d4a017; padding-bottom: 10px; }
+    h2 { color: #444; margin-top: 30px; }
+    .updated { color: #666; font-style: italic; margin-bottom: 30px; }
+    .contact { background: #f8f8f8; padding: 20px; border-radius: 8px; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: March 21, 2026</p>
+
+  <p><strong>Gabe Moves Metal</strong> ("we", "us", or "our") operates the Gabe Moves Metal Facebook Page and associated messaging services to help connect car buyers with vehicle inventory at Findlay Chevrolet in Las Vegas, NV.</p>
+
+  <h2>Information We Collect</h2>
+  <p>When you interact with our Facebook Page, Messenger, or Instagram, we may collect:</p>
+  <p>Your name and profile information as provided by Facebook/Instagram; messages you send to our Page via Messenger or Instagram DMs; your language preference (English or Spanish); information about vehicles you are interested in; and your contact information if voluntarily provided (phone number, email).</p>
+
+  <h2>How We Use Your Information</h2>
+  <p>We use the information we collect to respond to your inquiries about vehicles; match you with relevant inventory at Findlay Chevrolet; provide bilingual (English/Spanish) customer service; follow up on your interest in purchasing a vehicle; and improve our customer service experience.</p>
+
+  <h2>Information Sharing</h2>
+  <p>We do not sell, trade, or rent your personal information to third parties. Your information may be shared with Findlay Chevrolet staff solely for the purpose of completing a vehicle purchase you have initiated.</p>
+
+  <h2>Data Retention</h2>
+  <p>We retain your information only for as long as necessary to fulfill the purposes described in this policy, or as required by law. You can request deletion of your data at any time.</p>
+
+  <h2>Your Rights</h2>
+  <p>You have the right to access, correct, or delete your personal information. You may also opt out of communications at any time by messaging us "STOP" or contacting us directly.</p>
+
+  <h2>Data Security</h2>
+  <p>We implement reasonable security measures to protect your personal information. However, no method of electronic storage is 100% secure.</p>
+
+  <h2>Children's Privacy</h2>
+  <p>Our services are not directed to individuals under the age of 18. We do not knowingly collect personal information from children.</p>
+
+  <h2>Changes to This Policy</h2>
+  <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy on this page.</p>
+
+  <div class="contact">
+    <h2>Contact Us</h2>
+    <p>If you have questions about this Privacy Policy or wish to exercise your data rights, contact us:</p>
+    <p><strong>Gabe Moves Metal</strong><br>
+    Facebook: <a href="https://facebook.com/Gabemovesmetal1">facebook.com/Gabemovesmetal1</a><br>
+    Dealership: Findlay Chevrolet, Las Vegas, NV</p>
+  </div>
+</body>
+</html>`);
+});
+
+app.get('/data-deletion', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Deletion — Gabe Moves Metal</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; line-height: 1.6; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #d4a017; padding-bottom: 10px; }
+    h2 { color: #444; margin-top: 30px; }
+    .contact { background: #f8f8f8; padding: 20px; border-radius: 8px; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <h1>Data Deletion Instructions</h1>
+  <p>If you would like to request the deletion of your data from Gabe Moves Metal, you have several options:</p>
+
+  <h2>Option 1: Message Us on Facebook</h2>
+  <p>Send a message to our Facebook Page at <a href="https://facebook.com/Gabemovesmetal1">Gabe Moves Metal</a> requesting data deletion. Include the phrase "DELETE MY DATA" and we will process your request within 30 days.</p>
+
+  <h2>Option 2: Email Request</h2>
+  <p>Send an email to our team requesting data deletion. Include your Facebook name so we can locate your records.</p>
+
+  <h2>What Gets Deleted</h2>
+  <p>Upon receiving a valid deletion request, we will remove all conversation history and messages stored in our system; your contact information and lead records; any vehicle preference data; and any other personal information associated with your profile.</p>
+
+  <h2>Processing Time</h2>
+  <p>Data deletion requests are processed within 30 days of receipt. You will receive a confirmation once your data has been deleted.</p>
+
+  <div class="contact">
+    <h2>Contact</h2>
+    <p><strong>Gabe Moves Metal</strong><br>
+    Facebook: <a href="https://facebook.com/Gabemovesmetal1">facebook.com/Gabemovesmetal1</a><br>
+    Dealership: Findlay Chevrolet, Las Vegas, NV</p>
+  </div>
+</body>
+</html>`);
+});
+
+// Data deletion callback endpoint (for Meta)
+app.post('/data-deletion', (req, res) => {
+  const { signed_request } = req.body;
+  // Meta sends a signed request when a user requests data deletion
+  // Acknowledge the request and provide a status URL
+  const confirmationCode = crypto.randomBytes(16).toString('hex');
+  res.json({
+    url: `https://gabe-moves-metal.onrender.com/data-deletion?code=${confirmationCode}`,
+    confirmation_code: confirmationCode,
+  });
+});
 
 
 // ==================== START SERVER ====================

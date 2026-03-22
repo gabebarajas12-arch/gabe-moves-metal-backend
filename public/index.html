@@ -1258,6 +1258,10 @@
                     <div class="icon">📋</div>
                     <span>Templates</span>
                 </div>
+                <div class="nav-item" data-page="posting">
+                    <div class="icon">📝</div>
+                    <span>Post Creator</span>
+                </div>
                 <div class="nav-item" data-page="notifications">
                     <div class="icon">🔔</div>
                     <span>Notifications</span>
@@ -1436,6 +1440,190 @@
                     </div>
 
                     <div id="templatesList"></div>
+                </div>
+
+                <!-- Post Creator Page -->
+                <div class="page" id="posting">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; font-weight: 700;">Post Creator</h2>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-secondary" onclick="loadPostHistory()">📜 Post History</button>
+                        </div>
+                    </div>
+
+                    <!-- Post Type Selector -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+                        <div class="stat-card post-type-card active" data-posttype="sold_customer" onclick="selectPostType('sold_customer')" style="cursor: pointer; text-align: center; padding: 16px;">
+                            <div style="font-size: 28px; margin-bottom: 6px;">🎉</div>
+                            <div style="font-weight: 700; font-size: 13px;">Sold Customer</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Congrats posts</div>
+                        </div>
+                        <div class="stat-card post-type-card" data-posttype="current_deal" onclick="selectPostType('current_deal')" style="cursor: pointer; text-align: center; padding: 16px;">
+                            <div style="font-size: 28px; margin-bottom: 6px;">🔥</div>
+                            <div style="font-weight: 700; font-size: 13px;">Current Deals</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Specials & promos</div>
+                        </div>
+                        <div class="stat-card post-type-card" data-posttype="inventory_highlight" onclick="selectPostType('inventory_highlight')" style="cursor: pointer; text-align: center; padding: 16px;">
+                            <div style="font-size: 28px; margin-bottom: 6px;">🚗</div>
+                            <div style="font-weight: 700; font-size: 13px;">Inventory</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Showcase vehicles</div>
+                        </div>
+                        <div class="stat-card post-type-card" data-posttype="personal_brand" onclick="selectPostType('personal_brand')" style="cursor: pointer; text-align: center; padding: 16px;">
+                            <div style="font-size: 28px; margin-bottom: 6px;">💪</div>
+                            <div style="font-weight: 700; font-size: 13px;">Personal Brand</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Your story</div>
+                        </div>
+                    </div>
+
+                    <!-- Post Form -->
+                    <div class="card" id="postFormContainer">
+                        <!-- Sold Customer Form (default) -->
+                        <div id="postForm_sold_customer">
+                            <h3 style="margin-bottom: 16px; font-size: 15px; font-weight: 700;">🎉 Sold Customer Post</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Customer Name *</label>
+                                    <input type="text" class="form-input" id="postCustomerName" placeholder="John Smith">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Vehicle Year</label>
+                                    <input type="text" class="form-input" id="postVehicleYear" placeholder="2026">
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Vehicle Model *</label>
+                                    <input type="text" class="form-input" id="postVehicleModel" placeholder="Silverado 1500">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Trim</label>
+                                    <input type="text" class="form-input" id="postVehicleTrim" placeholder="LT Trail Boss">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Photo URL (for Instagram, include an image)</label>
+                                <input type="text" class="form-input" id="postImageUrl" placeholder="https://example.com/photo.jpg">
+                            </div>
+                        </div>
+
+                        <!-- Current Deal Form -->
+                        <div id="postForm_current_deal" style="display: none;">
+                            <h3 style="margin-bottom: 16px; font-size: 15px; font-weight: 700;">🔥 Current Deal / Special</h3>
+                            <div class="form-group">
+                                <label class="form-label">Deal Title *</label>
+                                <input type="text" class="form-input" id="postDealTitle" placeholder="0% APR on All 2026 Silverados!">
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Vehicle Model</label>
+                                    <input type="text" class="form-input" id="postDealModel" placeholder="Silverado 1500">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Expiration Date</label>
+                                    <input type="text" class="form-input" id="postDealExpiry" placeholder="March 31, 2026">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Deal Details *</label>
+                                <textarea class="form-input" id="postDealDetails" rows="3" placeholder="Get 0% APR for 72 months on all new 2026 Silverado 1500 models..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Photo URL</label>
+                                <input type="text" class="form-input" id="postDealImageUrl" placeholder="https://example.com/deal-photo.jpg">
+                            </div>
+                        </div>
+
+                        <!-- Inventory Highlight Form -->
+                        <div id="postForm_inventory_highlight" style="display: none;">
+                            <h3 style="margin-bottom: 16px; font-size: 15px; font-weight: 700;">🚗 Inventory Highlight</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Year</label>
+                                    <input type="text" class="form-input" id="postInvYear" placeholder="2026">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Model *</label>
+                                    <input type="text" class="form-input" id="postInvModel" placeholder="Tahoe">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Trim</label>
+                                    <input type="text" class="form-input" id="postInvTrim" placeholder="Z71">
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Price</label>
+                                    <input type="text" class="form-input" id="postInvPrice" placeholder="54995">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">Photo URL</label>
+                                    <input type="text" class="form-input" id="postInvImageUrl" placeholder="https://example.com/vehicle.jpg">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Highlights</label>
+                                <textarea class="form-input" id="postInvHighlights" rows="2" placeholder="Loaded with leather, sunroof, 4WD..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Personal Brand Form -->
+                        <div id="postForm_personal_brand" style="display: none;">
+                            <h3 style="margin-bottom: 16px; font-size: 15px; font-weight: 700;">💪 Personal Brand Content</h3>
+                            <div class="form-group">
+                                <label class="form-label">Your Message *</label>
+                                <textarea class="form-input" id="postBrandMessage" rows="4" placeholder="Another month, another record. When they ask how we do it at Findlay — we just keep moving metal..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Photo URL</label>
+                                <input type="text" class="form-input" id="postBrandImageUrl" placeholder="https://example.com/your-photo.jpg">
+                            </div>
+                        </div>
+
+                        <!-- Platform Selection + Language -->
+                        <div style="border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 16px;">
+                            <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 12px;">
+                                <label class="form-label" style="margin-bottom: 0; font-weight: 700;">Publish to:</label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="checkbox" id="postToFB" checked> <span style="font-size: 13px;">Facebook</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="checkbox" id="postToIG" checked> <span style="font-size: 13px;">Instagram</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="checkbox" id="postToWA"> <span style="font-size: 13px;">WhatsApp</span>
+                                </label>
+                            </div>
+                            <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 16px;">
+                                <label class="form-label" style="margin-bottom: 0; font-weight: 700;">Language:</label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="radio" name="postLang" value="en" checked> <span style="font-size: 13px;">English</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="radio" name="postLang" value="es"> <span style="font-size: 13px;">Español</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Caption Preview -->
+                        <div style="margin-bottom: 16px;">
+                            <button class="btn btn-secondary" onclick="previewPost()" style="margin-bottom: 10px;">👁️ Preview Caption</button>
+                            <div id="captionPreview" style="display: none; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: var(--text-primary);"></div>
+                        </div>
+
+                        <!-- Publish Button -->
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-primary" onclick="publishPost()" style="flex: 1; padding: 12px; font-size: 15px; font-weight: 700;">🚀 Publish Now</button>
+                        </div>
+
+                        <!-- Status Message -->
+                        <div id="postStatus" style="display: none; margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 13px;"></div>
+                    </div>
+
+                    <!-- Post History -->
+                    <div id="postHistory" style="display: none; margin-top: 24px;">
+                        <h3 style="margin-bottom: 15px; font-size: 16px; font-weight: 700;">Post History</h3>
+                        <div id="postHistoryList"></div>
+                    </div>
                 </div>
 
                 <!-- Notifications Page -->
@@ -1660,6 +1848,7 @@
                 conversations: 'Conversations',
                 inventory: 'Inventory',
                 templates: 'Auto-Reply Templates',
+                posting: 'Post Creator',
                 notifications: 'Notifications'
             };
             document.getElementById('pageTitle').textContent = titles[page];
@@ -1672,6 +1861,8 @@
                 loadInventory();
             } else if (page === 'templates') {
                 loadTemplates();
+            } else if (page === 'posting') {
+                // Post Creator page — no initial load needed
             } else if (page === 'notifications') {
                 loadNotifications();
             }
@@ -2339,6 +2530,217 @@
                 console.error('Error marking all notifications as read:', error);
             }
         }
+
+        // ==================== POST CREATOR ====================
+        let currentPostType = 'sold_customer';
+
+        function selectPostType(type) {
+            currentPostType = type;
+            // Update card styling
+            document.querySelectorAll('.post-type-card').forEach(card => {
+                card.classList.remove('active');
+                card.style.border = '1px solid var(--border-color)';
+            });
+            const activeCard = document.querySelector(`[data-posttype="${type}"]`);
+            if (activeCard) {
+                activeCard.classList.add('active');
+                activeCard.style.border = '2px solid var(--gold)';
+            }
+            // Show/hide forms
+            document.querySelectorAll('[id^="postForm_"]').forEach(f => f.style.display = 'none');
+            const form = document.getElementById(`postForm_${type}`);
+            if (form) form.style.display = 'block';
+            // Clear preview
+            document.getElementById('captionPreview').style.display = 'none';
+            document.getElementById('postStatus').style.display = 'none';
+        }
+
+        function getPostData() {
+            const data = {};
+            if (currentPostType === 'sold_customer') {
+                data.customerName = document.getElementById('postCustomerName').value;
+                data.vehicleYear = document.getElementById('postVehicleYear').value;
+                data.vehicleModel = document.getElementById('postVehicleModel').value;
+                data.vehicleTrim = document.getElementById('postVehicleTrim').value;
+                data.imageUrl = document.getElementById('postImageUrl').value;
+            } else if (currentPostType === 'current_deal') {
+                data.dealTitle = document.getElementById('postDealTitle').value;
+                data.vehicleModel = document.getElementById('postDealModel').value;
+                data.dealDetails = document.getElementById('postDealDetails').value;
+                data.expirationDate = document.getElementById('postDealExpiry').value;
+                data.imageUrl = document.getElementById('postDealImageUrl').value;
+            } else if (currentPostType === 'inventory_highlight') {
+                data.vehicleYear = document.getElementById('postInvYear').value;
+                data.vehicleModel = document.getElementById('postInvModel').value;
+                data.vehicleTrim = document.getElementById('postInvTrim').value;
+                data.price = document.getElementById('postInvPrice').value;
+                data.highlights = document.getElementById('postInvHighlights').value;
+                data.imageUrl = document.getElementById('postInvImageUrl').value;
+            } else if (currentPostType === 'personal_brand') {
+                data.message = document.getElementById('postBrandMessage').value;
+                data.imageUrl = document.getElementById('postBrandImageUrl').value;
+            }
+            return data;
+        }
+
+        function getSelectedPlatforms() {
+            const platforms = [];
+            if (document.getElementById('postToFB').checked) platforms.push('facebook');
+            if (document.getElementById('postToIG').checked) platforms.push('instagram');
+            if (document.getElementById('postToWA').checked) platforms.push('whatsapp');
+            return platforms;
+        }
+
+        function getSelectedLanguage() {
+            return document.querySelector('input[name="postLang"]:checked')?.value || 'en';
+        }
+
+        async function previewPost() {
+            const data = getPostData();
+            const language = getSelectedLanguage();
+            try {
+                const response = await fetch(`${API_BASE}/api/posts/preview`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: currentPostType, data, language }),
+                });
+                const result = await response.json();
+                const preview = document.getElementById('captionPreview');
+                preview.textContent = result.caption;
+                preview.style.display = 'block';
+            } catch (error) {
+                console.error('Preview error:', error);
+            }
+        }
+
+        async function publishPost() {
+            const data = getPostData();
+            const platforms = getSelectedPlatforms();
+            const language = getSelectedLanguage();
+
+            if (platforms.length === 0) {
+                showPostStatus('Please select at least one platform.', false);
+                return;
+            }
+
+            // Validate required fields
+            if (currentPostType === 'sold_customer' && (!data.customerName || !data.vehicleModel)) {
+                showPostStatus('Customer name and vehicle model are required.', false);
+                return;
+            }
+            if (currentPostType === 'current_deal' && (!data.dealTitle || !data.dealDetails)) {
+                showPostStatus('Deal title and details are required.', false);
+                return;
+            }
+            if (currentPostType === 'inventory_highlight' && !data.vehicleModel) {
+                showPostStatus('Vehicle model is required.', false);
+                return;
+            }
+            if (currentPostType === 'personal_brand' && !data.message) {
+                showPostStatus('Message is required.', false);
+                return;
+            }
+
+            if (platforms.includes('instagram') && !data.imageUrl) {
+                showPostStatus('Instagram requires a photo URL. Add one or uncheck Instagram.', false);
+                return;
+            }
+
+            showPostStatus('Publishing...', true, true);
+
+            try {
+                const response = await fetch(`${API_BASE}/api/posts/publish`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: currentPostType, data, platforms, language }),
+                });
+                const result = await response.json();
+
+                const successCount = result.results.filter(r => r.success).length;
+                const failCount = result.results.filter(r => !r.success).length;
+                let msg = `Published to ${successCount} platform(s)!`;
+                if (failCount > 0) {
+                    const errors = result.results.filter(r => !r.success).map(r => `${r.platform}: ${r.error}`).join(', ');
+                    msg += ` (${failCount} failed: ${errors})`;
+                }
+                showPostStatus(msg, failCount === 0);
+            } catch (error) {
+                showPostStatus('Error publishing post: ' + error.message, false);
+            }
+        }
+
+        function showPostStatus(message, success, loading = false) {
+            const el = document.getElementById('postStatus');
+            el.style.display = 'block';
+            el.textContent = message;
+            if (loading) {
+                el.style.background = 'rgba(212, 160, 23, 0.1)';
+                el.style.color = 'var(--gold)';
+            } else if (success) {
+                el.style.background = 'rgba(76, 175, 80, 0.1)';
+                el.style.color = '#4CAF50';
+            } else {
+                el.style.background = 'rgba(244, 67, 54, 0.1)';
+                el.style.color = '#f44336';
+            }
+        }
+
+        async function loadPostHistory() {
+            const container = document.getElementById('postHistory');
+            const list = document.getElementById('postHistoryList');
+            container.style.display = container.style.display === 'none' ? 'block' : 'none';
+
+            if (container.style.display === 'none') return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/posts`);
+                const postsList = await response.json();
+
+                if (postsList.length === 0) {
+                    list.innerHTML = '<div class="card" style="text-align: center; padding: 24px; color: var(--text-secondary);">No posts yet. Create your first one above!</div>';
+                    return;
+                }
+
+                list.innerHTML = postsList.map(post => {
+                    const typeLabels = {
+                        sold_customer: '🎉 Sold',
+                        current_deal: '🔥 Deal',
+                        inventory_highlight: '🚗 Inventory',
+                        personal_brand: '💪 Brand',
+                        custom: '📝 Custom',
+                    };
+                    const platformIcons = post.platforms.map(p => {
+                        if (p === 'facebook') return '📘 FB';
+                        if (p === 'instagram') return '📸 IG';
+                        if (p === 'whatsapp') return '📱 WA';
+                        return p;
+                    }).join(' · ');
+
+                    const date = new Date(post.createdAt).toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+                    });
+
+                    return `<div class="card" style="margin-bottom: 10px; padding: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <div>
+                                <span style="font-weight: 700; font-size: 13px;">${typeLabels[post.type] || post.type}</span>
+                                <span style="color: var(--text-secondary); font-size: 11px; margin-left: 8px;">${platformIcons}</span>
+                            </div>
+                            <span style="color: var(--text-secondary); font-size: 11px;">${date}</span>
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-secondary); white-space: pre-wrap; max-height: 60px; overflow: hidden;">${post.caption?.substring(0, 200) || ''}${post.caption?.length > 200 ? '...' : ''}</div>
+                    </div>`;
+                }).join('');
+            } catch (error) {
+                list.innerHTML = '<div class="card" style="text-align: center; padding: 24px; color: #f44336;">Error loading post history</div>';
+            }
+        }
+
+        // Initialize post type card styling on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const defaultCard = document.querySelector('[data-posttype="sold_customer"]');
+            if (defaultCard) defaultCard.style.border = '2px solid var(--gold)';
+        });
     </script>
 </body>
 </html>
