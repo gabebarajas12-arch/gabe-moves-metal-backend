@@ -94,7 +94,8 @@ function requireAuth(req, res, next) {
 // ==================== MIDDLEWARE ====================
 app.use(cors());
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf.toString(); } }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Serve frontend — 'public' is a subfolder of the backend repo on Render
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ==================== AUTH ROUTES (public) ====================
 app.post('/auth/login', (req, res) => {
