@@ -1,5 +1,5 @@
 /**
- * GABE MOVES METAL — Lead Engine Backend
+ * GABE MOVES METAL â Lead Engine Backend
  * =======================================
  * Personal lead generation server for Gabe's Facebook Business Page
  * "Gabe Moves Metal" (facebook.com/Gabemovesmetal1)
@@ -49,8 +49,8 @@ const CONFIG = {
   PAGE_ID: process.env.PAGE_ID || '61575074716398',
   IG_ACCOUNT_ID: process.env.IG_ACCOUNT_ID || 'YOUR_IG_ACCOUNT_ID',
   WEBHOOK_URL: process.env.WEBHOOK_URL || 'https://your-domain.com/webhook',
-  // WhatsApp Cloud API (register 702-416-3741 in Meta Developer Console → WhatsApp → API Setup)
-  // Meta assigns a Phone Number ID once registered — set it here or in Render env vars
+  // WhatsApp Cloud API (register 702-416-3741 in Meta Developer Console â WhatsApp â API Setup)
+  // Meta assigns a Phone Number ID once registered â set it here or in Render env vars
   WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || 'YOUR_WA_PHONE_NUMBER_ID',
   WHATSAPP_BUSINESS_ACCOUNT_ID: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '1972990456955920',
   WHATSAPP_PHONE_NUMBER: '17024163741', // Gabe's number in E.164 format
@@ -66,7 +66,7 @@ const CONFIG = {
 // Set CRM_PASSWORD in Render env vars. Default for local dev only.
 const CRM_PASSWORD = process.env.CRM_PASSWORD || 'gabemovesmetal2026';
 
-// Active sessions (token → { createdAt, expiresAt })
+// Active sessions (token â { createdAt, expiresAt })
 const sessions = new Map();
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -94,7 +94,7 @@ function getToken(req) {
   return req.query.token || null;
 }
 
-// Auth middleware — protects all /api/* routes
+// Auth middleware â protects all /api/* routes
 function requireAuth(req, res, next) {
   const token = getToken(req);
   if (isValidSession(token)) {
@@ -106,7 +106,7 @@ function requireAuth(req, res, next) {
 // ==================== MIDDLEWARE ====================
 app.use(cors());
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf.toString(); } }));
-// Serve frontend — 'public' is a subfolder of the backend repo on Render
+// Serve frontend â 'public' is a subfolder of the backend repo on Render
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ==================== AUTH ROUTES (public) ====================
@@ -152,7 +152,7 @@ let autoReplyTemplates = [
     trigger: 'new_message',
     lang: 'en',
     name: 'Instant Greeting (EN)',
-    message: `Hey {first_name}! Thanks for reaching out! This is Gabe from Gabe Moves Metal — I sell at Findlay Chevrolet, the #1 volume dealer west of Texas. What are you looking for today?`,
+    message: `Hey {first_name}! Thanks for reaching out! This is Gabe from Gabe Moves Metal â I sell at Findlay Chevrolet, the #1 volume dealer west of Texas. What are you looking for today?`,
     active: true,
     delay: 0,
   },
@@ -162,7 +162,7 @@ let autoReplyTemplates = [
     lang: 'en',
     keywords: ['truck', 'silverado', 'colorado', 'sierra', 'tow', 'towing', 'pickup', 'f150', 'ram'],
     name: 'Truck Interest (EN)',
-    message: `Great taste! I work at the #1 volume Chevy dealer west of Texas so we've got a HUGE truck selection. Silverado 1500, 2500HD, or Colorado — I can pull options and pricing right now. What are you looking at?`,
+    message: `Great taste! I work at the #1 volume Chevy dealer west of Texas so we've got a HUGE truck selection. Silverado 1500, 2500HD, or Colorado â I can pull options and pricing right now. What are you looking at?`,
     active: true,
     delay: 30,
   },
@@ -172,7 +172,7 @@ let autoReplyTemplates = [
     lang: 'en',
     keywords: ['suv', 'tahoe', 'suburban', 'blazer', 'equinox', 'trailblazer', 'trax', 'traverse', 'family'],
     name: 'SUV Interest (EN)',
-    message: `SUVs are my bread and butter! Whether you want an Equinox, Blazer, Tahoe, or Suburban — I've got them all on the lot. What size are you thinking, and is there a budget range you're working with?`,
+    message: `SUVs are my bread and butter! Whether you want an Equinox, Blazer, Tahoe, or Suburban â I've got them all on the lot. What size are you thinking, and is there a budget range you're working with?`,
     active: true,
     delay: 30,
   },
@@ -182,7 +182,7 @@ let autoReplyTemplates = [
     lang: 'en',
     keywords: ['ev', 'electric', 'equinox ev', 'blazer ev', 'silverado ev', 'hybrid', 'bolt', 'charge'],
     name: 'EV Interest (EN)',
-    message: `Love that you're looking at EVs! Chevy has incredible electric options — the Equinox EV starts under $35K and there are federal tax credits available. Want me to break down the numbers for you?`,
+    message: `Love that you're looking at EVs! Chevy has incredible electric options â the Equinox EV starts under $35K and there are federal tax credits available. Want me to break down the numbers for you?`,
     active: true,
     delay: 30,
   },
@@ -192,7 +192,7 @@ let autoReplyTemplates = [
     lang: 'en',
     keywords: ['trade', 'trade-in', 'trade in', 'sell my car', 'selling', 'what is my car worth', 'value'],
     name: 'Trade-In Interest (EN)',
-    message: `Trade values are strong right now! I can get you a quick appraisal — just need the year, make, model, and roughly how many miles. No obligation. Want to set that up?`,
+    message: `Trade values are strong right now! I can get you a quick appraisal â just need the year, make, model, and roughly how many miles. No obligation. Want to set that up?`,
     active: true,
     delay: 15,
   },
@@ -213,7 +213,7 @@ let autoReplyTemplates = [
     trigger: 'new_message',
     lang: 'es',
     name: 'Saludo Inicial (ES)',
-    message: `¡Hola {first_name}! Gracias por escribirme. Soy Gabe de Gabe Moves Metal — vendo en Findlay Chevrolet, el dealer #1 en volumen al oeste de Texas. ¿En qué te puedo ayudar hoy?`,
+    message: `Â¡Hola {first_name}! Gracias por escribirme. Soy Gabe de Gabe Moves Metal â vendo en Findlay Chevrolet, el dealer #1 en volumen al oeste de Texas. Â¿En quÃ© te puedo ayudar hoy?`,
     active: true,
     delay: 0,
   },
@@ -222,8 +222,8 @@ let autoReplyTemplates = [
     trigger: 'keyword',
     lang: 'es',
     keywords: ['troca', 'camioneta', 'silverado', 'colorado', 'pickup', 'remolque', 'jalar'],
-    name: 'Interés en Trocas (ES)',
-    message: `¡Buena elección! Trabajo en el dealer Chevy #1 en volumen al oeste de Texas — tenemos una selección enorme de trocas. Silverado 1500, 2500HD, o Colorado. ¿Cuál te interesa? Te puedo dar precios ahorita mismo.`,
+    name: 'InterÃ©s en Trocas (ES)',
+    message: `Â¡Buena elecciÃ³n! Trabajo en el dealer Chevy #1 en volumen al oeste de Texas â tenemos una selecciÃ³n enorme de trocas. Silverado 1500, 2500HD, o Colorado. Â¿CuÃ¡l te interesa? Te puedo dar precios ahorita mismo.`,
     active: true,
     delay: 30,
   },
@@ -232,8 +232,8 @@ let autoReplyTemplates = [
     trigger: 'keyword',
     lang: 'es',
     keywords: ['suv', 'tahoe', 'suburban', 'blazer', 'equinox', 'familiar', 'familia', 'camioneta grande'],
-    name: 'Interés en SUVs (ES)',
-    message: `¡Las SUVs son mi especialidad! Ya sea Equinox, Blazer, Tahoe o Suburban — las tengo todas en el lote. ¿Qué tamaño buscas y cuál es tu presupuesto más o menos?`,
+    name: 'InterÃ©s en SUVs (ES)',
+    message: `Â¡Las SUVs son mi especialidad! Ya sea Equinox, Blazer, Tahoe o Suburban â las tengo todas en el lote. Â¿QuÃ© tamaÃ±o buscas y cuÃ¡l es tu presupuesto mÃ¡s o menos?`,
     active: true,
     delay: 30,
   },
@@ -241,9 +241,9 @@ let autoReplyTemplates = [
     id: 'price_question_es',
     trigger: 'keyword',
     lang: 'es',
-    keywords: ['precio', 'cuánto', 'cuanto', 'cuesta', 'pago', 'mensual', 'financiar', 'crédito', 'credito', 'enganche'],
+    keywords: ['precio', 'cuÃ¡nto', 'cuanto', 'cuesta', 'pago', 'mensual', 'financiar', 'crÃ©dito', 'credito', 'enganche'],
     name: 'Pregunta de Precio (ES)',
-    message: `¡Buena pregunta! En Findlay movemos mucho volumen así que nuestros precios son muy competitivos. ¿Qué vehículo te interesa? Te consigo los mejores números que pueda.`,
+    message: `Â¡Buena pregunta! En Findlay movemos mucho volumen asÃ­ que nuestros precios son muy competitivos. Â¿QuÃ© vehÃ­culo te interesa? Te consigo los mejores nÃºmeros que pueda.`,
     active: true,
     delay: 15,
   },
@@ -251,9 +251,9 @@ let autoReplyTemplates = [
     id: 'trade_in_es',
     trigger: 'keyword',
     lang: 'es',
-    keywords: ['intercambio', 'trade', 'vender mi carro', 'cuánto vale', 'cuanto vale', 'avalúo'],
-    name: 'Interés en Trade-In (ES)',
-    message: `¡Los valores de trade-in están muy buenos ahorita! Solo necesito el año, marca, modelo y más o menos cuántas millas tiene. Sin compromiso. ¿Quieres que lo hagamos?`,
+    keywords: ['intercambio', 'trade', 'vender mi carro', 'cuÃ¡nto vale', 'cuanto vale', 'avalÃºo'],
+    name: 'InterÃ©s en Trade-In (ES)',
+    message: `Â¡Los valores de trade-in estÃ¡n muy buenos ahorita! Solo necesito el aÃ±o, marca, modelo y mÃ¡s o menos cuÃ¡ntas millas tiene. Sin compromiso. Â¿Quieres que lo hagamos?`,
     active: true,
     delay: 15,
   },
@@ -291,10 +291,10 @@ app.get('/webhook', (req, res) => {
 
   // Accept both Facebook/Instagram and WhatsApp verify tokens
   if (mode === 'subscribe' && (token === CONFIG.META_VERIFY_TOKEN || token === CONFIG.WHATSAPP_VERIFY_TOKEN)) {
-    console.log('✅ Webhook verified!');
+    console.log('â Webhook verified!');
     return res.status(200).send(challenge);
   }
-  console.log('❌ Webhook verification failed');
+  console.log('â Webhook verification failed');
   return res.sendStatus(403);
 });
 
@@ -313,7 +313,7 @@ app.post('/webhook', async (req, res) => {
     if (signature) {
       const expected = 'sha256=' + crypto.createHmac('sha256', CONFIG.META_APP_SECRET).update(req.rawBody).digest('hex');
       if (signature !== expected) {
-        console.log('❌ Invalid webhook signature');
+        console.log('â Invalid webhook signature');
         return;
       }
     }
@@ -377,7 +377,7 @@ async function handleMessage(event, platform) {
     const messageText = event.message.text || '';
     const messageId = event.message.mid;
 
-    console.log(`📩 New ${platform} message from ${senderId}: "${messageText}"`);
+    console.log(`ð© New ${platform} message from ${senderId}: "${messageText}"`);
 
     // Get sender profile
     const profile = await getSenderProfile(senderId, platform);
@@ -490,7 +490,7 @@ async function handleMessage(event, platform) {
       }, (keywordTemplate.delay || 30) * 1000);
     }
 
-    // 2.5. Inventory matching — send matching vehicles from the lot
+    // 2.5. Inventory matching â send matching vehicles from the lot
     const detectedInterest = detectInterest(messageText);
     if (detectedInterest) {
       const matches = inventoryModule.matchInventory(detectedInterest, { maxResults: 3 });
@@ -530,7 +530,7 @@ async function handleLeadAd(leadData) {
   const pageId = leadData.page_id;
   const formId = leadData.form_id;
 
-  console.log(`📋 New Lead Ad submission: ${leadgenId}`);
+  console.log(`ð New Lead Ad submission: ${leadgenId}`);
 
   // Fetch the actual lead data from Meta's API
   try {
@@ -576,7 +576,7 @@ async function handleLeadAd(leadData) {
       }
 
       saveData();
-      console.log(`✅ Lead captured: ${lead.name} - ${lead.interest}`);
+      console.log(`â Lead captured: ${lead.name} - ${lead.interest}`);
     }
   } catch (err) {
     console.error('Error fetching lead ad data:', err.message);
@@ -592,7 +592,7 @@ async function handleFeedEvent(feedData) {
     const comment = feedData.message || '';
     const postId = feedData.post_id;
 
-    console.log(`💬 New comment from ${commenterName}: "${comment}"`);
+    console.log(`ð¬ New comment from ${commenterName}: "${comment}"`);
 
     // Only capture if it looks like a potential lead
     const leadKeywords = /interest|price|how much|available|trade|looking for|want|need|buy/i;
@@ -648,7 +648,7 @@ async function handleWhatsAppMessage(msg, value) {
     messageText = `[${msgType} message]`;
   }
 
-  console.log(`📱 WhatsApp message from ${contactName} (${from}): "${messageText}"`);
+  console.log(`ð± WhatsApp message from ${contactName} (${from}): "${messageText}"`);
 
   // Find or create conversation (keyed by phone number for WhatsApp)
   let convo = conversations.find(c => c.senderId === from && c.platform === 'whatsapp');
@@ -707,7 +707,7 @@ async function handleWhatsAppMessage(msg, value) {
 
   const firstName = contactName.split(' ')[0] || 'there';
 
-  // First message → send greeting
+  // First message â send greeting
   if (convo.messages.filter(m => m.from === 'customer').length === 1) {
     const greeting = autoReplyTemplates.find(t =>
       t.trigger === 'new_message' && t.active && t.lang === detectedLang
@@ -802,7 +802,7 @@ async function sendWhatsAppMessage(to, text) {
     if (result.error) {
       console.error('WhatsApp send error:', result.error.message);
     } else {
-      console.log(`📤 WhatsApp sent to +${to}`);
+      console.log(`ð¤ WhatsApp sent to +${to}`);
     }
     return result;
   } catch (err) {
@@ -835,7 +835,7 @@ async function sendWhatsAppTemplate(to, templateName, languageCode = 'en_US', co
     if (result.error) {
       console.error('WhatsApp template error:', result.error.message);
     } else {
-      console.log(`📤 WhatsApp template "${templateName}" sent to +${to}`);
+      console.log(`ð¤ WhatsApp template "${templateName}" sent to +${to}`);
     }
     return result;
   } catch (err) {
@@ -891,7 +891,7 @@ async function sendMessage(recipientId, text, platform = 'page') {
     if (result.error) {
       console.error('Send message error:', result.error.message);
     } else {
-      console.log(`📤 Sent message to ${recipientId}`);
+      console.log(`ð¤ Sent message to ${recipientId}`);
     }
     return result;
   } catch (err) {
@@ -952,11 +952,11 @@ function detectLanguage(text) {
   const lower = text.toLowerCase();
   const spanishIndicators = [
     'hola', 'buenos', 'buenas', 'gracias', 'quiero', 'busco', 'necesito',
-    'precio', 'cuánto', 'cuanto', 'cuesta', 'carro', 'coche', 'troca',
-    'camioneta', 'interesa', 'puedo', 'tiene', 'están', 'favor', 'ayuda',
+    'precio', 'cuÃ¡nto', 'cuanto', 'cuesta', 'carro', 'coche', 'troca',
+    'camioneta', 'interesa', 'puedo', 'tiene', 'estÃ¡n', 'favor', 'ayuda',
     'familia', 'grande', 'nueva', 'nuevo', 'usada', 'usado', 'vender',
-    'comprar', 'financiar', 'crédito', 'credito', 'enganche', 'mensual',
-    'por favor', 'señor', 'amigo', 'millas', 'año',
+    'comprar', 'financiar', 'crÃ©dito', 'credito', 'enganche', 'mensual',
+    'por favor', 'seÃ±or', 'amigo', 'millas', 'aÃ±o',
   ];
   const spanishCount = spanishIndicators.filter(w => lower.includes(w)).length;
   return spanishCount >= 2 ? 'es' : 'en';
@@ -1221,11 +1221,11 @@ const STAGES_LIST = ['New Lead', 'Contacted', 'Appointment', 'Negotiation', 'Sol
 // Create and publish posts to Facebook, Instagram, and WhatsApp Status
 
 // -- Meta Algorithm-Optimized Post Engine --
-// Strategy: Hook → Value → CTA → Hashtags (bilingual EN+ES)
+// Strategy: Hook â Value â CTA â Hashtags (bilingual EN+ES)
 // Hashtags: 3-5 branded + 5-8 niche/location + 2-3 trending = 10-16 total (Meta sweet spot)
 // Line breaks for readability (algorithm rewards time-on-post)
 
-// Hashtag engine — mixes branded, niche, location, and engagement tags
+// Hashtag engine â mixes branded, niche, location, and engagement tags
 function getHashtags(type, data) {
   const branded = ['#GabeMovesmetal', '#FindlayChevrolet', '#FindlayChevy'];
   const location = ['#LasVegas', '#Vegas', '#Henderson', '#NevadaCars'];
@@ -1254,35 +1254,35 @@ function getHashtags(type, data) {
   return [...new Set(pool)].join(' ');
 }
 
-// Engagement hooks — Meta rewards posts that stop the scroll
+// Engagement hooks â Meta rewards posts that stop the scroll
 const HOOKS = {
   sold_customer: [
-    'SOLD! 🎉🔑',
-    'Another one OFF the lot! 🎉',
-    'Keys delivered. Dreams realized. 🔑✨',
-    'This is why I do what I do 🙌',
-    'CONGRATULATIONS are in order! 🎊',
+    'SOLD! ðð',
+    'Another one OFF the lot! ð',
+    'Keys delivered. Dreams realized. ðâ¨',
+    'This is why I do what I do ð',
+    'CONGRATULATIONS are in order! ð',
   ],
   current_deal: [
-    '🚨 DEAL ALERT 🚨',
-    'You\'re gonna want to see this 👀',
-    'My manager said YES to this one 🤝',
-    'This deal won\'t last — real talk 💯',
-    'READ THIS before you buy anywhere else ⬇️',
+    'ð¨ DEAL ALERT ð¨',
+    'You\'re gonna want to see this ð',
+    'My manager said YES to this one ð¤',
+    'This deal won\'t last â real talk ð¯',
+    'READ THIS before you buy anywhere else â¬ï¸',
   ],
   inventory_highlight: [
-    'JUST HIT THE LOT 🔥',
-    'Fresh off the truck 🚛✨',
-    'This one won\'t sit long 👀',
-    'Who wants it? 🙋‍♂️',
-    'Stop scrolling — look at this beauty 😍',
+    'JUST HIT THE LOT ð¥',
+    'Fresh off the truck ðâ¨',
+    'This one won\'t sit long ð',
+    'Who wants it? ðââï¸',
+    'Stop scrolling â look at this beauty ð',
   ],
   personal_brand: [
-    'Let me keep it real with you 💯',
+    'Let me keep it real with you ð¯',
     'People always ask me how I do it...',
-    'This is what moving metal looks like 💪',
-    'Grateful for another day on the lot 🙏',
-    'The grind doesn\'t stop 🏆',
+    'This is what moving metal looks like ðª',
+    'Grateful for another day on the lot ð',
+    'The grind doesn\'t stop ð',
   ],
 };
 
@@ -1297,20 +1297,20 @@ const POST_TEMPLATES = {
       const hook = pickRandom(HOOKS.sold_customer);
       const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
       const captions = [
-        `${hook}\n\nHuge congrats to ${data.customerName} on their brand new ${vehicle}! 🚗💨\n\nThis is what happens when you trust the process. You come in, we find the perfect ride, and you drive off HAPPY.\n\nReady to be next? DM me or call/text — I got you.\n📱 (702) 416-3741\n\n${getHashtags('sold_customer', data)}`,
-        `${hook}\n\n${data.customerName} just drove off in a BRAND NEW ${vehicle} and I couldn't be more hyped for them! 🔥\n\nFrom the test drive to the handshake — we made it happen at Findlay Chevrolet, the #1 volume dealer west of Texas.\n\nWho's next? Drop a 🔑 if you're ready!\n\n${getHashtags('sold_customer', data)}`,
-        `${hook}\n\nWelcome to the family, ${data.customerName}! 🤝\n\nYou came in looking for the right ${data.vehicleModel || 'ride'} and we got you RIGHT. That's how we do it at Findlay Chevy.\n\nIf you or someone you know is in the market — send them my way. I take care of my people. 💯\n\n${getHashtags('sold_customer', data)}`,
+        `${hook}\n\nHuge congrats to ${data.customerName} on their brand new ${vehicle}! ðð¨\n\nThis is what happens when you trust the process. You come in, we find the perfect ride, and you drive off HAPPY.\n\nReady to be next? DM me or call/text â I got you.\nð± (702) 416-3741\n\n${getHashtags('sold_customer', data)}`,
+        `${hook}\n\n${data.customerName} just drove off in a BRAND NEW ${vehicle} and I couldn't be more hyped for them! ð¥\n\nFrom the test drive to the handshake â we made it happen at Findlay Chevrolet, the #1 volume dealer west of Texas.\n\nWho's next? Drop a ð if you're ready!\n\n${getHashtags('sold_customer', data)}`,
+        `${hook}\n\nWelcome to the family, ${data.customerName}! ð¤\n\nYou came in looking for the right ${data.vehicleModel || 'ride'} and we got you RIGHT. That's how we do it at Findlay Chevy.\n\nIf you or someone you know is in the market â send them my way. I take care of my people. ð¯\n\n${getHashtags('sold_customer', data)}`,
       ];
       return pickRandom(captions);
     },
     generateCaptionES: (data) => {
       const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
-      return `¡VENDIDO! 🎉🔑\n\n¡Felicidades a ${data.customerName} por su ${vehicle} nuevo! 🚗💨\n\nEsto es lo que pasa cuando confías en el proceso. Vienes, encontramos el carro perfecto, y te vas FELIZ.\n\n¿Listo para ser el siguiente? Mándame mensaje o llámame — yo te ayudo.\n📱 (702) 416-3741\n\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('sold_customer', data)}`;
+      return `Â¡VENDIDO! ðð\n\nÂ¡Felicidades a ${data.customerName} por su ${vehicle} nuevo! ðð¨\n\nEsto es lo que pasa cuando confÃ­as en el proceso. Vienes, encontramos el carro perfecto, y te vas FELIZ.\n\nÂ¿Listo para ser el siguiente? MÃ¡ndame mensaje o llÃ¡mame â yo te ayudo.\nð± (702) 416-3741\n\nHablo espaÃ±ol ð²ð½ðºð¸\n\n${getHashtags('sold_customer', data)}`;
     },
     generateBilingual: (data) => {
       const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
       const hook = pickRandom(HOOKS.sold_customer);
-      return `${hook}\n\nCongrats to ${data.customerName} on their brand new ${vehicle}! 🚗💨\nAnother happy customer driving off the lot at Findlay Chevrolet — the #1 volume dealer west of Texas.\n\nReady to be next? DM me or call/text 📱 (702) 416-3741\n\n—\n\n¡Felicidades a ${data.customerName} por su ${vehicle} nuevo! 🎉\nOtro cliente feliz saliendo de Findlay Chevrolet. ¿Listo para ser el siguiente?\n\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('sold_customer', data)}`;
+      return `${hook}\n\nCongrats to ${data.customerName} on their brand new ${vehicle}! ðð¨\nAnother happy customer driving off the lot at Findlay Chevrolet â the #1 volume dealer west of Texas.\n\nReady to be next? DM me or call/text ð± (702) 416-3741\n\nâ\n\nÂ¡Felicidades a ${data.customerName} por su ${vehicle} nuevo! ð\nOtro cliente feliz saliendo de Findlay Chevrolet. Â¿Listo para ser el siguiente?\n\nHablo espaÃ±ol ð²ð½ðºð¸\n\n${getHashtags('sold_customer', data)}`;
     },
   },
   current_deal: {
@@ -1319,14 +1319,14 @@ const POST_TEMPLATES = {
     fields: ['dealTitle', 'vehicleModel', 'dealDetails', 'expirationDate', 'imageUrl'],
     generateCaption: (data) => {
       const hook = pickRandom(HOOKS.current_deal);
-      return `${hook}\n\n${data.dealTitle}\n\n${data.dealDetails}\n\n${data.expirationDate ? '⏰ Expires ' + data.expirationDate + ' — don\'t sleep on this!' : 'This won\'t last — first come, first served!'}\n\nDM me, call, or just pull up to Findlay Chevrolet. I'll make it happen. 🤝\n📱 (702) 416-3741\n\n${getHashtags('current_deal', data)}`;
+      return `${hook}\n\n${data.dealTitle}\n\n${data.dealDetails}\n\n${data.expirationDate ? 'â° Expires ' + data.expirationDate + ' â don\'t sleep on this!' : 'This won\'t last â first come, first served!'}\n\nDM me, call, or just pull up to Findlay Chevrolet. I'll make it happen. ð¤\nð± (702) 416-3741\n\n${getHashtags('current_deal', data)}`;
     },
     generateCaptionES: (data) => {
-      return `🚨 OFERTA 🚨\n\n${data.dealTitle}\n\n${data.dealDetails}\n\n${data.expirationDate ? '⏰ Vence ' + data.expirationDate + ' — ¡no te lo pierdas!' : '¡No dura para siempre — primero que llegue!'}\n\nMándame mensaje, llámame, o ven directo a Findlay Chevrolet. Yo te ayudo. 🤝\n📱 (702) 416-3741\n\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('current_deal', data)}`;
+      return `ð¨ OFERTA ð¨\n\n${data.dealTitle}\n\n${data.dealDetails}\n\n${data.expirationDate ? 'â° Vence ' + data.expirationDate + ' â Â¡no te lo pierdas!' : 'Â¡No dura para siempre â primero que llegue!'}\n\nMÃ¡ndame mensaje, llÃ¡mame, o ven directo a Findlay Chevrolet. Yo te ayudo. ð¤\nð± (702) 416-3741\n\nHablo espaÃ±ol ð²ð½ðºð¸\n\n${getHashtags('current_deal', data)}`;
     },
     generateBilingual: (data) => {
       const hook = pickRandom(HOOKS.current_deal);
-      return `${hook}\n\n${data.dealTitle}\n\n${data.dealDetails}\n\n${data.expirationDate ? '⏰ Expires ' + data.expirationDate : 'Won\'t last long!'} DM me or call 📱 (702) 416-3741\n\n—\n\n${data.dealTitle}\n${data.dealDetails}\n${data.expirationDate ? '⏰ Vence ' + data.expirationDate : '¡Apúrate!'}\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('current_deal', data)}`;
+      return `${hook}\n\n${data.dealTitle}\n\n${data.dealDetails}\n\n${data.expirationDate ? 'â° Expires ' + data.expirationDate : 'Won\'t last long!'} DM me or call ð± (702) 416-3741\n\nâ\n\n${data.dealTitle}\n${data.dealDetails}\n${data.expirationDate ? 'â° Vence ' + data.expirationDate : 'Â¡ApÃºrate!'}\nHablo espaÃ±ol ð²ð½ðºð¸\n\n${getHashtags('current_deal', data)}`;
     },
   },
   inventory_highlight: {
@@ -1336,19 +1336,19 @@ const POST_TEMPLATES = {
     generateCaption: (data) => {
       const hook = pickRandom(HOOKS.inventory_highlight);
       const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
-      const priceStr = data.price ? '💰 $' + Number(data.price).toLocaleString() : '';
-      return `${hook}\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n\n${data.highlights || 'Loaded and ready to roll.'}\n\nWant to see it in person? Schedule a test drive — DM me or hit my line:\n📱 (702) 416-3741\n\nFindlay Chevrolet — #1 volume dealer west of Texas 🏆\n\n${getHashtags('inventory_highlight', data)}`;
+      const priceStr = data.price ? 'ð° $' + Number(data.price).toLocaleString() : '';
+      return `${hook}\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n\n${data.highlights || 'Loaded and ready to roll.'}\n\nWant to see it in person? Schedule a test drive â DM me or hit my line:\nð± (702) 416-3741\n\nFindlay Chevrolet â #1 volume dealer west of Texas ð\n\n${getHashtags('inventory_highlight', data)}`;
     },
     generateCaptionES: (data) => {
       const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
-      const priceStr = data.price ? '💰 $' + Number(data.price).toLocaleString() : '';
-      return `ACABA DE LLEGAR 🔥\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n\n${data.highlights || 'Cargado y listo para rodar.'}\n\n¿Quieres verlo en persona? Agenda un test drive — mándame mensaje:\n📱 (702) 416-3741\n\nFindlay Chevrolet — Dealer #1 en volumen al oeste de Texas 🏆\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('inventory_highlight', data)}`;
+      const priceStr = data.price ? 'ð° $' + Number(data.price).toLocaleString() : '';
+      return `ACABA DE LLEGAR ð¥\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n\n${data.highlights || 'Cargado y listo para rodar.'}\n\nÂ¿Quieres verlo en persona? Agenda un test drive â mÃ¡ndame mensaje:\nð± (702) 416-3741\n\nFindlay Chevrolet â Dealer #1 en volumen al oeste de Texas ð\nHablo espaÃ±ol ð²ð½ðºð¸\n\n${getHashtags('inventory_highlight', data)}`;
     },
     generateBilingual: (data) => {
       const hook = pickRandom(HOOKS.inventory_highlight);
       const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
-      const priceStr = data.price ? '💰 $' + Number(data.price).toLocaleString() : '';
-      return `${hook}\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n\n${data.highlights || 'Loaded and ready.'}\n\nDM me or call 📱 (702) 416-3741\n\n—\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n${data.highlights || 'Cargado y listo.'}\nMándame mensaje 📱 (702) 416-3741\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('inventory_highlight', data)}`;
+      const priceStr = data.price ? 'ð° $' + Number(data.price).toLocaleString() : '';
+      return `${hook}\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n\n${data.highlights || 'Loaded and ready.'}\n\nDM me or call ð± (702) 416-3741\n\nâ\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n${data.highlights || 'Cargado y listo.'}\nMÃ¡ndame mensaje ð± (702) 416-3741\nHablo espaÃ±ol ð²ð½ðºð¸\n\n${getHashtags('inventory_highlight', data)}`;
     },
   },
   personal_brand: {
@@ -1357,14 +1357,14 @@ const POST_TEMPLATES = {
     fields: ['message', 'imageUrl'],
     generateCaption: (data) => {
       const hook = pickRandom(HOOKS.personal_brand);
-      return `${hook}\n\n${data.message}\n\nIf you know someone looking for a car — send them my way. I take care of my people. Always. 🤝\n\n— Gabe Barajas\nFindlay Chevrolet | Las Vegas\n📱 (702) 416-3741\n\n${getHashtags('personal_brand', data)}`;
+      return `${hook}\n\n${data.message}\n\nIf you know someone looking for a car â send them my way. I take care of my people. Always. ð¤\n\nâ Gabe Barajas\nFindlay Chevrolet | Las Vegas\nð± (702) 416-3741\n\n${getHashtags('personal_brand', data)}`;
     },
     generateCaptionES: (data) => {
-      return `💯\n\n${data.message}\n\nSi conoces a alguien buscando carro — mándamelos. Yo cuido a mi gente. Siempre. 🤝\n\n— Gabe Barajas\nFindlay Chevrolet | Las Vegas\n📱 (702) 416-3741\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('personal_brand', data)}`;
+      return `ð¯\n\n${data.message}\n\nSi conoces a alguien buscando carro â mÃ¡ndamelos. Yo cuido a mi gente. Siempre. ð¤\n\nâ Gabe Barajas\nFindlay Chevrolet | Las Vegas\nð± (702) 416-3741\nHablo espaÃ±ol ð²ð½ðºð¸\n\n${getHashtags('personal_brand', data)}`;
     },
     generateBilingual: (data) => {
       const hook = pickRandom(HOOKS.personal_brand);
-      return `${hook}\n\n${data.message}\n\nKnow someone looking for a car? Send them my way. 🤝\n¿Conoces a alguien buscando carro? Mándamelos. 🇲🇽🇺🇸\n\n— Gabe Barajas\nFindlay Chevrolet | Las Vegas\n📱 (702) 416-3741\n\n${getHashtags('personal_brand', data)}`;
+      return `${hook}\n\n${data.message}\n\nKnow someone looking for a car? Send them my way. ð¤\nÂ¿Conoces a alguien buscando carro? MÃ¡ndamelos. ð²ð½ðºð¸\n\nâ Gabe Barajas\nFindlay Chevrolet | Las Vegas\nð± (702) 416-3741\n\n${getHashtags('personal_brand', data)}`;
     },
   },
 };
@@ -1400,7 +1400,7 @@ async function publishToFacebook(caption, imageUrl = null) {
       console.error('Facebook post error:', result.error.message);
       return { success: false, error: result.error.message };
     }
-    console.log(`📝 Facebook post published: ${result.id || result.post_id}`);
+    console.log(`ð Facebook post published: ${result.id || result.post_id}`);
     return { success: true, postId: result.id || result.post_id, platform: 'facebook' };
   } catch (err) {
     console.error('Failed to publish to Facebook:', err.message);
@@ -1448,7 +1448,7 @@ async function publishToInstagram(caption, imageUrl) {
       console.error('Instagram publish error:', result.error.message);
       return { success: false, error: result.error.message };
     }
-    console.log(`📸 Instagram post published: ${result.id}`);
+    console.log(`ð¸ Instagram post published: ${result.id}`);
     return { success: true, postId: result.id, platform: 'instagram' };
   } catch (err) {
     console.error('Failed to publish to Instagram:', err.message);
@@ -1472,7 +1472,7 @@ app.get('/api/posts/templates', (req, res) => {
 // AI-Powered Caption Generator (Claude API)
 // Falls back to templates if ANTHROPIC_API_KEY is not set
 app.post('/api/posts/ai-generate', async (req, res) => {
-  const { type, data, language } = req.body;
+  const { type, data, language, customerContext } = req.body;
   const template = POST_TEMPLATES[type];
   if (!template) return res.status(400).json({ error: 'Unknown post type' });
 
@@ -1500,11 +1500,11 @@ app.post('/api/posts/ai-generate', async (req, res) => {
 
   const languageInstructions = {
     en: 'Write the caption in English only.',
-    es: 'Write the caption in Spanish only. Include "Hablo español" somewhere.',
-    bilingual: 'Write the caption in BOTH English and Spanish. Put the English version first, then a line break with "—", then the Spanish version. Include "Hablo español" with flag emojis in the Spanish section.',
+    es: 'Write the caption in Spanish only. Include "Hablo espaÃ±ol" somewhere.',
+    bilingual: 'Write the caption in BOTH English and Spanish. Put the English version first, then a line break with "â", then the Spanish version. Include "Hablo espaÃ±ol" with flag emojis in the Spanish section.',
   };
 
-  const prompt = `You are a social media caption writer for Gabe Barajas, a bilingual car salesman at Findlay Chevrolet in Las Vegas — the #1 volume Chevy dealer west of Texas. His brand is "Gabe Moves Metal."
+  const prompt = `You are a social media caption writer for Gabe Barajas, a bilingual car salesman at Findlay Chevrolet in Las Vegas â the #1 volume Chevy dealer west of Texas. His brand is "Gabe Moves Metal."
 
 Write a Facebook post caption for ${typeDescriptions[type] || 'a social media post'}.
 
@@ -1517,7 +1517,7 @@ RULES FOR META ALGORITHM OPTIMIZATION:
 - Include a clear CTA (DM me, call/text, come see me)
 - Include Gabe's phone: (702) 416-3741
 - End with 10-15 hashtags mixing: branded (#GabeMovesmetal #FindlayChevrolet), location (#LasVegas #Vegas), niche (car-related), and engagement tags
-- Keep it authentic, energetic, and conversational — NOT corporate
+- Keep it authentic, energetic, and conversational â NOT corporate
 - Use emojis naturally but don't overdo it (3-6 per post)
 - If the vehicle model is mentioned, include a hashtag for it
 - Never use the word "utilize" or sound like a robot
@@ -1525,7 +1525,9 @@ RULES FOR META ALGORITHM OPTIMIZATION:
 
 ${languageInstructions[language] || languageInstructions.bilingual}
 
-Write ONLY the caption text. No explanations or metadata.`;
+Write ONLY the caption text. No explanations or metadata.
+
+IMPORTANT: If customer context/story is provided, weave those details naturally into the caption to make it personal and authentic. For example, if they are a repeat customer, mention their loyalty. If first-time buyer, celebrate the milestone. If referral, acknowledge the connection.`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1846,12 +1848,13 @@ app.post('/api/whatsapp/template', async (req, res) => {
 // Required for Meta App Review
 
 app.get('/privacy-policy', (req, res) => {
-  res.send(`<!DOCTYPE html>
+  res.send(`
+${customerContext ? `CUSTOMER CONTEXT/STORY: ${customerContext}\n\n` : ""}<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy — Gabe Moves Metal</title>
+  <title>Privacy Policy â Gabe Moves Metal</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; line-height: 1.6; color: #333; }
     h1 { color: #1a1a1a; border-bottom: 2px solid #d4a017; padding-bottom: 10px; }
@@ -1908,7 +1911,7 @@ app.get('/data-deletion', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Data Deletion — Gabe Moves Metal</title>
+  <title>Data Deletion â Gabe Moves Metal</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; line-height: 1.6; color: #333; }
     h1 { color: #1a1a1a; border-bottom: 2px solid #d4a017; padding-bottom: 10px; }
@@ -1956,7 +1959,7 @@ app.post('/data-deletion', (req, res) => {
 
 
 // ==================== DEALS TRACKER (SECURE) ====================
-// All deal data behind requireAuth — must be logged in to access
+// All deal data behind requireAuth â must be logged in to access
 const DEALS_FILE = path.join(__dirname, 'deals.json');
 
 function loadDeals() {
@@ -2104,20 +2107,20 @@ app.listen(PORT, () => {
   inventoryModule.startAutoRefresh();
 
   console.log(`
-  ╔══════════════════════════════════════════════════╗
-  ║     GABE MOVES METAL — Lead Engine Running       ║
-  ║     Personal Lead Gen for Gabe @ Findlay Chevy   ║
-  ║                                                  ║
-  ║  🌐 API:      http://localhost:${PORT}              ║
-  ║  🔗 Webhook:  http://localhost:${PORT}/webhook       ║
-  ║  📊 Status:   http://localhost:${PORT}/api/stats      ║
-  ║  📦 Inventory: ${String(inventoryModule.getInventoryCount()).padEnd(4)} vehicles loaded           ║
-  ║  🌎 Bilingual: EN/ES auto-replies active         ║
-  ║  📄 Page ID:  ${CONFIG.PAGE_ID.padEnd(20)}           ║
-  ║                                                  ║
-  ║  ${CONFIG.META_APP_ID === 'YOUR_APP_ID' ? '⚠️  Meta API not configured yet!' : '✅  Meta API connected!'}                 ║
-  ║  See META_SETUP_GUIDE.md to connect              ║
-  ╚══════════════════════════════════════════════════╝
+  ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  â     GABE MOVES METAL â Lead Engine Running       â
+  â     Personal Lead Gen for Gabe @ Findlay Chevy   â
+  â                                                  â
+  â  ð API:      http://localhost:${PORT}              â
+  â  ð Webhook:  http://localhost:${PORT}/webhook       â
+  â  ð Status:   http://localhost:${PORT}/api/stats      â
+  â  ð¦ Inventory: ${String(inventoryModule.getInventoryCount()).padEnd(4)} vehicles loaded           â
+  â  ð Bilingual: EN/ES auto-replies active         â
+  â  ð Page ID:  ${CONFIG.PAGE_ID.padEnd(20)}           â
+  â                                                  â
+  â  ${CONFIG.META_APP_ID === 'YOUR_APP_ID' ? 'â ï¸  Meta API not configured yet!' : 'â  Meta API connected!'}                 â
+  â  See META_SETUP_GUIDE.md to connect              â
+  ââââââââââââââââââââââââââââââââââââââââââââââââââââ
   `);
 });
 
