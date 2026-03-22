@@ -17,6 +17,18 @@
  */
 
 const express = require('express');
+const multer = require('multer');
+const uploadStorage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    const dir = path.join(__dirname, 'public', 'uploads');
+    if (!require('fs').existsSync(dir)) require('fs').mkdirSync(dir, {recursive: true});
+    cb(null, dir);
+  },
+  filename: function(req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9.]/g, '_'));
+  }
+});
+const upload = multer({ storage: uploadStorage, limits: { fileSize: 10 * 1024 * 1024 } });
 const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -1564,6 +1576,24 @@ app.post('/api/posts/preview', (req, res) => {
     caption = template.generateCaption(data);
   }
   res.json({ caption, source: 'template' });
+});
+
+
+// Photo upload endpoint
+app.post('/api/upload-photo', upload.single('photo'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No photo uploaded' });
+    }
+    // Build the public URL for this file
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.get('host');
+    const publicUrl = protocol + '://' + host + '/uploads/' + req.file.filename;
+    res.json({ url: publicUrl, filename: req.file.filename });
+  } catch (error) {
+    console.error('Photo upload error:', error);
+    res.status(500).json({ error: 'Failed to upload photo' });
+  }
 });
 
 app.post('/api/posts/publish', async (req, res) => {
