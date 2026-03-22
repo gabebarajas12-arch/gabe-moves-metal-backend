@@ -1,0 +1,2344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gabe Moves Metal - CRM Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --gold: #d4a017;
+            --dark-bg: #0f1117;
+            --card-bg: #1a1d27;
+            --border-color: #252830;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+            --blue: #58a6ff;
+            --purple: #bc8ef4;
+            --green: #3fb950;
+            --orange: #fb8500;
+            --pink: #ff1493;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 240px;
+            background-color: var(--card-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 20px 0;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .logo {
+            padding: 0 20px 30px;
+            border-bottom: 2px solid var(--gold);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .logo-text {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--gold);
+            margin: 10px 0 0;
+        }
+
+        .nav-section {
+            margin-bottom: 20px;
+        }
+
+        .nav-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 10px 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background-color: rgba(212, 160, 23, 0.1);
+            color: var(--gold);
+            border-left-color: var(--gold);
+        }
+
+        .nav-item.active {
+            background-color: rgba(212, 160, 23, 0.15);
+            color: var(--gold);
+            border-left-color: var(--gold);
+            font-weight: 600;
+        }
+
+        .icon {
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Main content */
+        .main {
+            margin-left: 240px;
+            width: calc(100% - 240px);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 50;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .notification-bell {
+            position: relative;
+            cursor: pointer;
+            font-size: 20px;
+            transition: transform 0.2s ease;
+        }
+
+        .notification-bell:hover {
+            transform: scale(1.1);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: var(--danger);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .search-box {
+            background-color: var(--dark-bg);
+            border: 1px solid var(--border-color);
+            padding: 8px 15px;
+            border-radius: 6px;
+            color: var(--text-primary);
+            width: 200px;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        /* Content area */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--gold);
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .stat-change {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        /* Table */
+        .table-container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table td {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+        }
+
+        .table tr:hover {
+            background-color: rgba(212, 160, 23, 0.05);
+        }
+
+        .table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge-new {
+            background-color: rgba(88, 166, 255, 0.2);
+            color: var(--blue);
+        }
+
+        .badge-contacted {
+            background-color: rgba(251, 133, 0, 0.2);
+            color: var(--orange);
+        }
+
+        .badge-appointment {
+            background-color: rgba(188, 142, 244, 0.2);
+            color: var(--purple);
+        }
+
+        .badge-negotiation {
+            background-color: rgba(210, 153, 34, 0.2);
+            color: var(--warning);
+        }
+
+        .badge-sold {
+            background-color: rgba(63, 185, 80, 0.2);
+            color: var(--success);
+        }
+
+        .badge-messenger {
+            background-color: rgba(88, 166, 255, 0.2);
+            color: var(--blue);
+        }
+
+        .badge-instagram {
+            background: linear-gradient(135deg, rgba(255, 20, 147, 0.2), rgba(188, 142, 244, 0.2));
+            color: var(--pink);
+        }
+
+        .badge-lead-ad {
+            background-color: rgba(63, 185, 80, 0.2);
+            color: var(--success);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background-color: var(--gold);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            background-color: #e8b923;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(212, 160, 23, 0.1);
+            border-color: var(--gold);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-danger {
+            background-color: rgba(248, 81, 73, 0.2);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .btn-danger:hover {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-close {
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--text-secondary);
+            transition: color 0.2s ease;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--dark-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        /* Leads page */
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--dark-bg);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        .lead-item {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .lead-item:hover {
+            border-color: var(--gold);
+            background-color: rgba(212, 160, 23, 0.05);
+        }
+
+        .lead-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .lead-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .lead-meta {
+            display: flex;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .lead-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .lead-action-btn {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--dark-bg);
+            color: var(--gold);
+            border: 1px solid var(--gold);
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .lead-action-btn:hover {
+            background-color: var(--gold);
+            color: #000;
+        }
+
+        .followup-indicator {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        .followup-overdue {
+            background-color: rgba(248, 81, 73, 0.2);
+            color: var(--danger);
+        }
+
+        .followup-today {
+            background-color: rgba(210, 153, 34, 0.2);
+            color: var(--warning);
+        }
+
+        .followup-upcoming {
+            background-color: rgba(139, 148, 158, 0.2);
+            color: var(--text-secondary);
+        }
+
+        /* Conversations */
+        .conversations-container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 0;
+            height: calc(100vh - 140px);
+        }
+
+        .conversation-list {
+            background-color: var(--card-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+        }
+
+        .conversation-item {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .conversation-item:hover,
+        .conversation-item.active {
+            background-color: rgba(212, 160, 23, 0.1);
+        }
+
+        .conversation-header {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .conversation-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--dark-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .conversation-info {
+            flex: 1;
+        }
+
+        .conversation-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .conversation-platform {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .conversation-preview {
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 4px;
+        }
+
+        .conversation-panel {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--dark-bg);
+        }
+
+        .conversation-no-select {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        .message-thread {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .message-customer,
+        .message-bot {
+            justify-content: flex-start;
+        }
+
+        .message-salesman {
+            justify-content: flex-end;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            word-wrap: break-word;
+        }
+
+        .message-customer .message-bubble,
+        .message-bot .message-bubble {
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .message-bot .message-bubble {
+            opacity: 0.8;
+            border-left: 3px solid var(--gold);
+        }
+
+        .message-salesman .message-bubble {
+            background-color: var(--gold);
+            color: #000;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .message-bot-tag {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--gold);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .reply-input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+        }
+
+        .reply-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .reply-input:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        /* Inventory */
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .inventory-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .inventory-card:hover {
+            border-color: var(--gold);
+            transform: translateY(-4px);
+        }
+
+        .inventory-image {
+            width: 100%;
+            height: 150px;
+            background: linear-gradient(135deg, var(--border-color), rgba(212, 160, 23, 0.1));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 40px;
+        }
+
+        .inventory-details {
+            padding: 15px;
+        }
+
+        .inventory-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .inventory-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gold);
+            margin-bottom: 8px;
+        }
+
+        .inventory-info {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        /* Templates */
+        .template-item {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .template-content {
+            flex: 1;
+        }
+
+        .template-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .template-trigger {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .template-text {
+            font-size: 13px;
+            color: var(--text-secondary);
+            padding: 10px;
+            background-color: var(--dark-bg);
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .template-keywords {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 40px;
+            height: 24px;
+            background-color: var(--text-secondary);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .toggle-switch.active {
+            background-color: var(--gold);
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background-color: white;
+            border-radius: 50%;
+            transition: left 0.2s ease;
+        }
+
+        .toggle-switch.active .toggle-slider {
+            left: 18px;
+        }
+
+        /* Notifications */
+        .notification-item {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .notification-item:hover {
+            border-color: var(--gold);
+            background-color: rgba(212, 160, 23, 0.05);
+        }
+
+        .notification-item.unread {
+            border-left: 4px solid var(--gold);
+            background-color: rgba(212, 160, 23, 0.08);
+        }
+
+        .notification-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .notification-message {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .notification-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Detail view */
+        .detail-view {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .detail-field {
+            background-color: var(--dark-bg);
+            padding: 15px;
+            border-radius: 6px;
+        }
+
+        .detail-field-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .detail-field-value {
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .detail-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        /* Pipeline view */
+        .pipeline {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .pipeline-stage {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .pipeline-stage-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .pipeline-count {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .pipeline-percent {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 200px;
+            }
+
+            .main {
+                margin-left: 200px;
+                width: calc(100% - 200px);
+            }
+
+            .conversations-container {
+                grid-template-columns: 250px 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .pipeline {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 180px;
+                padding: 15px 0;
+            }
+
+            .logo {
+                padding: 0 15px 20px;
+            }
+
+            .logo-text {
+                font-size: 12px;
+            }
+
+            .nav-item {
+                padding: 10px 15px;
+                font-size: 13px;
+            }
+
+            .nav-section-title {
+                padding: 8px 15px;
+            }
+
+            .main {
+                margin-left: 180px;
+                width: calc(100% - 180px);
+            }
+
+            .header {
+                padding: 12px 20px;
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .search-box {
+                width: 100%;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .pipeline {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .conversations-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 150px 1fr;
+                height: auto;
+            }
+
+            .conversation-list {
+                max-height: 150px;
+                overflow-x: auto;
+                overflow-y: hidden;
+                display: flex;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .conversation-item {
+                flex-shrink: 0;
+                width: 250px;
+                border-bottom: none;
+                border-right: 1px solid var(--border-color);
+            }
+
+            .conversation-item:last-child {
+                border-right: none;
+            }
+
+            .inventory-grid {
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            }
+
+            .table {
+                font-size: 12px;
+            }
+
+            .table th,
+            .table td {
+                padding: 10px;
+            }
+
+            .modal-content {
+                width: 95%;
+                max-width: 100%;
+                padding: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sidebar {
+                width: 150px;
+            }
+
+            .main {
+                margin-left: 150px;
+                width: calc(100% - 150px);
+            }
+
+            .logo-text {
+                font-size: 11px;
+                letter-spacing: 0;
+            }
+
+            .nav-item {
+                padding: 8px 10px;
+                font-size: 12px;
+            }
+
+            .content {
+                padding: 15px;
+            }
+
+            .header-title {
+                font-size: 16px;
+            }
+
+            .stat-card {
+                padding: 15px;
+            }
+
+            .stat-value {
+                font-size: 24px;
+            }
+
+            .pipeline {
+                grid-template-columns: 1fr;
+            }
+
+            .pipeline-count {
+                font-size: 24px;
+            }
+
+            .lead-item {
+                padding: 12px;
+            }
+
+            .lead-name {
+                font-size: 14px;
+            }
+
+            .inventory-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Utility */
+        .hidden {
+            display: none !important;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-20 {
+            margin-top: 20px;
+        }
+
+        .mb-20 {
+            margin-bottom: 20px;
+        }
+
+        .gap-10 {
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                <div class="logo-text">GABE MOVES METAL</div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-item active" data-page="dashboard">
+                    <div class="icon">📊</div>
+                    <span>Dashboard</span>
+                </div>
+                <div class="nav-item" data-page="leads">
+                    <div class="icon">👥</div>
+                    <span>Leads</span>
+                </div>
+                <div class="nav-item" data-page="conversations">
+                    <div class="icon">💬</div>
+                    <span>Conversations</span>
+                </div>
+                <div class="nav-item" data-page="inventory">
+                    <div class="icon">🚗</div>
+                    <span>Inventory</span>
+                </div>
+                <div class="nav-item" data-page="templates">
+                    <div class="icon">📋</div>
+                    <span>Templates</span>
+                </div>
+                <div class="nav-item" data-page="notifications">
+                    <div class="icon">🔔</div>
+                    <span>Notifications</span>
+                </div>
+            </div>
+
+            <div style="padding: 20px; border-top: 1px solid var(--border-color); text-align: center; font-size: 11px; color: var(--text-secondary); margin-top: 40px;">
+                <p><strong>Findlay Chevrolet</strong></p>
+                <p>#1 Volume Dealer<br>West of Texas</p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-title" id="pageTitle">Dashboard</div>
+                <div class="header-actions">
+                    <input type="text" class="search-box" id="searchBox" placeholder="Search leads...">
+                    <div class="notification-bell" id="notificationBell">
+                        🔔
+                        <div class="notification-badge" id="notificationCount" style="display: none;">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="content">
+                <!-- Dashboard Page -->
+                <div class="page active" id="dashboard">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Leads</div>
+                            <div class="stat-value" id="totalLeads">0</div>
+                            <div class="stat-change" id="totalLeadsChange">All time</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">New This Month</div>
+                            <div class="stat-value" id="newThisMonth">0</div>
+                            <div class="stat-change" id="newThisMonthChange">Current month</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Active Conversations</div>
+                            <div class="stat-value" id="conversations">0</div>
+                            <div class="stat-change" id="conversationsChange">Ongoing chats</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Unread Notifications</div>
+                            <div class="stat-value" id="unreadNotifications">0</div>
+                            <div class="stat-change" id="unreadNotificationsChange">Action needed</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 15px; font-size: 16px; font-weight: 700;">Leads by Stage</h3>
+                        <div class="pipeline" id="pipeline">
+                            <div class="pipeline-stage">
+                                <div class="pipeline-stage-title">New Lead</div>
+                                <div class="pipeline-count" data-stage="New Lead">0</div>
+                                <div class="pipeline-percent">0%</div>
+                            </div>
+                            <div class="pipeline-stage">
+                                <div class="pipeline-stage-title">Contacted</div>
+                                <div class="pipeline-count" data-stage="Contacted">0</div>
+                                <div class="pipeline-percent">0%</div>
+                            </div>
+                            <div class="pipeline-stage">
+                                <div class="pipeline-stage-title">Appointment</div>
+                                <div class="pipeline-count" data-stage="Appointment">0</div>
+                                <div class="pipeline-percent">0%</div>
+                            </div>
+                            <div class="pipeline-stage">
+                                <div class="pipeline-stage-title">Negotiation</div>
+                                <div class="pipeline-count" data-stage="Negotiation">0</div>
+                                <div class="pipeline-percent">0%</div>
+                            </div>
+                            <div class="pipeline-stage">
+                                <div class="pipeline-stage-title">Sold</div>
+                                <div class="pipeline-count" data-stage="Sold">0</div>
+                                <div class="pipeline-percent">0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 15px; font-size: 16px; font-weight: 700;">Recent Leads</h3>
+                        <div id="recentLeads"></div>
+                    </div>
+
+                    <button class="btn btn-primary" id="quickAddBtn">+ Add New Lead</button>
+                </div>
+
+                <!-- Leads Page -->
+                <div class="page" id="leads">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; font-weight: 700;">All Leads</h2>
+                        <button class="btn btn-primary" id="addLeadBtn">+ New Lead</button>
+                    </div>
+
+                    <div class="filters">
+                        <select class="filter-select" id="filterStage">
+                            <option value="">All Stages</option>
+                            <option value="New Lead">New Lead</option>
+                            <option value="Contacted">Contacted</option>
+                            <option value="Appointment">Appointment</option>
+                            <option value="Negotiation">Negotiation</option>
+                            <option value="Sold">Sold</option>
+                        </select>
+                        <select class="filter-select" id="filterSource">
+                            <option value="">All Sources</option>
+                            <option value="FB Messenger">FB Messenger</option>
+                            <option value="Instagram DM">Instagram DM</option>
+                            <option value="FB Lead Ad">FB Lead Ad</option>
+                            <option value="FB Comment">FB Comment</option>
+                            <option value="Manual">Manual</option>
+                        </select>
+                        <select class="filter-select" id="filterLanguage">
+                            <option value="">All Languages</option>
+                            <option value="EN">English</option>
+                            <option value="ES">Spanish</option>
+                        </select>
+                    </div>
+
+                    <div id="leadsList"></div>
+                </div>
+
+                <!-- Conversations Page -->
+                <div class="page" id="conversations">
+                    <div class="conversations-container">
+                        <div class="conversation-list" id="conversationList">
+                            <div style="padding: 20px; text-align: center; color: var(--text-secondary);">Loading conversations...</div>
+                        </div>
+                        <div class="conversation-panel" id="conversationPanel">
+                            <div class="conversation-no-select">Select a conversation to view messages</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventory Page -->
+                <div class="page" id="inventory">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; font-weight: 700;">Inventory</h2>
+                        <button class="btn btn-primary" id="refreshInventoryBtn">🔄 Refresh</button>
+                    </div>
+
+                    <div class="filters" style="margin-bottom: 20px;">
+                        <select class="filter-select" id="filterCondition">
+                            <option value="">All Conditions</option>
+                            <option value="New">New</option>
+                            <option value="Used">Used</option>
+                            <option value="Certified">Certified</option>
+                        </select>
+                        <select class="filter-select" id="filterModel">
+                            <option value="">All Models</option>
+                        </select>
+                        <input type="number" class="filter-select" id="filterMinPrice" placeholder="Min Price" style="flex: 1;">
+                        <input type="number" class="filter-select" id="filterMaxPrice" placeholder="Max Price" style="flex: 1;">
+                        <input type="text" class="filter-select" id="matchInterest" placeholder="Match to lead interest" style="flex: 1;">
+                    </div>
+
+                    <div class="inventory-grid" id="inventoryGrid"></div>
+                </div>
+
+                <!-- Templates Page -->
+                <div class="page" id="templates">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; font-weight: 700;">Auto-Reply Templates</h2>
+                        <button class="btn btn-primary" id="addTemplateBtn">+ New Template</button>
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                            <button class="btn btn-secondary" id="tabEN" style="background-color: var(--gold); color: #000;">English</button>
+                            <button class="btn btn-secondary" id="tabES">Español</button>
+                        </div>
+                    </div>
+
+                    <div id="templatesList"></div>
+                </div>
+
+                <!-- Notifications Page -->
+                <div class="page" id="notifications">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; font-weight: 700;">Notifications</h2>
+                        <button class="btn btn-secondary" id="markAllReadBtn">Mark All as Read</button>
+                    </div>
+
+                    <div id="notificationsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Add/Edit Lead Modal -->
+    <div class="modal" id="leadModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="leadModalTitle">Add New Lead</span>
+                <span class="modal-close" onclick="closeLead Modal()">✕</span>
+            </div>
+            <form id="leadForm" onsubmit="saveLead(event)">
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input type="text" class="form-input" id="leadName" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phone</label>
+                    <input type="tel" class="form-input" id="leadPhone">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" id="leadEmail">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Interest</label>
+                    <input type="text" class="form-input" id="leadInterest" placeholder="e.g., 2024 Silverado">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Source</label>
+                    <select class="form-select" id="leadSource">
+                        <option value="Manual">Manual</option>
+                        <option value="FB Messenger">FB Messenger</option>
+                        <option value="Instagram DM">Instagram DM</option>
+                        <option value="FB Lead Ad">FB Lead Ad</option>
+                        <option value="FB Comment">FB Comment</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Stage</label>
+                    <select class="form-select" id="leadStage">
+                        <option value="New Lead">New Lead</option>
+                        <option value="Contacted">Contacted</option>
+                        <option value="Appointment">Appointment</option>
+                        <option value="Negotiation">Negotiation</option>
+                        <option value="Sold">Sold</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Follow-up Date</label>
+                    <input type="date" class="form-input" id="leadFollowUpDate">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Language</label>
+                    <select class="form-select" id="leadLanguage">
+                        <option value="EN">English</option>
+                        <option value="ES">Spanish</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-textarea" id="leadNotes" placeholder="Internal notes..."></textarea>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">Save Lead</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeLeadModal()">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="deleteLeadBtn" style="display: none; margin-left: auto;">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Template Modal -->
+    <div class="modal" id="templateModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="templateModalTitle">Add New Template</span>
+                <span class="modal-close" onclick="closeTemplateModal()">✕</span>
+            </div>
+            <form id="templateForm" onsubmit="saveTemplate(event)">
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input type="text" class="form-input" id="templateName" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Trigger Type</label>
+                    <select class="form-select" id="templateTrigger">
+                        <option value="new_message">New Message</option>
+                        <option value="keyword">Keyword</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Keywords (comma separated)</label>
+                    <input type="text" class="form-input" id="templateKeywords" placeholder="e.g., hi, hello, hey">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Delay (minutes)</label>
+                    <input type="number" class="form-input" id="templateDelay" value="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Message *</label>
+                    <textarea class="form-textarea" id="templateMessage" required placeholder="Your auto-reply message..."></textarea>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">Save Template</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeTemplateModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lead Detail Modal -->
+    <div class="modal" id="leadDetailModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <span id="detailLeadName"></span>
+                <span class="modal-close" onclick="closeLeadDetailModal()">✕</span>
+            </div>
+            <div id="leadDetailContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE = getApiBase();
+
+        function getApiBase() {
+            const hostname = window.location.hostname;
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                return 'http://localhost:3001';
+            }
+            return 'https://gabe-moves-metal.onrender.com';
+        }
+
+        // State
+        let currentUser = { id: 'gabe-1', name: 'Gabe' };
+        let allLeads = [];
+        let allConversations = [];
+        let allNotifications = [];
+        let currentConversation = null;
+        let selectedLeadId = null;
+        let templateLanguage = 'EN';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupNavigation();
+            setupEventListeners();
+            loadDashboard();
+            setInterval(loadDashboard, 30000);
+        });
+
+        function setupNavigation() {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const page = item.dataset.page;
+                    switchPage(page);
+                });
+            });
+        }
+
+        function setupEventListeners() {
+            // Quick add lead button
+            document.getElementById('quickAddBtn').addEventListener('click', () => openLeadModal());
+            document.getElementById('addLeadBtn').addEventListener('click', () => openLeadModal());
+
+            // Filters
+            document.getElementById('filterStage').addEventListener('change', renderLeads);
+            document.getElementById('filterSource').addEventListener('change', renderLeads);
+            document.getElementById('filterLanguage').addEventListener('change', renderLeads);
+
+            // Inventory filters
+            document.getElementById('filterCondition').addEventListener('change', renderInventory);
+            document.getElementById('filterModel').addEventListener('change', renderInventory);
+            document.getElementById('filterMinPrice').addEventListener('change', renderInventory);
+            document.getElementById('filterMaxPrice').addEventListener('change', renderInventory);
+            document.getElementById('matchInterest').addEventListener('change', renderInventory);
+
+            // Inventory refresh
+            document.getElementById('refreshInventoryBtn').addEventListener('click', refreshInventory);
+
+            // Templates
+            document.getElementById('addTemplateBtn').addEventListener('click', () => openTemplateModal());
+            document.getElementById('tabEN').addEventListener('click', () => switchTemplateLanguage('EN'));
+            document.getElementById('tabES').addEventListener('click', () => switchTemplateLanguage('ES'));
+
+            // Notifications
+            document.getElementById('notificationBell').addEventListener('click', () => switchPage('notifications'));
+            document.getElementById('markAllReadBtn').addEventListener('click', markAllNotificationsRead);
+
+            // Search
+            document.getElementById('searchBox').addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                const currentPage = document.querySelector('.page.active').id;
+                if (currentPage === 'leads') {
+                    renderLeads();
+                }
+            });
+        }
+
+        function switchPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(page).classList.add('active');
+
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            document.querySelector(`[data-page="${page}"]`).classList.add('active');
+
+            const titles = {
+                dashboard: 'Dashboard',
+                leads: 'Leads',
+                conversations: 'Conversations',
+                inventory: 'Inventory',
+                templates: 'Auto-Reply Templates',
+                notifications: 'Notifications'
+            };
+            document.getElementById('pageTitle').textContent = titles[page];
+
+            if (page === 'leads') {
+                loadLeads();
+            } else if (page === 'conversations') {
+                loadConversations();
+            } else if (page === 'inventory') {
+                loadInventory();
+            } else if (page === 'templates') {
+                loadTemplates();
+            } else if (page === 'notifications') {
+                loadNotifications();
+            }
+        }
+
+        // Dashboard
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/api/stats`);
+                const stats = await response.json();
+
+                document.getElementById('totalLeads').textContent = stats.totalLeads || 0;
+                document.getElementById('newThisMonth').textContent = stats.newThisMonth || 0;
+                document.getElementById('conversations').textContent = stats.conversations || 0;
+                document.getElementById('unreadNotifications').textContent = stats.unreadNotifications || 0;
+
+                if (stats.unreadNotifications > 0) {
+                    document.getElementById('notificationCount').textContent = stats.unreadNotifications;
+                    document.getElementById('notificationCount').style.display = 'flex';
+                } else {
+                    document.getElementById('notificationCount').style.display = 'none';
+                }
+
+                // Pipeline
+                const byStage = stats.byStage || {};
+                const total = stats.totalLeads || 1;
+                document.querySelectorAll('.pipeline-count').forEach(el => {
+                    const stage = el.dataset.stage;
+                    const count = byStage[stage] || 0;
+                    el.textContent = count;
+                    el.parentElement.querySelector('.pipeline-percent').textContent =
+                        Math.round((count / total) * 100) + '%';
+                });
+
+                // Recent leads
+                loadLeads();
+                renderRecentLeads();
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        async function renderRecentLeads() {
+            try {
+                const response = await fetch(`${API_BASE}/api/leads`);
+                allLeads = await response.json();
+                const recent = allLeads.slice(0, 5);
+
+                let html = '';
+                recent.forEach(lead => {
+                    const stageBadgeClass = `badge-${lead.stage.toLowerCase().replace(/ /g, '')}`;
+                    const stageClass = `badge-${lead.stage.toLowerCase().replace(/ /g, '')}`;
+                    html += `
+                        <div class="lead-item" onclick="viewLeadDetail('${lead.id}')">
+                            <div class="lead-header">
+                                <div class="lead-name">${lead.name}</div>
+                                <span class="badge badge-${lead.source.toLowerCase().replace(/ /g, '')}">${lead.source}</span>
+                            </div>
+                            <div class="lead-meta">
+                                <span>${lead.phone || 'No phone'}</span>
+                                <span>•</span>
+                                <span class="badge ${stageClass}">${lead.stage}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                document.getElementById('recentLeads').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading recent leads:', error);
+            }
+        }
+
+        // Leads
+        async function loadLeads() {
+            try {
+                const response = await fetch(`${API_BASE}/api/leads`);
+                allLeads = await response.json();
+                renderLeads();
+            } catch (error) {
+                console.error('Error loading leads:', error);
+                document.getElementById('leadsList').innerHTML = '<p>Error loading leads.</p>';
+            }
+        }
+
+        function renderLeads() {
+            const stage = document.getElementById('filterStage').value;
+            const source = document.getElementById('filterSource').value;
+            const language = document.getElementById('filterLanguage').value;
+            const search = document.getElementById('searchBox').value.toLowerCase();
+
+            let filtered = allLeads.filter(lead => {
+                if (stage && lead.stage !== stage) return false;
+                if (source && lead.source !== source) return false;
+                if (language && lead.language !== language) return false;
+                if (search && !lead.name.toLowerCase().includes(search) &&
+                    !lead.phone?.toLowerCase().includes(search)) return false;
+                return true;
+            });
+
+            let html = '';
+            filtered.forEach(lead => {
+                const stageClass = `badge-${lead.stage.toLowerCase().replace(/ /g, '')}`;
+                const sourceClass = `badge-${lead.source.toLowerCase().replace(/ /g, '')}`;
+
+                let followUpHTML = '';
+                if (lead.followUpDate) {
+                    const today = new Date().toISOString().split('T')[0];
+                    const followUpDate = lead.followUpDate.split('T')[0];
+                    if (followUpDate < today) {
+                        followUpHTML = `<span class="followup-indicator followup-overdue">Overdue</span>`;
+                    } else if (followUpDate === today) {
+                        followUpHTML = `<span class="followup-indicator followup-today">Today</span>`;
+                    } else {
+                        followUpHTML = `<span class="followup-indicator followup-upcoming">Upcoming</span>`;
+                    }
+                }
+
+                html += `
+                    <div class="lead-item">
+                        <div class="lead-header">
+                            <div>
+                                <div class="lead-name">${lead.name}</div>
+                                <div class="lead-meta">
+                                    <span>${lead.phone || 'No phone'}</span>
+                                    <span>•</span>
+                                    <span>${lead.email || 'No email'}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="badge ${stageClass}">${lead.stage}</span>
+                                <span class="badge ${sourceClass}">${lead.source}</span>
+                                ${followUpHTML}
+                            </div>
+                        </div>
+                        <div class="lead-meta">
+                            <span>Interest: ${lead.interest || 'None specified'}</span>
+                        </div>
+                        <div class="lead-actions">
+                            <a href="tel:${lead.phone}" class="lead-action-btn" title="Call">📞 Call</a>
+                            <a href="sms:${lead.phone}" class="lead-action-btn" title="Text">💬 Text</a>
+                            ${lead.conversationId ? `<button class="lead-action-btn" onclick="viewConversation('${lead.conversationId}')">💬 Message</button>` : ''}
+                            <button class="lead-action-btn" onclick="viewLeadDetail('${lead.id}')">✏️ Edit</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('leadsList').innerHTML = html || '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No leads found.</p>';
+        }
+
+        function openLeadModal(leadId = null) {
+            selectedLeadId = leadId;
+            if (leadId) {
+                const lead = allLeads.find(l => l.id === leadId);
+                document.getElementById('leadModalTitle').textContent = 'Edit Lead';
+                document.getElementById('leadName').value = lead.name;
+                document.getElementById('leadPhone').value = lead.phone || '';
+                document.getElementById('leadEmail').value = lead.email || '';
+                document.getElementById('leadInterest').value = lead.interest || '';
+                document.getElementById('leadSource').value = lead.source;
+                document.getElementById('leadStage').value = lead.stage;
+                document.getElementById('leadFollowUpDate').value = lead.followUpDate?.split('T')[0] || '';
+                document.getElementById('leadLanguage').value = lead.language || 'EN';
+                document.getElementById('leadNotes').value = lead.notes || '';
+                document.getElementById('deleteLeadBtn').style.display = 'block';
+                document.getElementById('deleteLeadBtn').onclick = () => deleteLead(leadId);
+            } else {
+                document.getElementById('leadModalTitle').textContent = 'Add New Lead';
+                document.getElementById('leadForm').reset();
+                document.getElementById('deleteLeadBtn').style.display = 'none';
+            }
+            document.getElementById('leadModal').classList.add('active');
+        }
+
+        function closeLeadModal() {
+            document.getElementById('leadModal').classList.remove('active');
+            selectedLeadId = null;
+        }
+
+        async function saveLead(e) {
+            e.preventDefault();
+            const leadData = {
+                name: document.getElementById('leadName').value,
+                phone: document.getElementById('leadPhone').value,
+                email: document.getElementById('leadEmail').value,
+                interest: document.getElementById('leadInterest').value,
+                source: document.getElementById('leadSource').value,
+                stage: document.getElementById('leadStage').value,
+                followUpDate: document.getElementById('leadFollowUpDate').value,
+                language: document.getElementById('leadLanguage').value,
+                notes: document.getElementById('leadNotes').value
+            };
+
+            try {
+                const method = selectedLeadId ? 'PUT' : 'POST';
+                const url = selectedLeadId ? `${API_BASE}/api/leads/${selectedLeadId}` : `${API_BASE}/api/leads`;
+
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(leadData)
+                });
+
+                if (response.ok) {
+                    closeLeadModal();
+                    loadLeads();
+                    loadDashboard();
+                } else {
+                    alert('Error saving lead');
+                }
+            } catch (error) {
+                console.error('Error saving lead:', error);
+                alert('Error saving lead');
+            }
+        }
+
+        async function deleteLead(leadId) {
+            if (!confirm('Are you sure you want to delete this lead?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/leads/${leadId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    closeLeadModal();
+                    loadLeads();
+                    loadDashboard();
+                } else {
+                    alert('Error deleting lead');
+                }
+            } catch (error) {
+                console.error('Error deleting lead:', error);
+                alert('Error deleting lead');
+            }
+        }
+
+        function viewLeadDetail(leadId) {
+            const lead = allLeads.find(l => l.id === leadId);
+            if (!lead) return;
+
+            document.getElementById('detailLeadName').textContent = lead.name;
+
+            const stageClass = `badge-${lead.stage.toLowerCase().replace(/ /g, '')}`;
+            const sourceClass = `badge-${lead.source.toLowerCase().replace(/ /g, '')}`;
+
+            const detailHTML = `
+                <div class="detail-grid">
+                    <div class="detail-field">
+                        <div class="detail-field-label">Phone</div>
+                        <div class="detail-field-value">
+                            ${lead.phone ? `<a href="tel:${lead.phone}">${lead.phone}</a>` : 'Not provided'}
+                        </div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="detail-field-label">Email</div>
+                        <div class="detail-field-value">
+                            ${lead.email ? `<a href="mailto:${lead.email}">${lead.email}</a>` : 'Not provided'}
+                        </div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="detail-field-label">Interest</div>
+                        <div class="detail-field-value">${lead.interest || 'None specified'}</div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="detail-field-label">Stage</div>
+                        <div class="detail-field-value">
+                            <span class="badge ${stageClass}">${lead.stage}</span>
+                        </div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="detail-field-label">Source</div>
+                        <div class="detail-field-value">
+                            <span class="badge ${sourceClass}">${lead.source}</span>
+                        </div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="detail-field-label">Language</div>
+                        <div class="detail-field-value">${lead.language || 'EN'}</div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="detail-field-label">Follow-up Date</div>
+                        <div class="detail-field-value">${lead.followUpDate ? new Date(lead.followUpDate).toLocaleDateString() : 'Not set'}</div>
+                    </div>
+                    <div class="detail-field">
+                        <div class="detail-field-label">Created</div>
+                        <div class="detail-field-value">${new Date(lead.createdAt).toLocaleDateString()}</div>
+                    </div>
+                </div>
+
+                ${lead.notes ? `
+                    <div style="background-color: var(--dark-bg); padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                        <div class="detail-field-label">Notes</div>
+                        <div class="detail-field-value">${lead.notes}</div>
+                    </div>
+                ` : ''}
+
+                <div class="detail-actions">
+                    <button class="btn btn-primary" onclick="openLeadModal('${lead.id}')">Edit Lead</button>
+                    ${lead.conversationId ? `<button class="btn btn-secondary" onclick="viewConversation('${lead.conversationId}')">View Conversation</button>` : ''}
+                </div>
+            `;
+
+            document.getElementById('leadDetailContent').innerHTML = detailHTML;
+            document.getElementById('leadDetailModal').classList.add('active');
+        }
+
+        function closeLeadDetailModal() {
+            document.getElementById('leadDetailModal').classList.remove('active');
+        }
+
+        // Conversations
+        async function loadConversations() {
+            try {
+                const response = await fetch(`${API_BASE}/api/conversations`);
+                allConversations = await response.json();
+                renderConversationList();
+            } catch (error) {
+                console.error('Error loading conversations:', error);
+                document.getElementById('conversationList').innerHTML = '<p>Error loading conversations.</p>';
+            }
+        }
+
+        function renderConversationList() {
+            let html = '';
+            allConversations.forEach(conv => {
+                const lastMsg = conv.messages && conv.messages.length > 0 ?
+                    conv.messages[conv.messages.length - 1] : null;
+                const preview = lastMsg ? lastMsg.text.substring(0, 50) : 'No messages';
+                const platformClass = conv.platform === 'FB Messenger' ? 'badge-messenger' : 'badge-instagram';
+                const platformEmoji = conv.platform === 'FB Messenger' ? 'f' : '📷';
+
+                html += `
+                    <div class="conversation-item" onclick="viewConversation('${conv.id}')">
+                        <div class="conversation-header">
+                            <div class="conversation-avatar" style="background: linear-gradient(135deg, var(--gold), rgba(212, 160, 23, 0.5));">
+                                ${conv.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="conversation-info">
+                                <div class="conversation-name">${conv.name}</div>
+                                <div class="conversation-platform">
+                                    <span class="badge ${platformClass}" style="font-size: 11px;">${conv.platform}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="conversation-preview">${preview}</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('conversationList').innerHTML = html ||
+                '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">No conversations yet.</div>';
+        }
+
+        async function viewConversation(convId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/conversations/${convId}`);
+                const conv = await response.json();
+                currentConversation = conv;
+
+                const platformClass = conv.platform === 'FB Messenger' ? 'badge-messenger' : 'badge-instagram';
+
+                let messagesHTML = '';
+                (conv.messages || []).forEach(msg => {
+                    const isFromBot = msg.senderType === 'bot';
+                    const isFromSalesman = msg.senderId === currentUser.id;
+                    const messageClass = isFromSalesman ? 'message-salesman' : (isFromBot ? 'message-bot' : 'message-customer');
+
+                    messagesHTML += `
+                        <div class="message ${messageClass}">
+                            ${isFromBot ? '<div class="message-bot-tag">Bot</div>' : ''}
+                            <div class="message-bubble">${msg.text}</div>
+                            <div class="message-time">${new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                        </div>
+                    `;
+                });
+
+                const panelHTML = `
+                    <div style="padding: 15px; border-bottom: 1px solid var(--border-color);">
+                        <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">${conv.name}</div>
+                        <span class="badge ${platformClass}">${conv.platform}</span>
+                        ${conv.leadId ? `<button class="btn btn-sm btn-secondary" style="margin-left: 10px;" onclick="viewLeadDetail('${conv.leadId}')">View Lead</button>` : ''}
+                    </div>
+                    <div class="message-thread">${messagesHTML}</div>
+                    <div class="reply-input-area">
+                        <input type="text" class="reply-input" id="replyInput" placeholder="Type your reply...">
+                        <button class="btn btn-primary" onclick="sendReply('${conv.id}')">Send</button>
+                    </div>
+                `;
+
+                document.getElementById('conversationPanel').innerHTML = panelHTML;
+                document.querySelector(`[data-conv-id="${conv.id}"]`)?.classList.add('active');
+                document.querySelectorAll('.conversation-item').forEach(item => item.classList.remove('active'));
+                document.querySelector(`[onclick="viewConversation('${conv.id}')"]`)?.classList.add('active');
+
+                document.getElementById('replyInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        sendReply(convId);
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading conversation:', error);
+            }
+        }
+
+        async function sendReply(convId) {
+            const text = document.getElementById('replyInput').value.trim();
+            if (!text) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/conversations/${convId}/reply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+
+                if (response.ok) {
+                    document.getElementById('replyInput').value = '';
+                    viewConversation(convId);
+                } else {
+                    alert('Error sending reply');
+                }
+            } catch (error) {
+                console.error('Error sending reply:', error);
+                alert('Error sending reply');
+            }
+        }
+
+        // Inventory
+        async function loadInventory() {
+            try {
+                const response = await fetch(`${API_BASE}/api/inventory`);
+                const inventory = await response.json();
+                renderInventory();
+            } catch (error) {
+                console.error('Error loading inventory:', error);
+                document.getElementById('inventoryGrid').innerHTML = '<p>Error loading inventory.</p>';
+            }
+        }
+
+        async function renderInventory() {
+            const condition = document.getElementById('filterCondition').value;
+            const model = document.getElementById('filterModel').value;
+            const minPrice = document.getElementById('filterMinPrice').value;
+            const maxPrice = document.getElementById('filterMaxPrice').value;
+            const interest = document.getElementById('matchInterest').value;
+
+            const params = new URLSearchParams();
+            if (condition) params.append('condition', condition);
+            if (model) params.append('model', model);
+            if (minPrice) params.append('minPrice', minPrice);
+            if (maxPrice) params.append('maxPrice', maxPrice);
+            if (interest) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/inventory/match?interest=${encodeURIComponent(interest)}`);
+                    const matched = await response.json();
+                    renderInventoryGrid(matched);
+                    return;
+                } catch (error) {
+                    console.error('Error matching inventory:', error);
+                }
+            }
+
+            try {
+                const url = `${API_BASE}/api/inventory${params.toString() ? '?' + params.toString() : ''}`;
+                const response = await fetch(url);
+                const vehicles = await response.json();
+                renderInventoryGrid(vehicles);
+            } catch (error) {
+                console.error('Error filtering inventory:', error);
+            }
+        }
+
+        function renderInventoryGrid(vehicles) {
+            let html = '';
+            vehicles.forEach(vehicle => {
+                html += `
+                    <div class="inventory-card">
+                        <div class="inventory-image">🚗</div>
+                        <div class="inventory-details">
+                            <div class="inventory-title">${vehicle.year} ${vehicle.make} ${vehicle.model}</div>
+                            <div class="inventory-price">$${vehicle.price?.toLocaleString()}</div>
+                            <div class="inventory-info">
+                                <div>Condition: ${vehicle.condition}</div>
+                                <div>Stock: ${vehicle.stockNumber}</div>
+                                <div>Mileage: ${vehicle.mileage?.toLocaleString() || 'N/A'} mi</div>
+                            </div>
+                            <button class="btn btn-sm btn-primary" style="width: 100%; margin-top: 10px;">View Details</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('inventoryGrid').innerHTML = html ||
+                '<p style="color: var(--text-secondary); text-align: center; padding: 40px; grid-column: 1/-1;">No vehicles found.</p>';
+        }
+
+        async function refreshInventory() {
+            try {
+                await fetch(`${API_BASE}/api/inventory/refresh`, { method: 'POST' });
+                loadInventory();
+            } catch (error) {
+                console.error('Error refreshing inventory:', error);
+            }
+        }
+
+        // Templates
+        async function loadTemplates() {
+            try {
+                const response = await fetch(`${API_BASE}/api/templates`);
+                const templates = await response.json();
+                renderTemplates(templates);
+            } catch (error) {
+                console.error('Error loading templates:', error);
+                document.getElementById('templatesList').innerHTML = '<p>Error loading templates.</p>';
+            }
+        }
+
+        function renderTemplates(templates) {
+            const filtered = templates.filter(t => t.lang === templateLanguage);
+            let html = '';
+
+            filtered.forEach(template => {
+                const triggerLabel = template.trigger === 'new_message' ? 'New Message' : 'Keyword';
+                const keywordsDisplay = template.keywords?.join(', ') || '-';
+
+                html += `
+                    <div class="template-item">
+                        <div class="template-content">
+                            <div class="template-name">${template.name}</div>
+                            <div class="template-trigger">Trigger: ${triggerLabel}</div>
+                            <div class="template-text">"${template.message}"</div>
+                            <div class="template-keywords">Keywords: ${keywordsDisplay} | Delay: ${template.delay || 0}m</div>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div class="toggle-switch ${template.active ? 'active' : ''}" onclick="toggleTemplate('${template.id}', this)">
+                                <div class="toggle-slider"></div>
+                            </div>
+                            <button class="btn btn-sm btn-secondary" onclick="editTemplate('${template.id}')">Edit</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('templatesList').innerHTML = html ||
+                '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No templates yet.</p>';
+        }
+
+        function switchTemplateLanguage(lang) {
+            templateLanguage = lang;
+            document.getElementById('tabEN').style.backgroundColor = lang === 'EN' ? 'var(--gold)' : 'var(--card-bg)';
+            document.getElementById('tabEN').style.color = lang === 'EN' ? '#000' : 'var(--text-primary)';
+            document.getElementById('tabES').style.backgroundColor = lang === 'ES' ? 'var(--gold)' : 'var(--card-bg)';
+            document.getElementById('tabES').style.color = lang === 'ES' ? '#000' : 'var(--text-primary)';
+            loadTemplates();
+        }
+
+        function openTemplateModal(templateId = null) {
+            document.getElementById('templateForm').reset();
+            if (templateId) {
+                // Load template for editing
+                document.getElementById('templateModalTitle').textContent = 'Edit Template';
+            } else {
+                document.getElementById('templateModalTitle').textContent = 'Add New Template';
+            }
+            document.getElementById('templateModal').classList.add('active');
+        }
+
+        function closeTemplateModal() {
+            document.getElementById('templateModal').classList.remove('active');
+        }
+
+        async function saveTemplate(e) {
+            e.preventDefault();
+            const templateData = {
+                name: document.getElementById('templateName').value,
+                trigger: document.getElementById('templateTrigger').value,
+                keywords: document.getElementById('templateKeywords').value.split(',').map(k => k.trim()),
+                delay: parseInt(document.getElementById('templateDelay').value) || 0,
+                message: document.getElementById('templateMessage').value,
+                lang: templateLanguage,
+                active: true
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/api/templates`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(templateData)
+                });
+
+                if (response.ok) {
+                    closeTemplateModal();
+                    loadTemplates();
+                } else {
+                    alert('Error saving template');
+                }
+            } catch (error) {
+                console.error('Error saving template:', error);
+                alert('Error saving template');
+            }
+        }
+
+        async function toggleTemplate(templateId, element) {
+            try {
+                const isActive = element.classList.contains('active');
+                const response = await fetch(`${API_BASE}/api/templates/${templateId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active: !isActive })
+                });
+
+                if (response.ok) {
+                    element.classList.toggle('active');
+                } else {
+                    alert('Error updating template');
+                }
+            } catch (error) {
+                console.error('Error updating template:', error);
+            }
+        }
+
+        // Notifications
+        async function loadNotifications() {
+            try {
+                const response = await fetch(`${API_BASE}/api/notifications`);
+                allNotifications = await response.json();
+                renderNotifications();
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+                document.getElementById('notificationsList').innerHTML = '<p>Error loading notifications.</p>';
+            }
+        }
+
+        function renderNotifications() {
+            let html = '';
+            allNotifications.forEach(notif => {
+                const unreadClass = !notif.read ? 'unread' : '';
+                html += `
+                    <div class="notification-item ${unreadClass}" onclick="markNotificationRead('${notif.id}')">
+                        <div class="notification-title">${notif.title}</div>
+                        <div class="notification-message">${notif.message}</div>
+                        <div class="notification-time">${new Date(notif.createdAt).toLocaleString()}</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('notificationsList').innerHTML = html ||
+                '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No notifications.</p>';
+        }
+
+        async function markNotificationRead(notifId) {
+            try {
+                await fetch(`${API_BASE}/api/notifications/${notifId}/read`, { method: 'PUT' });
+                loadNotifications();
+                loadDashboard();
+            } catch (error) {
+                console.error('Error marking notification as read:', error);
+            }
+        }
+
+        async function markAllNotificationsRead() {
+            try {
+                await fetch(`${API_BASE}/api/notifications/read-all`, { method: 'POST' });
+                loadNotifications();
+                loadDashboard();
+            } catch (error) {
+                console.error('Error marking all notifications as read:', error);
+            }
+        }
+    </script>
+</body>
+</html>
