@@ -2998,7 +2998,8 @@
                     {label:'Tier', value: ms.tier || '--', color:'#ce93d8'},
                     {label:'Total Gross', value: fmt$(ms.totalGrossEntered || 0), color: (ms.totalGrossEntered||0) >= 0 ? '#81c784':'#ef5350'},
                     {label:'Commission', value: fmt$(ms.commissionTotal || 0), color:'#ffd54f'},
-                    {label:'Spiffs', value: fmt$(ms.spiffsAuto || 0), color:'#4db6ac'},
+                    {label:'Spiffs Paid', value: fmt$(ms.spiffsPaid || 0), color:'#81c784'},
+                    {label:'Spiffs Pending', value: fmt$(ms.spiffsPendingCalc || 0), color: (ms.spiffsPendingCalc || 0) > 0 ? '#ffa726' : '#81c784'},
                     {label:'Net After Draw', value: fmt$(ms.netAfterDraw || 0), color: (ms.netAfterDraw||0) >= 0 ? '#81c784':'#ef5350'},
                 ].map(c => `<div style="background:var(--card-bg);border-radius:10px;padding:12px;border:1px solid var(--border-color);">
                     <div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px;">${c.label}</div>
