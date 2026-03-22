@@ -1208,22 +1208,97 @@ const STAGES_LIST = ['New Lead', 'Contacted', 'Appointment', 'Negotiation', 'Sol
 // ==================== AUTO-POSTING ENGINE ====================
 // Create and publish posts to Facebook, Instagram, and WhatsApp Status
 
-// -- Post Templates (pre-built content types) --
+// -- Meta Algorithm-Optimized Post Engine --
+// Strategy: Hook → Value → CTA → Hashtags (bilingual EN+ES)
+// Hashtags: 3-5 branded + 5-8 niche/location + 2-3 trending = 10-16 total (Meta sweet spot)
+// Line breaks for readability (algorithm rewards time-on-post)
+
+// Hashtag engine — mixes branded, niche, location, and engagement tags
+function getHashtags(type, data) {
+  const branded = ['#GabeMovesmetal', '#FindlayChevrolet', '#FindlayChevy'];
+  const location = ['#LasVegas', '#Vegas', '#Henderson', '#NevadaCars'];
+  const chevy = ['#Chevrolet', '#Chevy', '#ChevyNation', '#ChevyTrucks'];
+  
+  const modelTag = data.vehicleModel ? '#' + data.vehicleModel.replace(/\s+/g, '') : '';
+  const yearTag = data.vehicleYear ? '#' + data.vehicleYear : '';
+  
+  const typeSpecific = {
+    sold_customer: ['#Sold', '#NewCar', '#HappyCustomer', '#JustSold', '#CustomerAppreciation', '#DreamCar', '#CarDelivery'],
+    current_deal: ['#CarDeals', '#AutoDeals', '#SpecialOffer', '#LimitedTime', '#SaveBig', '#NewCarDeal', '#ChevyDeals'],
+    inventory_highlight: ['#NewInventory', '#JustArrived', '#InStock', '#TestDrive', '#CarShopping', '#NewArrival', '#HotRide'],
+    personal_brand: ['#CarSales', '#SalesLife', '#Hustle', '#Grind', '#AutomotiveSales', '#DealerLife', '#MovingMetal'],
+  };
+  
+  const pool = [...branded, ...location.slice(0, 2), ...chevy.slice(0, 2)];
+  if (modelTag) pool.push(modelTag);
+  if (yearTag) pool.push(yearTag);
+  
+  const specific = typeSpecific[type] || [];
+  // Pick 5-6 random type-specific tags
+  const shuffled = specific.sort(() => 0.5 - Math.random());
+  pool.push(...shuffled.slice(0, 5));
+  
+  // Deduplicate and return
+  return [...new Set(pool)].join(' ');
+}
+
+// Engagement hooks — Meta rewards posts that stop the scroll
+const HOOKS = {
+  sold_customer: [
+    'SOLD! 🎉🔑',
+    'Another one OFF the lot! 🎉',
+    'Keys delivered. Dreams realized. 🔑✨',
+    'This is why I do what I do 🙌',
+    'CONGRATULATIONS are in order! 🎊',
+  ],
+  current_deal: [
+    '🚨 DEAL ALERT 🚨',
+    'You\'re gonna want to see this 👀',
+    'My manager said YES to this one 🤝',
+    'This deal won\'t last — real talk 💯',
+    'READ THIS before you buy anywhere else ⬇️',
+  ],
+  inventory_highlight: [
+    'JUST HIT THE LOT 🔥',
+    'Fresh off the truck 🚛✨',
+    'This one won\'t sit long 👀',
+    'Who wants it? 🙋‍♂️',
+    'Stop scrolling — look at this beauty 😍',
+  ],
+  personal_brand: [
+    'Let me keep it real with you 💯',
+    'People always ask me how I do it...',
+    'This is what moving metal looks like 💪',
+    'Grateful for another day on the lot 🙏',
+    'The grind doesn\'t stop 🏆',
+  ],
+};
+
+function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
 const POST_TEMPLATES = {
   sold_customer: {
     type: 'sold_customer',
     label: 'Sold Customer Celebration',
     fields: ['customerName', 'vehicleYear', 'vehicleModel', 'vehicleTrim', 'imageUrl'],
     generateCaption: (data) => {
+      const hook = pickRandom(HOOKS.sold_customer);
+      const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
       const captions = [
-        `Congratulations to ${data.customerName} on their brand new ${data.vehicleYear} ${data.vehicleModel}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}! Another happy customer driving off the lot at Findlay Chevrolet. When you're ready to move metal, you know who to call! #GabeMovesmetal #FindlayChevrolet #Sold #NewCar`,
-        `SOLD! ${data.customerName} just drove off in a ${data.vehicleYear} ${data.vehicleModel}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}! Thank you for trusting me with your purchase. It's what I do — I move metal! #FindlayChevy #GabeMovesmetal #CustomerFirst`,
-        `Another one off the lot! Huge congrats to ${data.customerName} on this beautiful ${data.vehicleYear} ${data.vehicleModel}. The #1 volume dealer west of Texas keeps delivering. Who's next? #GabeMovesmetal #FindlayChevrolet #MovingMetal`,
+        `${hook}\n\nHuge congrats to ${data.customerName} on their brand new ${vehicle}! 🚗💨\n\nThis is what happens when you trust the process. You come in, we find the perfect ride, and you drive off HAPPY.\n\nReady to be next? DM me or call/text — I got you.\n📱 (702) 416-3741\n\n${getHashtags('sold_customer', data)}`,
+        `${hook}\n\n${data.customerName} just drove off in a BRAND NEW ${vehicle} and I couldn't be more hyped for them! 🔥\n\nFrom the test drive to the handshake — we made it happen at Findlay Chevrolet, the #1 volume dealer west of Texas.\n\nWho's next? Drop a 🔑 if you're ready!\n\n${getHashtags('sold_customer', data)}`,
+        `${hook}\n\nWelcome to the family, ${data.customerName}! 🤝\n\nYou came in looking for the right ${data.vehicleModel || 'ride'} and we got you RIGHT. That's how we do it at Findlay Chevy.\n\nIf you or someone you know is in the market — send them my way. I take care of my people. 💯\n\n${getHashtags('sold_customer', data)}`,
       ];
-      return captions[Math.floor(Math.random() * captions.length)];
+      return pickRandom(captions);
     },
     generateCaptionES: (data) => {
-      return `¡Felicidades a ${data.customerName} por su ${data.vehicleYear} ${data.vehicleModel}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''} nuevo! Otro cliente feliz saliendo del lote en Findlay Chevrolet. ¡Cuando estés listo, ya sabes a quién llamar! #GabeMovesmetal #FindlayChevrolet #Vendido`;
+      const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
+      return `¡VENDIDO! 🎉🔑\n\n¡Felicidades a ${data.customerName} por su ${vehicle} nuevo! 🚗💨\n\nEsto es lo que pasa cuando confías en el proceso. Vienes, encontramos el carro perfecto, y te vas FELIZ.\n\n¿Listo para ser el siguiente? Mándame mensaje o llámame — yo te ayudo.\n📱 (702) 416-3741\n\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('sold_customer', data)}`;
+    },
+    generateBilingual: (data) => {
+      const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
+      const hook = pickRandom(HOOKS.sold_customer);
+      return `${hook}\n\nCongrats to ${data.customerName} on their brand new ${vehicle}! 🚗💨\nAnother happy customer driving off the lot at Findlay Chevrolet — the #1 volume dealer west of Texas.\n\nReady to be next? DM me or call/text 📱 (702) 416-3741\n\n—\n\n¡Felicidades a ${data.customerName} por su ${vehicle} nuevo! 🎉\nOtro cliente feliz saliendo de Findlay Chevrolet. ¿Listo para ser el siguiente?\n\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('sold_customer', data)}`;
     },
   },
   current_deal: {
@@ -1231,10 +1306,15 @@ const POST_TEMPLATES = {
     label: 'Current Deal / Special',
     fields: ['dealTitle', 'vehicleModel', 'dealDetails', 'expirationDate', 'imageUrl'],
     generateCaption: (data) => {
-      return `🔥 ${data.dealTitle} 🔥\n\n${data.dealDetails}\n\nDon't miss out — this deal on the ${data.vehicleModel} won't last forever${data.expirationDate ? '. Expires ' + data.expirationDate : ''}! DM me or come see me at Findlay Chevrolet.\n\n#FindlayChevrolet #GabeMovesmetal #Deals #Chevy #LasVegas`;
+      const hook = pickRandom(HOOKS.current_deal);
+      return `${hook}\n\n${data.dealTitle}\n\n${data.dealDetails}\n\n${data.expirationDate ? '⏰ Expires ' + data.expirationDate + ' — don\'t sleep on this!' : 'This won\'t last — first come, first served!'}\n\nDM me, call, or just pull up to Findlay Chevrolet. I'll make it happen. 🤝\n📱 (702) 416-3741\n\n${getHashtags('current_deal', data)}`;
     },
     generateCaptionES: (data) => {
-      return `🔥 ${data.dealTitle} 🔥\n\n${data.dealDetails}\n\n¡No te lo pierdas! Esta oferta en el ${data.vehicleModel} no dura para siempre${data.expirationDate ? '. Vence ' + data.expirationDate : ''}. Mándame un mensaje o ven a verme a Findlay Chevrolet.\n\n#FindlayChevrolet #GabeMovesmetal #Ofertas #Chevy`;
+      return `🚨 OFERTA 🚨\n\n${data.dealTitle}\n\n${data.dealDetails}\n\n${data.expirationDate ? '⏰ Vence ' + data.expirationDate + ' — ¡no te lo pierdas!' : '¡No dura para siempre — primero que llegue!'}\n\nMándame mensaje, llámame, o ven directo a Findlay Chevrolet. Yo te ayudo. 🤝\n📱 (702) 416-3741\n\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('current_deal', data)}`;
+    },
+    generateBilingual: (data) => {
+      const hook = pickRandom(HOOKS.current_deal);
+      return `${hook}\n\n${data.dealTitle}\n\n${data.dealDetails}\n\n${data.expirationDate ? '⏰ Expires ' + data.expirationDate : 'Won\'t last long!'} DM me or call 📱 (702) 416-3741\n\n—\n\n${data.dealTitle}\n${data.dealDetails}\n${data.expirationDate ? '⏰ Vence ' + data.expirationDate : '¡Apúrate!'}\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('current_deal', data)}`;
     },
   },
   inventory_highlight: {
@@ -1242,10 +1322,21 @@ const POST_TEMPLATES = {
     label: 'Inventory Highlight',
     fields: ['vehicleYear', 'vehicleModel', 'vehicleTrim', 'price', 'highlights', 'imageUrl'],
     generateCaption: (data) => {
-      return `Just hit the lot: ${data.vehicleYear} ${data.vehicleModel}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}${data.price ? ' — $' + Number(data.price).toLocaleString() : ''}\n\n${data.highlights || 'Come check it out!'}\n\nDM me for details or to schedule a test drive. We're Findlay Chevrolet — the #1 volume dealer west of Texas.\n\n#FindlayChevrolet #GabeMovesmetal #Chevy #${data.vehicleModel?.replace(/\s/g, '') || 'Chevrolet'} #LasVegas`;
+      const hook = pickRandom(HOOKS.inventory_highlight);
+      const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
+      const priceStr = data.price ? '💰 $' + Number(data.price).toLocaleString() : '';
+      return `${hook}\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n\n${data.highlights || 'Loaded and ready to roll.'}\n\nWant to see it in person? Schedule a test drive — DM me or hit my line:\n📱 (702) 416-3741\n\nFindlay Chevrolet — #1 volume dealer west of Texas 🏆\n\n${getHashtags('inventory_highlight', data)}`;
     },
     generateCaptionES: (data) => {
-      return `Acaba de llegar: ${data.vehicleYear} ${data.vehicleModel}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}${data.price ? ' — $' + Number(data.price).toLocaleString() : ''}\n\n${data.highlights || '¡Ven a verlo!'}\n\nMándame mensaje para más detalles o para agendar una prueba de manejo. Somos Findlay Chevrolet — el dealer #1 en volumen al oeste de Texas.\n\n#FindlayChevrolet #GabeMovesmetal #Chevy`;
+      const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
+      const priceStr = data.price ? '💰 $' + Number(data.price).toLocaleString() : '';
+      return `ACABA DE LLEGAR 🔥\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n\n${data.highlights || 'Cargado y listo para rodar.'}\n\n¿Quieres verlo en persona? Agenda un test drive — mándame mensaje:\n📱 (702) 416-3741\n\nFindlay Chevrolet — Dealer #1 en volumen al oeste de Texas 🏆\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('inventory_highlight', data)}`;
+    },
+    generateBilingual: (data) => {
+      const hook = pickRandom(HOOKS.inventory_highlight);
+      const vehicle = `${data.vehicleYear || ''} ${data.vehicleModel || ''}${data.vehicleTrim ? ' ' + data.vehicleTrim : ''}`.trim();
+      const priceStr = data.price ? '💰 $' + Number(data.price).toLocaleString() : '';
+      return `${hook}\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n\n${data.highlights || 'Loaded and ready.'}\n\nDM me or call 📱 (702) 416-3741\n\n—\n\n${vehicle}${priceStr ? '\n' + priceStr : ''}\n${data.highlights || 'Cargado y listo.'}\nMándame mensaje 📱 (702) 416-3741\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('inventory_highlight', data)}`;
     },
   },
   personal_brand: {
@@ -1253,10 +1344,15 @@ const POST_TEMPLATES = {
     label: 'Personal Brand Content',
     fields: ['message', 'imageUrl'],
     generateCaption: (data) => {
-      return `${data.message}\n\n— Gabe Barajas | Findlay Chevrolet\n#GabeMovesmetal #FindlayChevrolet #LasVegas #CarSales`;
+      const hook = pickRandom(HOOKS.personal_brand);
+      return `${hook}\n\n${data.message}\n\nIf you know someone looking for a car — send them my way. I take care of my people. Always. 🤝\n\n— Gabe Barajas\nFindlay Chevrolet | Las Vegas\n📱 (702) 416-3741\n\n${getHashtags('personal_brand', data)}`;
     },
     generateCaptionES: (data) => {
-      return `${data.message}\n\n— Gabe Barajas | Findlay Chevrolet\n#GabeMovesmetal #FindlayChevrolet #LasVegas`;
+      return `💯\n\n${data.message}\n\nSi conoces a alguien buscando carro — mándamelos. Yo cuido a mi gente. Siempre. 🤝\n\n— Gabe Barajas\nFindlay Chevrolet | Las Vegas\n📱 (702) 416-3741\nHablo español 🇲🇽🇺🇸\n\n${getHashtags('personal_brand', data)}`;
+    },
+    generateBilingual: (data) => {
+      const hook = pickRandom(HOOKS.personal_brand);
+      return `${hook}\n\n${data.message}\n\nKnow someone looking for a car? Send them my way. 🤝\n¿Conoces a alguien buscando carro? Mándamelos. 🇲🇽🇺🇸\n\n— Gabe Barajas\nFindlay Chevrolet | Las Vegas\n📱 (702) 416-3741\n\n${getHashtags('personal_brand', data)}`;
     },
   },
 };
@@ -1361,23 +1457,115 @@ app.get('/api/posts/templates', (req, res) => {
   res.json(templates);
 });
 
-// Generate a caption preview (without publishing)
+// AI-Powered Caption Generator (Claude API)
+// Falls back to templates if ANTHROPIC_API_KEY is not set
+app.post('/api/posts/ai-generate', async (req, res) => {
+  const { type, data, language } = req.body;
+  const template = POST_TEMPLATES[type];
+  if (!template) return res.status(400).json({ error: 'Unknown post type' });
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    // Fallback to templates
+    let caption;
+    if (language === 'bilingual' && template.generateBilingual) {
+      caption = template.generateBilingual(data);
+    } else if (language === 'es' && template.generateCaptionES) {
+      caption = template.generateCaptionES(data);
+    } else {
+      caption = template.generateCaption(data);
+    }
+    return res.json({ caption, source: 'template' });
+  }
+
+  // Build the AI prompt
+  const typeDescriptions = {
+    sold_customer: 'a customer delivery celebration post (someone just bought a car)',
+    current_deal: 'a promotional deal/special offer post',
+    inventory_highlight: 'a vehicle inventory showcase post (new arrival on the lot)',
+    personal_brand: 'a personal brand/motivational post from a car salesman',
+  };
+
+  const languageInstructions = {
+    en: 'Write the caption in English only.',
+    es: 'Write the caption in Spanish only. Include "Hablo español" somewhere.',
+    bilingual: 'Write the caption in BOTH English and Spanish. Put the English version first, then a line break with "—", then the Spanish version. Include "Hablo español" with flag emojis in the Spanish section.',
+  };
+
+  const prompt = `You are a social media caption writer for Gabe Barajas, a bilingual car salesman at Findlay Chevrolet in Las Vegas — the #1 volume Chevy dealer west of Texas. His brand is "Gabe Moves Metal."
+
+Write a Facebook post caption for ${typeDescriptions[type] || 'a social media post'}.
+
+POST DATA:
+${JSON.stringify(data, null, 2)}
+
+RULES FOR META ALGORITHM OPTIMIZATION:
+- Start with a scroll-stopping hook (1 short punchy line with emoji)
+- Use line breaks between sections (Meta rewards time-on-post)
+- Include a clear CTA (DM me, call/text, come see me)
+- Include Gabe's phone: (702) 416-3741
+- End with 10-15 hashtags mixing: branded (#GabeMovesmetal #FindlayChevrolet), location (#LasVegas #Vegas), niche (car-related), and engagement tags
+- Keep it authentic, energetic, and conversational — NOT corporate
+- Use emojis naturally but don't overdo it (3-6 per post)
+- If the vehicle model is mentioned, include a hashtag for it
+- Never use the word "utilize" or sound like a robot
+- Sound like a real person who genuinely loves selling cars
+
+${languageInstructions[language] || languageInstructions.bilingual}
+
+Write ONLY the caption text. No explanations or metadata.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const result = await response.json();
+    if (result.content && result.content[0]) {
+      return res.json({ caption: result.content[0].text, source: 'ai' });
+    }
+    throw new Error(result.error?.message || 'AI generation failed');
+  } catch (err) {
+    console.error('AI caption error, falling back to template:', err.message);
+    // Fallback to template
+    let caption;
+    if (language === 'bilingual' && template.generateBilingual) {
+      caption = template.generateBilingual(data);
+    } else if (language === 'es' && template.generateCaptionES) {
+      caption = template.generateCaptionES(data);
+    } else {
+      caption = template.generateCaption(data);
+    }
+    return res.json({ caption, source: 'template' });
+  }
+});
+
+// Generate a caption preview using templates (fast fallback)
 app.post('/api/posts/preview', (req, res) => {
   const { type, data, language } = req.body;
   const template = POST_TEMPLATES[type];
   if (!template) return res.status(400).json({ error: 'Unknown post type' });
 
-  const captionEN = template.generateCaption(data);
-  const captionES = template.generateCaptionES ? template.generateCaptionES(data) : captionEN;
-
-  res.json({
-    captionEN,
-    captionES,
-    caption: language === 'es' ? captionES : captionEN,
-  });
+  let caption;
+  if (language === 'bilingual' && template.generateBilingual) {
+    caption = template.generateBilingual(data);
+  } else if (language === 'es' && template.generateCaptionES) {
+    caption = template.generateCaptionES(data);
+  } else {
+    caption = template.generateCaption(data);
+  }
+  res.json({ caption, source: 'template' });
 });
 
-// Create and publish a post
 app.post('/api/posts/publish', async (req, res) => {
   const { type, data, platforms, language, customCaption } = req.body;
   // platforms: ['facebook', 'instagram', 'whatsapp'] or ['all']
@@ -1484,9 +1672,14 @@ app.post('/api/posts/sold', async (req, res) => {
   };
 
   const template = POST_TEMPLATES.sold_customer;
-  const caption = language === 'es'
-    ? template.generateCaptionES(req.body.data)
-    : template.generateCaption(req.body.data);
+  let caption;
+    if (language === 'bilingual' && template.generateBilingual) {
+      caption = template.generateBilingual(data);
+    } else if (language === 'es' && template.generateCaptionES) {
+      caption = template.generateCaptionES(data);
+    } else {
+      caption = template.generateCaption(data);
+    }
 
   const targetPlatforms = (platforms || ['facebook', 'instagram']);
   const results = [];
