@@ -50,10 +50,81 @@ const CONFIG = {
   MESSENGER_ID: '653248677865512',
 };
 
+// ==================== AUTHENTICATION ====================
+// Set CRM_PASSWORD in Render env vars. Default for local dev only.
+const CRM_PASSWORD = process.env.CRM_PASSWORD || 'gabemovesmetal2026';
+
+// Active sessions (token → { createdAt, expiresAt })
+const sessions = new Map();
+const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function isValidSession(token) {
+  if (!token) return false;
+  const session = sessions.get(token);
+  if (!session) return false;
+  if (Date.now() > session.expiresAt) {
+    sessions.delete(token);
+    return false;
+  }
+  return true;
+}
+
+// Extract token from Authorization header or query param
+function getToken(req) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice(7);
+  }
+  return req.query.token || null;
+}
+
+// Auth middleware — protects all /api/* routes
+function requireAuth(req, res, next) {
+  const token = getToken(req);
+  if (isValidSession(token)) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Unauthorized. Please log in.' });
+}
+
 // ==================== MIDDLEWARE ====================
 app.use(cors());
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf.toString(); } }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// ==================== AUTH ROUTES (public) ====================
+app.post('/auth/login', (req, res) => {
+  const { password } = req.body;
+  if (password === CRM_PASSWORD) {
+    const token = generateToken();
+    sessions.set(token, {
+      createdAt: Date.now(),
+      expiresAt: Date.now() + SESSION_DURATION,
+    });
+    return res.json({ success: true, token, expiresIn: SESSION_DURATION });
+  }
+  return res.status(401).json({ success: false, error: 'Wrong password.' });
+});
+
+app.post('/auth/logout', (req, res) => {
+  const token = getToken(req);
+  if (token) sessions.delete(token);
+  return res.json({ success: true });
+});
+
+app.get('/auth/check', (req, res) => {
+  const token = getToken(req);
+  return res.json({ authenticated: isValidSession(token) });
+});
+
+// ==================== PROTECT API ROUTES ====================
+// Webhook & public pages are NOT protected (Meta needs access)
+// All /api/* routes require authentication
+app.use('/api', requireAuth);
 
 // ==================== IN-MEMORY DATA STORE ====================
 // In production, replace with a database (SQLite, PostgreSQL, etc.)
