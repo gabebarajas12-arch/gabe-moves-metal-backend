@@ -2205,30 +2205,33 @@ app.post('/api/posts/ai-generate', async (req, res) => {
     bilingual: 'Write the caption in BOTH English and Spanish. Put the English version first, then a line break with "Ã¢ÂÂ", then the Spanish version. Include "Hablo espaÃÂ±ol" with flag emojis in the Spanish section.',
   };
 
-  const prompt = `You are a social media caption writer for Gabe Barajas, a bilingual car salesman at Findlay Chevrolet in Las Vegas Ã¢ÂÂ the #1 volume Chevy dealer west of Texas. His brand is "Gabe Moves Metal."
+  const prompt = `You are writing a social media post AS Gabe Barajas \u2014 a car salesman at Findlay Chevrolet in Las Vegas. Gabe is real, down to earth, and genuinely passionate about helping people find the right vehicle. He is NOT a corporate marketing department.
 
-Write a Facebook post caption for ${typeDescriptions[type] || 'a social media post'}.
-
-POST DATA:
+Write a ${typeDescriptions[type] || 'social media post'} using this info:
 ${JSON.stringify(data, null, 2)}
 
-RULES FOR META ALGORITHM OPTIMIZATION:
-- Start with a scroll-stopping hook (1 short punchy line with emoji)
-- Use line breaks between sections (Meta rewards time-on-post)
-- Include a clear CTA (DM me, call/text, come see me)
-- Include Gabe's phone: (702) 416-3741
-- End with 10-15 hashtags mixing: branded (#GabeMovesmetal #FindlayChevrolet), location (#LasVegas #Vegas), niche (car-related), and engagement tags
-- Keep it authentic, energetic, and conversational Ã¢ÂÂ NOT corporate
-- Use emojis naturally but don't overdo it (3-6 per post)
-- If the vehicle model is mentioned, include a hashtag for it
-- Never use the word "utilize" or sound like a robot
-- Sound like a real person who genuinely loves selling cars
+VOICE & TONE \u2014 THIS IS CRITICAL:
+- Write like a real person texting a friend about something exciting at work
+- NO generic sales phrases like "Don't miss out!", "Act now!", "Limited time!", "Incredible deal!", "Dream car!", "Look no further!"
+- NO excessive exclamation marks or ALL CAPS words
+- NO robot language \u2014 if it sounds like a car commercial, rewrite it
+- Talk like Gabe actually talks: casual, warm, confident but not pushy
+- Share the genuine excitement without the used-car-salesman energy
+- It should feel like a real post you'd see from someone you know, not an ad
+- 2-4 emojis max, placed naturally \u2014 not every other word
+
+STRUCTURE:
+- Open with something real and specific (not a generic hook)
+- Keep it conversational \u2014 short sentences, natural line breaks
+- Include Gabe's number (702) 416-3741 casually, like "hit my line" or "text me"
+- End with 5-8 relevant hashtags (not 15) \u2014 #FindlayChevrolet #LasVegas #GabeMovesmetal plus model-specific ones
+- Total length: 4-8 lines of actual content before hashtags
+
+${customerContext ? 'PERSONAL CONTEXT (weave this in naturally): ' + customerContext : ''}
 
 ${languageInstructions[language] || languageInstructions.bilingual}
 
-Write ONLY the caption text. No explanations or metadata.
-
-IMPORTANT: If customer context/story is provided, weave those details naturally into the caption to make it personal and authentic. For example, if they are a repeat customer, mention their loyalty. If first-time buyer, celebrate the milestone. If referral, acknowledge the connection.`;
+Write ONLY the caption. Nothing else.`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -3433,10 +3436,16 @@ async function scrapeFindlayDeals() {
       const stockMatch = text.match(/Stock[:#]?\s*([A-Z0-9]+)/i);
       
       if (name && (savings || discount || customerCash || findlayPrice)) {
+        const img = card.find('img').first();
+        const image = img.attr('src') || img.attr('data-src') || '';
+        const vinEl = card.find('[data-vin]');
+        const vin = vinEl.attr('data-vin') || '';
         deals.push({
           vehicle: name,
           msrp, findlayPrice, savings, discount, customerCash,
           stock: stockMatch ? stockMatch[1] : '',
+          vin,
+          image,
           type: 'findlay_special',
           source: 'findlaychevy.com'
         });

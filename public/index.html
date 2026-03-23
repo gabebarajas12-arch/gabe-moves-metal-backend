@@ -2951,18 +2951,24 @@
         function renderInventoryGrid(vehicles) {
             let html = '';
             vehicles.forEach(vehicle => {
+                const imgSrc = vehicle.image || '';
+                const imgHtml = imgSrc
+                    ? `<img src="${imgSrc}" alt="${vehicle.year} ${vehicle.make} ${vehicle.model}" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div style="display:none;width:100%;height:160px;align-items:center;justify-content:center;background:#1a1a2e;border-radius:8px 8px 0 0;font-size:48px;">🚗</div>`
+                    : `<div style="width:100%;height:160px;display:flex;align-items:center;justify-content:center;background:#1a1a2e;border-radius:8px 8px 0 0;font-size:48px;">🚗</div>`;
+                const stockNum = vehicle.stockNumber || vehicle.stock || '';
+                const priceVal = vehicle.price || vehicle.msrp || '';
+                const priceDisplay = priceVal ? '$' + Number(String(priceVal).replace(/[^0-9]/g,'')).toLocaleString() : 'Call for price';
                 html += `
                     <div class="inventory-card">
-                        <div class="inventory-image">🚗</div>
-                        <div class="inventory-details">
-                            <div class="inventory-title">${vehicle.year} ${vehicle.make} ${vehicle.model}</div>
-                            <div class="inventory-price">$${vehicle.price?.toLocaleString()}</div>
+                        ${imgHtml}
+                        <div class="inventory-details" style="padding:12px;">
+                            <div class="inventory-title">${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}</div>
+                            <div class="inventory-price">${priceDisplay}</div>
                             <div class="inventory-info">
-                                <div>Condition: ${vehicle.condition}</div>
-                                <div>Stock: ${vehicle.stockNumber}</div>
-                                <div>Mileage: ${vehicle.mileage?.toLocaleString() || 'N/A'} mi</div>
+                                <div>Stock: ${stockNum || 'N/A'}</div>
+                                ${vehicle.vin ? '<div>VIN: ...' + vehicle.vin.slice(-6) + '</div>' : ''}
+                                <div>${vehicle.condition || 'New'}</div>
                             </div>
-                            <button class="btn btn-sm btn-primary" style="width: 100%; margin-top: 10px;">View Details</button>
                         </div>
                     </div>
                 `;
@@ -3901,7 +3907,10 @@
                     d.apr ? d.apr + '% APR' : ''
                   ].filter(Boolean).join(' | '),
                   expiration: d.expirationDate || d.expiry || '',
-                  source: d.source || 'findlaychevy.com'
+                  source: d.source || 'findlaychevy.com',
+                  image: d.image || '',
+                  stock: d.stock || d.stockNumber || '',
+                  vin: d.vin || ''
                 }));
                 renderLiveDeals(liveDealsCache);
               } catch(err) {
@@ -3914,7 +3923,7 @@
     function renderLiveDeals(deals) {
       const grid = document.getElementById('liveDealsGrid');
       if (!grid) return;
-      
+
       grid.innerHTML = deals.map((deal, i) => {
         const model = deal.model || 'Chevrolet';
         const type = deal.offer_type || 'Special';
@@ -3922,12 +3931,28 @@
         const details = deal.details || '';
         const source = deal.source || '';
         const exp = deal.expiration || '';
-        return '<div class="deal-card-pick" onclick="selectDeal(' + i + ')" data-index="' + i + '">' +
+        const img = deal.image || '';
+        const stock = deal.stock || '';
+        const vin = deal.vin || '';
+
+        const imgHtml = img
+          ? '<img src="' + img + '" alt="' + model + '" style="width:100%;height:120px;object-fit:cover;border-radius:8px 8px 0 0;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+            '<div style="display:none;width:100%;height:120px;background:var(--card-bg);border-radius:8px 8px 0 0;align-items:center;justify-content:center;font-size:36px;">🚗</div>'
+          : '<div style="width:100%;height:120px;background:var(--card-bg);border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:center;font-size:36px;">🚗</div>';
+
+        const stockHtml = stock ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">Stock #' + stock + '</div>' : '';
+        const vinHtml = vin ? '<div style="font-size:11px;color:var(--text-secondary);">VIN: ...' + vin.slice(-6) + '</div>' : '';
+
+        return '<div class="deal-card-pick" onclick="selectDeal(' + i + ')" data-index="' + i + '" style="overflow:hidden;">' +
+          imgHtml +
+          '<div style="padding:8px 12px;">' +
           '<div class="deal-type">' + type + '</div>' +
           '<div class="deal-model">' + model + '</div>' +
           '<div class="deal-headline">' + headline + '</div>' +
+          stockHtml + vinHtml +
           (exp ? '<div class="deal-source">Expires: ' + exp + '</div>' : '') +
           '<div class="deal-source">Source: ' + source + '</div>' +
+          '</div>' +
         '</div>';
       }).join('');
     }
@@ -3953,8 +3978,19 @@
       if (detailsEl) detailsEl.value = [
         deal.headline || '',
         deal.details || '',
+        deal.stock ? 'Stock #' + deal.stock : '',
+        deal.vin ? 'VIN: ' + deal.vin : '',
         deal.source ? 'Source: ' + deal.source : ''
       ].filter(Boolean).join('\n');
+
+      // Store image URL for use in post generation
+      const imgPreview = document.getElementById('postDealImage');
+      if (imgPreview && deal.image) {
+        imgPreview.src = deal.image;
+        imgPreview.style.display = 'block';
+      } else if (imgPreview) {
+        imgPreview.style.display = 'none';
+      }
     }
     
     // Auto-load deals when Current Deal post type is selected
