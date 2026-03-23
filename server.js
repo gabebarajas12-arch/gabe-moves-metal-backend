@@ -2321,6 +2321,154 @@ app.get('/api/calendar/feed', (req, res) => {
   }
 });
 
+// ============ APPOINTMENTS API ============
+let appointments = [];
+let apptIdCounter = 1;
+
+// Get all appointments (optionally filter by date)
+app.get('/api/appointments', (req, res) => {
+  try {
+    const { date, from, to } = req.query;
+    let filtered = [...appointments];
+    
+    if (date) {
+      filtered = filtered.filter(a => a.date === date);
+    } else if (from && to) {
+      filtered = filtered.filter(a => a.date >= from && a.date <= to);
+    }
+    
+    filtered.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return (a.time || '00:00').localeCompare(b.time || '00:00');
+    });
+    
+    res.json({ success: true, appointments: filtered });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create appointment
+app.post('/api/appointments', (req, res) => {
+  try {
+    const { customerName, date, time, type, duration, notes, vehicle, phone } = req.body;
+    if (!date || !type) {
+      return res.status(400).json({ success: false, error: 'Date and type are required' });
+    }
+    
+    const appt = {
+      id: apptIdCounter++,
+      customerName: customerName || '',
+      date,
+      time: time || '09:00',
+      type,
+      duration: duration || 30,
+      notes: notes || '',
+      vehicle: vehicle || '',
+      phone: phone || '',
+      status: 'scheduled',
+      createdAt: new Date().toISOString()
+    };
+    
+    appointments.push(appt);
+    res.json({ success: true, appointment: appt });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update appointment
+app.put('/api/appointments/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const idx = appointments.findIndex(a => a.id === id);
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Not found' });
+    
+    const updates = req.body;
+    appointments[idx] = { ...appointments[idx], ...updates, id };
+    res.json({ success: true, appointment: appointments[idx] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete appointment
+app.delete('/api/appointments/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const idx = appointments.findIndex(a => a.id === id);
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Not found' });
+    
+    appointments.splice(idx, 1);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate .ics for a single appointment
+app.get('/api/appointments/:id/ical', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const appt = appointments.find(a => a.id === id);
+    if (!appt) return res.status(404).json({ success: false, error: 'Not found' });
+    
+    const startDate = new Date(appt.date + 'T' + (appt.time || '09:00') + ':00');
+    const endDate = new Date(startDate.getTime() + (appt.duration || 30) * 60000);
+    const fmt = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    
+    const typeLabels = {
+      test_drive: 'Test Drive',
+      delivery: 'Vehicle Delivery',
+      follow_up: 'Follow-Up',
+      walk_in: 'Walk-In Appt',
+      phone_call: 'Phone Call',
+      team_meeting: 'Team Meeting',
+      training: 'Training',
+      manager_meeting: 'Manager Check-In',
+      other: 'Appointment'
+    };
+    
+    const label = typeLabels[appt.type] || appt.type;
+    const summary = appt.customerName ? label + ' - ' + appt.customerName : label;
+    const desc = [
+      appt.vehicle ? 'Vehicle: ' + appt.vehicle : '',
+      appt.phone ? 'Phone: ' + appt.phone : '',
+      appt.notes ? 'Notes: ' + appt.notes : ''
+    ].filter(Boolean).join('\\n');
+    
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Gabe Moves Metal//CRM//EN',
+      'BEGIN:VEVENT',
+      'UID:gmm-appt-' + appt.id + '@gabemovesmetal.com',
+      'DTSTAMP:' + fmt(new Date()),
+      'DTSTART:' + fmt(startDate),
+      'DTEND:' + fmt(endDate),
+      'SUMMARY:' + summary,
+      'DESCRIPTION:' + desc,
+      'CATEGORIES:Findlay Chevy,' + label,
+      'STATUS:CONFIRMED',
+      'BEGIN:VALARM',
+      'TRIGGER:-PT15M',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:' + summary + ' in 15 minutes',
+      'END:VALARM',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+    
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="appt-' + appt.date + '.ics"');
+    res.send(ics);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
 
 
 
