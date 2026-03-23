@@ -2707,38 +2707,63 @@ async function scrapeFindlayDeals() {
 }
 
 // GET /api/live-deals - returns combined deals from Findlay + Chevy.com
+// Falls back to curated sample deals when DDC WAF blocks scraping
 app.get('/api/live-deals', requireAuth, async (req, res) => {
   try {
     const now = Date.now();
     if (cachedDeals.length > 0 && (now - dealsLastFetch) < CACHE_TTL) {
       return res.json({ deals: cachedDeals, cached: true, lastFetch: dealsLastFetch });
     }
+    console.log('[Deals] Starting deals refresh...');
     const [findlayDeals, chevyOffers] = await Promise.all([
       scrapeFindlayDeals(),
       scrapeChevyOffers()
     ]);
-    cachedDeals = [...findlayDeals, ...chevyOffers];
+    const liveDeals = [...findlayDeals, ...chevyOffers];
+    if (liveDeals.length > 0) {
+      cachedDeals = liveDeals;
+      console.log('[Deals] Refresh complete: ' + liveDeals.length + ' structured deals');
+    } else {
+      // Fallback to curated deals when scrapers are blocked
+      const fallbackDeals = inventoryModule.getFallbackDeals ? inventoryModule.getFallbackDeals() : [];
+      const fallbackOffers = inventoryModule.getFallbackOffers ? inventoryModule.getFallbackOffers() : [];
+      cachedDeals = [...fallbackDeals, ...fallbackOffers];
+      console.log('[Deals] Scrapers blocked - using ' + cachedDeals.length + ' fallback deals');
+    }
     dealsLastFetch = now;
     res.json({ deals: cachedDeals, cached: false, lastFetch: dealsLastFetch });
   } catch (err) {
     console.error('[API] live-deals error:', err.message);
-    res.status(500).json({ error: 'Failed to fetch deals', details: err.message });
+    // Even on error, return fallback data instead of 500
+    const fallbackDeals = inventoryModule.getFallbackDeals ? inventoryModule.getFallbackDeals() : [];
+    const fallbackOffers = inventoryModule.getFallbackOffers ? inventoryModule.getFallbackOffers() : [];
+    res.json({ deals: [...fallbackDeals, ...fallbackOffers], cached: false, fallback: true });
   }
 });
 
 // GET /api/live-inventory - returns inventory from Findlay
+// Falls back to curated inventory when DDC WAF blocks scraping
 app.get('/api/live-inventory', requireAuth, async (req, res) => {
   try {
     const now = Date.now();
     if (cachedInventory.length > 0 && (now - inventoryLastFetch) < CACHE_TTL) {
       return res.json({ inventory: cachedInventory, cached: true, lastFetch: inventoryLastFetch });
     }
-    cachedInventory = await scrapeFindlayInventory();
+    const scraped = await scrapeFindlayInventory();
+    if (scraped.length > 0) {
+      cachedInventory = scraped;
+      console.log('[Inventory] Live scrape: ' + scraped.length + ' vehicles');
+    } else {
+      // Fallback to curated inventory when DDC blocks us
+      cachedInventory = inventoryModule.getInventory();
+      console.log('[Inventory] Scrapers blocked - using ' + cachedInventory.length + ' fallback vehicles');
+    }
     inventoryLastFetch = now;
     res.json({ inventory: cachedInventory, cached: false, lastFetch: inventoryLastFetch });
   } catch (err) {
     console.error('[API] live-inventory error:', err.message);
-    res.status(500).json({ error: 'Failed to fetch inventory', details: err.message });
+    // Even on error, return fallback data instead of 500
+    res.json({ inventory: inventoryModule.getInventory(), cached: false, fallback: true });
   }
 });
 
