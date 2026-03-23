@@ -2444,7 +2444,17 @@ async function scrapeDeals() {
 // // Auto-refresh deals every 12 hours
 // setInterval(() => { scrapeDeals().catch(console.error); }, 12 * 60 * 60 * 1000);
 // // Initial scrape on server start (delayed 10s to let server boot) // Disabled old inventory auto-refresh
-setTimeout(() => { scrapeDeals().catch(console.error); }, 10000);
+// Deferred: scrape on first API request instead of boot (fixes Render deploy timeouts)
+// setTimeout(() => { scrapeDeals().catch(console.error); }, 10000);
+
+let initialScrapeTriggered = false;
+function triggerInitialScrape() {
+  if (!initialScrapeTriggered) {
+    initialScrapeTriggered = true;
+    console.log('[Scraper] First API request - triggering initial scrape...');
+    scrapeDeals().catch(e => console.error('[Scraper] Initial scrape error:', e.message));
+  }
+}
 
 // GET /api/deals - Return cached deals
 app.get('/api/deals', (req, res) => {
@@ -3444,6 +3454,7 @@ async function scrapeFindlayDeals() {
 // GET /api/live-deals - returns combined deals from Findlay + Chevy.com
 // Falls back to curated sample deals when DDC WAF blocks scraping
 app.get('/api/live-deals', requireAuth, async (req, res) => {
+  triggerInitialScrape();
   try {
     const now = Date.now();
     if (cachedDeals.length > 0 && (now - dealsLastFetch) < CACHE_TTL) {
@@ -3479,6 +3490,7 @@ app.get('/api/live-deals', requireAuth, async (req, res) => {
 // GET /api/live-inventory - returns inventory from Findlay
 // Falls back to curated inventory when DDC WAF blocks scraping
 app.get('/api/live-inventory', requireAuth, async (req, res) => {
+  triggerInitialScrape();
   try {
     const now = Date.now();
     if (cachedInventory.length > 0 && (now - inventoryLastFetch) < CACHE_TTL) {
