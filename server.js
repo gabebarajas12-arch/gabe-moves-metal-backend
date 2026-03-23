@@ -2473,6 +2473,211 @@ app.get('/api/appointments/:id/ical', (req, res) => {
 
 
 // ==================== START SERVER ====================
+
+// ===== LIVE DEALS & INVENTORY SCRAPERS =====
+let cachedDeals = [];
+let cachedInventory = [];
+let dealsLastFetch = 0;
+let inventoryLastFetch = 0;
+const CACHE_TTL = 30 * 60 * 1000; // 30 min cache
+
+// Scrape Findlay Chevy inventory from DDC platform (server-rendered HTML)
+async function scrapeFindlayInventory() {
+  try {
+    const resp = await axios.get('https://www.findlaychevy.com/new-vehicles/', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      timeout: 15000
+    });
+    const $ = cheerio.load(resp.data);
+    const vehicles = [];
+    
+    // DDC platform renders .hit-content cards server-side
+    $('.hit-content').each((i, el) => {
+      const card = $(el);
+      const titleEl = card.find('.result-title');
+      const name = titleEl.text().trim().replace(/\s+/g, ' ');
+      
+      // Extract VIN from data-vin attribute
+      const vinEl = card.find('[data-vin]');
+      const vin = vinEl.attr('data-vin') || '';
+      
+      // Extract stock number
+      const stockText = card.text().match(/Stock[:#]?\s*([A-Z0-9]+)/i);
+      const stock = stockText ? stockText[1] : '';
+      
+      // Extract prices - look for MSRP and Findlay Price
+      const fullText = card.text();
+      const msrpMatch = fullText.match(/MSRP[\s:]*\$([\d,]+)/i);
+      const findlayPriceMatch = fullText.match(/Findlay\s*Price[\s:]*\$([\d,]+)/i);
+      const sellingPriceMatch = fullText.match(/(?:Selling|Sale|Our)\s*Price[\s:]*\$([\d,]+)/i);
+      
+      const msrp = msrpMatch ? msrpMatch[1].replace(/,/g, '') : '';
+      const price = findlayPriceMatch ? findlayPriceMatch[1].replace(/,/g, '') : 
+                    sellingPriceMatch ? sellingPriceMatch[1].replace(/,/g, '') : msrp;
+      
+      // Extract image
+      const img = card.find('img').first();
+      const image = img.attr('src') || img.attr('data-src') || '';
+      
+      if (name) {
+        vehicles.push({
+          name, vin, stock, msrp, price, image,
+          url: 'https://www.findlaychevy.com/new-vehicles/',
+          source: 'findlaychevy.com'
+        });
+      }
+    });
+    
+    console.log('[Scraper] Found ' + vehicles.length + ' vehicles from findlaychevy.com');
+    return vehicles;
+  } catch (err) {
+    console.error('[Scraper] Findlay inventory error:', err.message);
+    return [];
+  }
+}
+
+// Scrape Chevy.com national offers for deals
+async function scrapeChevyOffers() {
+  try {
+    const resp = await axios.get('https://www.chevrolet.com/current-offers', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      timeout: 15000
+    });
+    const $ = cheerio.load(resp.data);
+    const deals = [];
+    
+    // Chevy.com uses various card/offer structures
+    $('[class*="offer"], [class*="vehicle-card"], [class*="incentive"], [class*="tile"]').each((i, el) => {
+      const card = $(el);
+      const text = card.text().trim();
+      
+      // Skip nav/footer elements
+      if (text.length < 20 || text.length > 2000) return;
+      
+      const nameMatch = text.match(/(20[2-3]\d\s+Chevrolet\s+[A-Za-z0-9 -]+)/i) ||
+                        text.match(/(Silverado|Equinox|Trax|Blazer|Tahoe|Suburban|Traverse|Malibu|Camaro|Corvette|Colorado|Trailblazer|Bolt)[\s\w]*/i);
+      const monthlyMatch = text.match(/\$(\d{2,3})\/mo/i) || text.match(/\$(\d{2,3})\s*per\s*month/i);
+      const aprMatch = text.match(/(\d\.\d+)%\s*APR/i);
+      const cashMatch = text.match(/\$(\d[\d,]+)\s*(?:cash|bonus|allowance|off)/i);
+      const priceMatch = text.match(/\$([\d,]+)\s*(?:MSRP|starting)/i);
+      
+      if (nameMatch) {
+        deals.push({
+          vehicle: nameMatch[1] || nameMatch[0],
+          monthly: monthlyMatch ? monthlyMatch[1] : null,
+          apr: aprMatch ? aprMatch[1] : null,
+          cashBack: cashMatch ? cashMatch[1] : null,
+          price: priceMatch ? priceMatch[1] : null,
+          type: 'national_offer',
+          source: 'chevrolet.com'
+        });
+      }
+    });
+    
+    // Deduplicate by vehicle name
+    const seen = new Set();
+    const unique = deals.filter(d => {
+      const key = d.vehicle.toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    
+    console.log('[Scraper] Found ' + unique.length + ' offers from chevrolet.com');
+    return unique;
+  } catch (err) {
+    console.error('[Scraper] Chevy offers error:', err.message);
+    return [];
+  }
+}
+
+// Scrape Findlay Chevy specials/deals (vehicles with discounts)
+async function scrapeFindlayDeals() {
+  try {
+    // Use the main inventory page - vehicles with Findlay Discount are the "deals"
+    const resp = await axios.get('https://www.findlaychevy.com/new-vehicles/', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      timeout: 15000
+    });
+    const $ = cheerio.load(resp.data);
+    const deals = [];
+    
+    $('.hit-content').each((i, el) => {
+      const card = $(el);
+      const text = card.text();
+      const name = card.find('.result-title').text().trim().replace(/\s+/g, ' ');
+      
+      // Only include vehicles that show a discount/savings
+      const msrpMatch = text.match(/MSRP[\s:]*\$([\d,]+)/i);
+      const findlayPriceMatch = text.match(/Findlay\s*Price[\s:]*\$([\d,]+)/i);
+      const savingsMatch = text.match(/(?:You Save|Your Savings|Savings)[\s:]*\$([\d,]+)/i);
+      const discountMatch = text.match(/Findlay\s*Discount[\s:]*\$([\d,]+)/i);
+      const cashMatch = text.match(/Customer\s*Cash[\s:]*\$([\d,]+)/i);
+      
+      const msrp = msrpMatch ? msrpMatch[1] : null;
+      const findlayPrice = findlayPriceMatch ? findlayPriceMatch[1] : null;
+      const savings = savingsMatch ? savingsMatch[1] : null;
+      const discount = discountMatch ? discountMatch[1] : null;
+      const customerCash = cashMatch ? cashMatch[1] : null;
+      
+      const stockMatch = text.match(/Stock[:#]?\s*([A-Z0-9]+)/i);
+      
+      if (name && (savings || discount || customerCash || findlayPrice)) {
+        deals.push({
+          vehicle: name,
+          msrp, findlayPrice, savings, discount, customerCash,
+          stock: stockMatch ? stockMatch[1] : '',
+          type: 'findlay_special',
+          source: 'findlaychevy.com'
+        });
+      }
+    });
+    
+    console.log('[Scraper] Found ' + deals.length + ' deals from findlaychevy.com');
+    return deals;
+  } catch (err) {
+    console.error('[Scraper] Findlay deals error:', err.message);
+    return [];
+  }
+}
+
+// GET /api/live-deals - returns combined deals from Findlay + Chevy.com
+app.get('/api/live-deals', requireAuth, async (req, res) => {
+  try {
+    const now = Date.now();
+    if (cachedDeals.length > 0 && (now - dealsLastFetch) < CACHE_TTL) {
+      return res.json({ deals: cachedDeals, cached: true, lastFetch: dealsLastFetch });
+    }
+    const [findlayDeals, chevyOffers] = await Promise.all([
+      scrapeFindlayDeals(),
+      scrapeChevyOffers()
+    ]);
+    cachedDeals = [...findlayDeals, ...chevyOffers];
+    dealsLastFetch = now;
+    res.json({ deals: cachedDeals, cached: false, lastFetch: dealsLastFetch });
+  } catch (err) {
+    console.error('[API] live-deals error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch deals', details: err.message });
+  }
+});
+
+// GET /api/live-inventory - returns inventory from Findlay
+app.get('/api/live-inventory', requireAuth, async (req, res) => {
+  try {
+    const now = Date.now();
+    if (cachedInventory.length > 0 && (now - inventoryLastFetch) < CACHE_TTL) {
+      return res.json({ inventory: cachedInventory, cached: true, lastFetch: inventoryLastFetch });
+    }
+    cachedInventory = await scrapeFindlayInventory();
+    inventoryLastFetch = now;
+    res.json({ inventory: cachedInventory, cached: false, lastFetch: inventoryLastFetch });
+  } catch (err) {
+    console.error('[API] live-inventory error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch inventory', details: err.message });
+  }
+});
+
+
 app.listen(PORT, () => {
   // Start inventory auto-refresh
   inventoryModule.startAutoRefresh();
