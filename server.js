@@ -3255,67 +3255,54 @@ function proxyUrl(targetUrl) {
 
 // Scrape Findlay Chevy inventory from DDC platform (server-rendered HTML)
 async function scrapeFindlayInventory() {
-  console.log("[Scraper] Starting Findlay inventory scrape...");
+  console.log("[Scraper] Starting Findlay inventory fetch via Algolia API...");
   try {
-    const resp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/'), {
-      headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Cache-Control': 'no-cache',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Upgrade-Insecure-Requests': '1',
-          'Connection': 'keep-alive',
-          'Referer': 'https://www.google.com/'
+    // DDC/Dealer.com sites use Algolia for inventory search
+    // These are public search-only credentials embedded in the site's HTML
+    const ALGOLIA_APP_ID = '2591J46P8G';
+    const ALGOLIA_SEARCH_KEY = '78311e75e16dd6273d6b00cd6c21db3c';
+    const ALGOLIA_INDEX = 'findlaychevrolet_production_inventory';
+
+    const resp = await axios.post(
+      `https://${ALGOLIA_APP_ID}-dsn.algolia.net/1/indexes/${ALGOLIA_INDEX}/query`,
+      {
+        params: 'hitsPerPage=100&facetFilters=[["type:new"]]&attributesToRetrieve=title_vrp,stock,vin,thumbnail,msrp,our_price,make,model,year,trim,ext_color,link,body,drivetrain,transmission_description,in_transit_vehicles,days_in_stock'
+      },
+      {
+        headers: {
+          'X-Algolia-Application-Id': ALGOLIA_APP_ID,
+          'X-Algolia-API-Key': ALGOLIA_SEARCH_KEY,
+          'Content-Type': 'application/json'
         },
-      timeout: 60000,
-      maxRedirects: 5
-    });
-    const $ = cheerio.load(resp.data);
-    const vehicles = [];
-    
-    // DDC platform renders .hit-content cards server-side
-    $('.hit-content').each((i, el) => {
-      const card = $(el);
-      const titleEl = card.find('.result-title');
-      const name = titleEl.text().trim().replace(/\s+/g, ' ');
-      
-      // Extract VIN from data-vin attribute
-      const vinEl = card.find('[data-vin]');
-      const vin = vinEl.attr('data-vin') || '';
-      
-      // Extract stock number
-      const stockText = card.text().match(/Stock[:#]?\s*([A-Z0-9]+)/i);
-      const stock = stockText ? stockText[1] : '';
-      
-      // Extract prices - look for MSRP and Findlay Price
-      const fullText = card.text();
-      const msrpMatch = fullText.match(/MSRP[\s:]*\$([\d,]+)/i);
-      const findlayPriceMatch = fullText.match(/Findlay\s*Price[\s:]*\$([\d,]+)/i);
-      const sellingPriceMatch = fullText.match(/(?:Selling|Sale|Our)\s*Price[\s:]*\$([\d,]+)/i);
-      
-      const msrp = msrpMatch ? msrpMatch[1].replace(/,/g, '') : '';
-      const price = findlayPriceMatch ? findlayPriceMatch[1].replace(/,/g, '') : 
-                    sellingPriceMatch ? sellingPriceMatch[1].replace(/,/g, '') : msrp;
-      
-      // Extract image
-      const img = card.find('img').first();
-      const image = img.attr('src') || img.attr('data-src') || '';
-      
-      if (name) {
-        vehicles.push({
-          name, vin, stock, msrp, price, image,
-          url: 'https://www.findlaychevy.com/new-vehicles/',
-          source: 'findlaychevy.com'
-        });
+        timeout: 15000
       }
-    });
-    
-    console.log('[Scraper] Found ' + vehicles.length + ' vehicles from findlaychevy.com');
+    );
+
+    const hits = resp.data.hits || [];
+    const vehicles = hits.map(h => ({
+      name: h.title_vrp || `${h.year} ${h.make} ${h.model} ${h.trim || ''}`.trim(),
+      year: h.year || '',
+      make: h.make || 'Chevrolet',
+      model: h.model || '',
+      trim: h.trim || '',
+      condition: 'New',
+      vin: h.vin || '',
+      stockNumber: h.stock || '',
+      stock: h.stock || '',
+      msrp: h.msrp || '',
+      price: h.our_price || h.msrp || '',
+      image: h.thumbnail || '',
+      color: h.ext_color || '',
+      body: h.body || '',
+      drivetrain: h.drivetrain || '',
+      transmission: h.transmission_description || '',
+      daysInStock: h.days_in_stock || 0,
+      inTransit: h.in_transit_vehicles === 'In Transit',
+      url: h.link || 'https://www.findlaychevy.com/new-vehicles/',
+      source: 'findlaychevy.com'
+    }));
+
+    console.log('[Scraper] Algolia returned ' + vehicles.length + ' real vehicles from findlaychevy.com');
     return vehicles;
   } catch (err) {
     console.error('[Scraper] Findlay inventory error:', err.message);
@@ -3394,65 +3381,65 @@ async function scrapeChevyOffers() {
 // Scrape Findlay Chevy specials/deals (vehicles with discounts)
 async function scrapeFindlayDeals() {
   try {
-    // Use the main inventory page - vehicles with Findlay Discount are the "deals"
-    const resp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/'), {
-      headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Cache-Control': 'no-cache',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Upgrade-Insecure-Requests': '1',
-          'Connection': 'keep-alive',
-          'Referer': 'https://www.google.com/'
+    // Use Algolia API directly — bypasses Cloudflare WAF entirely
+    // Returns real inventory with actual stock numbers, VINs, images, and pricing
+    const ALGOLIA_APP_ID = '2591J46P8G';
+    const ALGOLIA_SEARCH_KEY = '78311e75e16dd6273d6b00cd6c21db3c';
+    const ALGOLIA_INDEX = 'findlaychevrolet_production_inventory';
+
+    const resp = await axios.post(
+      `https://${ALGOLIA_APP_ID}-dsn.algolia.net/1/indexes/${ALGOLIA_INDEX}/query`,
+      {
+        params: 'hitsPerPage=50&facetFilters=[["type:new"]]&attributesToRetrieve=title_vrp,stock,vin,thumbnail,msrp,our_price,make,model,year,trim,ext_color,link,lightning'
+      },
+      {
+        headers: {
+          'X-Algolia-Application-Id': ALGOLIA_APP_ID,
+          'X-Algolia-API-Key': ALGOLIA_SEARCH_KEY,
+          'Content-Type': 'application/json'
         },
-      timeout: 60000
-    });
-    const $ = cheerio.load(resp.data);
+        timeout: 15000
+      }
+    );
+
+    const hits = resp.data.hits || [];
     const deals = [];
-    
-    $('.hit-content').each((i, el) => {
-      const card = $(el);
-      const text = card.text();
-      const name = card.find('.result-title').text().trim().replace(/\s+/g, ' ');
-      
-      // Only include vehicles that show a discount/savings
-      const msrpMatch = text.match(/MSRP[\s:]*\$([\d,]+)/i);
-      const findlayPriceMatch = text.match(/Findlay\s*Price[\s:]*\$([\d,]+)/i);
-      const savingsMatch = text.match(/(?:You Save|Your Savings|Savings)[\s:]*\$([\d,]+)/i);
-      const discountMatch = text.match(/Findlay\s*Discount[\s:]*\$([\d,]+)/i);
-      const cashMatch = text.match(/Customer\s*Cash[\s:]*\$([\d,]+)/i);
-      
-      const msrp = msrpMatch ? msrpMatch[1] : null;
-      const findlayPrice = findlayPriceMatch ? findlayPriceMatch[1] : null;
-      const savings = savingsMatch ? savingsMatch[1] : null;
-      const discount = discountMatch ? discountMatch[1] : null;
-      const customerCash = cashMatch ? cashMatch[1] : null;
-      
-      const stockMatch = text.match(/Stock[:#]?\s*([A-Z0-9]+)/i);
-      
-      if (name && (savings || discount || customerCash || findlayPrice)) {
-        const img = card.find('img').first();
-        const image = img.attr('src') || img.attr('data-src') || '';
-        const vinEl = card.find('[data-vin]');
-        const vin = vinEl.attr('data-vin') || '';
+
+    for (const h of hits) {
+      const msrp = parseInt(h.msrp) || 0;
+      const ourPrice = parseInt(h.our_price) || 0;
+      const savings = msrp > ourPrice ? msrp - ourPrice : 0;
+
+      // Parse Findlay Discount and Customer Cash from the pricing stack HTML if available
+      let findlayDiscount = 0;
+      let customerCash = 0;
+      const pricingHtml = h.lightning?.advancedPricingStack || '';
+      const discountMatch = pricingHtml.match(/Findlay Discount.*?\$(\d[\d,]*)/s);
+      const cashMatch = pricingHtml.match(/(?:Customer Cash|Bonus Cash|Cash Back).*?\$(\d[\d,]*)/s);
+      if (discountMatch) findlayDiscount = parseInt(discountMatch[1].replace(/,/g, ''));
+      if (cashMatch) customerCash = parseInt(cashMatch[1].replace(/,/g, ''));
+
+      // Only include vehicles that have some kind of deal/savings
+      if (savings > 0 || findlayDiscount > 0 || customerCash > 0) {
         deals.push({
-          vehicle: name,
-          msrp, findlayPrice, savings, discount, customerCash,
-          stock: stockMatch ? stockMatch[1] : '',
-          vin,
-          image,
+          vehicle: h.title_vrp || `${h.year} ${h.make} ${h.model} ${h.trim || ''}`.trim(),
+          msrp: String(msrp),
+          findlayPrice: String(ourPrice),
+          savings: String(savings),
+          discount: String(findlayDiscount),
+          customerCash: String(customerCash),
+          stock: h.stock || '',
+          vin: h.vin || '',
+          image: h.thumbnail || '',
+          color: h.ext_color || '',
+          url: h.link || '',
           type: 'findlay_special',
           source: 'findlaychevy.com'
         });
       }
-    });
-    
-    console.log('[Scraper] Found ' + deals.length + ' deals from findlaychevy.com');
+    }
+
+    console.log('[Scraper] Algolia returned ' + deals.length + ' real deals from findlaychevy.com');
     return deals;
   } catch (err) {
     console.error('[Scraper] Findlay deals error:', err.message);
