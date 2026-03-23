@@ -3229,7 +3229,7 @@ let inventoryLastFetch = 0;
 const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hour cache
 
 // ScraperAPI proxy to bypass DDC WAF on findlaychevy.com
-const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || '';
+const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || 'a5ecdf522bd4d89563b2bd5354b924b9';
 function proxyUrl(targetUrl) {
   if (SCRAPER_API_KEY) {
     console.log('[Proxy] Routing through ScraperAPI: ' + targetUrl.substring(0, 60) + '...');
