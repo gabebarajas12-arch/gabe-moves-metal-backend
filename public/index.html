@@ -1766,6 +1766,16 @@
 
                         <!-- Inventory Highlight Form -->
                         <div id="postForm_inventory_highlight" style="display: none;">
+                            <!-- Live Inventory Picker -->
+                            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <h3 style="color: var(--gold); font-size: 14px; font-weight: 700; margin: 0;">Live Inventory from Findlay</h3>
+                                    <button onclick="loadLiveInventoryForPost()" style="background: var(--gold); color: #000; border: none; padding: 6px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600;">Refresh</button>
+                                </div>
+                                <div id="liveInventoryGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; max-height: 400px; overflow-y: auto;">
+                                    <p style="color:var(--text-secondary);padding:8px;grid-column:1/-1;text-align:center;">Click a vehicle below to auto-fill the form, or type manually.</p>
+                                </div>
+                            </div>
                             <h3 style="margin-bottom: 16px; font-size: 15px; font-weight: 700;">🚗 Inventory Highlight</h3>
                             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                                 <div class="form-group" style="margin-bottom: 0;">
@@ -3993,7 +4003,93 @@
       }
     }
     
-    // Auto-load deals when Current Deal post type is selected
+    // ============ LIVE INVENTORY PICKER FOR POST CREATOR ============
+    let liveInventoryCache = [];
+
+    async function loadLiveInventoryForPost() {
+      const grid = document.getElementById('liveInventoryGrid');
+      if (!grid) return;
+      grid.innerHTML = '<p style="color:var(--text-secondary);padding:12px;grid-column:1/-1;text-align:center;">Loading inventory from findlaychevy.com...</p>';
+
+      try {
+        const resp = await fetch('/api/live-inventory', {
+          headers: { 'Authorization': 'Bearer ' + authToken }
+        });
+        const data = await resp.json();
+        const vehicles = data.inventory || [];
+        if (vehicles.length === 0) {
+          grid.innerHTML = '<p style="color:var(--text-secondary);padding:12px;grid-column:1/-1;text-align:center;">No inventory found. Try refreshing in a moment.</p>';
+          return;
+        }
+        liveInventoryCache = vehicles;
+        renderLiveInventoryPicker(vehicles);
+      } catch(err) {
+        grid.innerHTML = '<p style="color:var(--danger);padding:12px;grid-column:1/-1;">Error loading inventory: ' + err.message + '</p>';
+      }
+    }
+
+    function renderLiveInventoryPicker(vehicles) {
+      const grid = document.getElementById('liveInventoryGrid');
+      if (!grid) return;
+
+      grid.innerHTML = vehicles.map((v, i) => {
+        const name = v.name || [v.year, v.make, v.model, v.trim].filter(Boolean).join(' ');
+        const img = v.image || v.thumbnail || '';
+        const stock = v.stockNumber || v.stock || '';
+        const price = v.price || v.msrp || '';
+        const priceDisplay = price ? '$' + Number(String(price).replace(/[^0-9]/g, '')).toLocaleString() : '';
+
+        const imgHtml = img
+          ? '<img src="' + img + '" alt="' + name + '" style="width:100%;height:100px;object-fit:cover;border-radius:8px 8px 0 0;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+            '<div style="display:none;width:100%;height:100px;background:#1a1a2e;border-radius:8px 8px 0 0;align-items:center;justify-content:center;font-size:28px;">🚗</div>'
+          : '<div style="width:100%;height:100px;background:#1a1a2e;border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:center;font-size:28px;">🚗</div>';
+
+        return '<div class="inv-pick-card" onclick="selectInventoryVehicle(' + i + ')" data-inv-index="' + i + '" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;cursor:pointer;overflow:hidden;transition:border-color 0.2s;">' +
+          imgHtml +
+          '<div style="padding:6px 8px;">' +
+            '<div style="font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + name + '</div>' +
+            (priceDisplay ? '<div style="font-size:11px;color:var(--gold);font-weight:600;">' + priceDisplay + '</div>' : '') +
+            (stock ? '<div style="font-size:10px;color:var(--text-secondary);">Stock #' + stock + '</div>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function selectInventoryVehicle(index) {
+      const v = liveInventoryCache[index];
+      if (!v) return;
+
+      // Highlight selected card
+      document.querySelectorAll('.inv-pick-card').forEach(c => c.style.borderColor = 'var(--border-color)');
+      const card = document.querySelector('.inv-pick-card[data-inv-index="' + index + '"]');
+      if (card) card.style.borderColor = 'var(--gold)';
+
+      // Auto-fill inventory form fields
+      const yearEl = document.getElementById('postInvYear');
+      const modelEl = document.getElementById('postInvModel');
+      const trimEl = document.getElementById('postInvTrim');
+      const priceEl = document.getElementById('postInvPrice');
+      const imageEl = document.getElementById('postInvImageUrl');
+      const highlightsEl = document.getElementById('postInvHighlights');
+
+      if (yearEl) yearEl.value = v.year || '';
+      if (modelEl) modelEl.value = v.model || '';
+      if (trimEl) trimEl.value = v.trim || '';
+      if (priceEl) priceEl.value = v.price || v.msrp || '';
+      if (imageEl) imageEl.value = v.image || v.thumbnail || '';
+      if (highlightsEl) {
+        const highlights = [
+          v.color ? 'Color: ' + v.color : '',
+          v.stockNumber || v.stock ? 'Stock #' + (v.stockNumber || v.stock) : '',
+          v.vin ? 'VIN: ' + v.vin : '',
+          v.drivetrain || '',
+          v.body || ''
+        ].filter(Boolean).join(', ');
+        highlightsEl.value = highlights;
+      }
+    }
+
+    // Auto-load deals/inventory when post type is selected
     const origSelectPostType = typeof selectPostType === 'function' ? selectPostType : null;
     if (origSelectPostType) {
       const _origSPT = selectPostType;
@@ -4001,6 +4097,9 @@
         _origSPT(type);
         if (type === 'current_deal' && liveDealsCache.length === 0) {
           loadLiveDeals();
+        }
+        if (type === 'inventory_highlight' && liveInventoryCache.length === 0) {
+          loadLiveInventoryForPost();
         }
       };
     }
