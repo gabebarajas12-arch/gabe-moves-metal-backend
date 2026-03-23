@@ -2239,6 +2239,90 @@ app.delete('/api/deals/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// ============ iCAL CALENDAR EVENT GENERATOR ============
+app.post('/api/calendar/event', (req, res) => {
+  try {
+    const { title, description, scheduledDate, scheduledTime, postType, platform } = req.body;
+    
+    if (!title || !scheduledDate) {
+      return res.status(400).json({ success: false, error: 'Title and scheduled date are required' });
+    }
+    
+    const startTime = scheduledTime || '10:00';
+    const startDate = new Date(scheduledDate + 'T' + startTime + ':00');
+    const endDate = new Date(startDate.getTime() + 30 * 60000); // 30 min duration
+    
+    const formatICSDate = (d) => {
+      return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    };
+    
+    const uid = 'gmm-' + Date.now() + '@gabemovesmetal.com';
+    const now = formatICSDate(new Date());
+    const dtStart = formatICSDate(startDate);
+    const dtEnd = formatICSDate(endDate);
+    
+    const platformLabel = platform ? ' [' + platform.toUpperCase() + ']' : '';
+    const typeLabel = postType ? postType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Post';
+    
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Gabe Moves Metal//CRM//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      'UID:' + uid,
+      'DTSTAMP:' + now,
+      'DTSTART:' + dtStart,
+      'DTEND:' + dtEnd,
+      'SUMMARY:' + typeLabel + platformLabel + ' - ' + title.substring(0, 60),
+      'DESCRIPTION:' + (description || '').replace(/\n/g, '\\n').substring(0, 500),
+      'CATEGORIES:Gabe Moves Metal,Social Media',
+      'STATUS:CONFIRMED',
+      'BEGIN:VALARM',
+      'TRIGGER:-PT15M',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:Time to post: ' + typeLabel,
+      'END:VALARM',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+    
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="gmm-post-' + scheduledDate + '.ics"');
+    res.send(icsContent);
+    
+  } catch (error) {
+    console.error('Calendar event error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate calendar event' });
+  }
+});
+
+// Calendar feed endpoint - returns all scheduled posts as .ics feed
+app.get('/api/calendar/feed', (req, res) => {
+  try {
+    // Return a basic calendar feed structure
+    // In production, this would pull from a database of scheduled posts
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Gabe Moves Metal//CRM//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'X-WR-CALNAME:Gabe Moves Metal Posts',
+      'X-WR-CALDESC:Scheduled social media posts',
+      'END:VCALENDAR'
+    ].join('\r\n');
+    
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.send(icsContent);
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to generate calendar feed' });
+  }
+});
+
+
+
 
 // ==================== START SERVER ====================
 app.listen(PORT, () => {
