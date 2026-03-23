@@ -2220,7 +2220,7 @@ For a sold customer post:
 #FindlayChevrolet #LasVegas #Traverse #ChevyTraverse #GabeMovesmetal #NewCar #VegasLife"
 
 For an inventory post:
-"This Blazer EV RS just hit the lot and I already know it's not gonna last 😤 That front end is MEAN. Electric, 320 miles range, and honestly drives like nothing else in this price range. Come see it before someone else does — I'm at Findlay all day. (702) 416-3741
+"Ngl this Blazer EV RS is one of the hardest things on our lot right now and I already know it's not gonna last 😤 That front end is MEAN. Electric, 320 miles range, and honestly drives like nothing else in this price range. Come see it before someone else does — I'm at Findlay all day. (702) 416-3741
 
 #ChevyBlazerEV #ElectricVehicle #FindlayChevrolet #LasVegas #GabeMovesmetal #EVLife"
 
@@ -2238,7 +2238,7 @@ RULES:
 - Write EXACTLY like those examples. Same casual tone, same energy, same structure
 - Talk like you're posting on YOUR page, not writing ad copy for a corporation
 - Use "fr", "yo", "ngl", "lowkey" sparingly and naturally — like a real person would
-- NO phrases like: "Don't miss out", "Act now", "Dream car", "Look no further", "Incredible deal", "Ready to roll", "Hit the road", "Behind the wheel", "Let's make it happen"
+- NO phrases like: "Don't miss out", "Act now", "Dream car", "Look no further", "Incredible deal", "Ready to roll", "Hit the road", "Behind the wheel", "Let's make it happen", "Just got", "Just landed", "Fresh off the truck"
 - NO sentences that start with "Whether you're looking for..." or "If you've been searching for..."
 - 2-3 emojis max. Place them where a real person would
 - Include (702) 416-3741 once, casually
@@ -3283,7 +3283,7 @@ async function scrapeFindlayInventory() {
     const resp = await axios.post(
       `https://${ALGOLIA_APP_ID}-dsn.algolia.net/1/indexes/${ALGOLIA_INDEX}/query`,
       {
-        params: 'hitsPerPage=100&facetFilters=[["type:new"]]&attributesToRetrieve=title_vrp,stock,vin,thumbnail,msrp,our_price,make,model,year,trim,ext_color,link,body,drivetrain,transmission_description,in_transit_vehicles,days_in_stock'
+        params: 'hitsPerPage=500&attributesToRetrieve=title_vrp,stock,vin,thumbnail,msrp,our_price,make,model,year,trim,ext_color,link,body,drivetrain,transmission_description,in_transit_vehicles,days_in_stock,type'
       },
       {
         headers: {
@@ -3302,7 +3302,7 @@ async function scrapeFindlayInventory() {
       make: h.make || 'Chevrolet',
       model: h.model || '',
       trim: h.trim || '',
-      condition: 'New',
+      condition: (h.type === 'Used' || h.type === 'CarBravo') ? 'Used' : (h.type === 'CTP' ? 'Certified' : 'New'),
       vin: h.vin || '',
       stockNumber: h.stock || '',
       stock: h.stock || '',
@@ -3407,7 +3407,7 @@ async function scrapeFindlayDeals() {
     const resp = await axios.post(
       `https://${ALGOLIA_APP_ID}-dsn.algolia.net/1/indexes/${ALGOLIA_INDEX}/query`,
       {
-        params: 'hitsPerPage=50&facetFilters=[["type:new"]]&attributesToRetrieve=title_vrp,stock,vin,thumbnail,msrp,our_price,make,model,year,trim,ext_color,link,lightning'
+        params: 'hitsPerPage=200&attributesToRetrieve=title_vrp,stock,vin,thumbnail,msrp,our_price,make,model,year,trim,ext_color,link,lightning,type'
       },
       {
         headers: {
