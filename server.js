@@ -57,6 +57,10 @@ const CONFIG = {
   WHATSAPP_BUSINESS_ACCOUNT_ID: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '1972990456955920',
   WHATSAPP_PHONE_NUMBER: '17024163741', // Gabe's number in E.164 format
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || 'gabe_moves_metal_wa_2026',
+  // TikTok Content Posting API (apply at developers.tiktok.com → Content Posting API)
+  TIKTOK_ACCESS_TOKEN: process.env.TIKTOK_ACCESS_TOKEN || '',
+  TIKTOK_CLIENT_KEY: process.env.TIKTOK_CLIENT_KEY || '',
+  TIKTOK_CLIENT_SECRET: process.env.TIKTOK_CLIENT_SECRET || '',
   // Personal brand info
   SALESMAN_NAME: 'Gabe',
   PAGE_NAME: 'Gabe Moves Metal',
@@ -1222,6 +1226,579 @@ const STAGES_LIST = ['New Lead', 'Contacted', 'Appointment', 'Negotiation', 'Sol
 // ==================== AUTO-POSTING ENGINE ====================
 // Create and publish posts to Facebook, Instagram, and WhatsApp Status
 
+// ==================== LEAD-OPTIMIZED AUTO-POSTING ENGINE ====================
+// Create and publish posts to Facebook, Instagram, TikTok, and WhatsApp Status
+// Built with FB/IG/TikTok lead generation best practices baked in
+
+// -- LEAD OPTIMIZATION KNOWLEDGE BASE --
+// This data drives the coaching tips, scoring, and smart defaults throughout the Post Creator
+
+const LEAD_OPT = {
+  // Best posting times for car sales (Pacific Time — Las Vegas)
+  bestTimes: {
+    facebook: {
+      weekday: ['11:00 AM', '1:00 PM', '7:00 PM'],
+      weekend: ['10:00 AM', '12:00 PM', '5:00 PM'],
+      peakDays: ['Tuesday', 'Thursday', 'Saturday'],
+      why: 'Lunch breaks and after-work scrolling drive highest FB engagement for auto sales',
+    },
+    instagram: {
+      weekday: ['12:00 PM', '5:00 PM', '8:00 PM'],
+      weekend: ['11:00 AM', '1:00 PM', '7:00 PM'],
+      peakDays: ['Wednesday', 'Friday', 'Saturday'],
+      why: 'IG engagement peaks during breaks and evening scroll time; Reels get pushed on weekends',
+    },
+    tiktok: {
+      weekday: ['7:00 AM', '12:00 PM', '7:00 PM', '10:00 PM'],
+      weekend: ['9:00 AM', '12:00 PM', '7:00 PM'],
+      peakDays: ['Tuesday', 'Thursday', 'Friday'],
+      why: 'TikTok FYP algorithm pushes content hard during commute times and late-night scroll sessions; Tue/Thu/Fri see highest car content engagement',
+    },
+  },
+
+  // Hashtag strategy: mix of broad reach + niche + local + branded
+  hashtagSets: {
+    sold: {
+      branded: ['#GabeMovesmetal', '#FindlayChevrolet', '#GabeBarajas'],
+      local: ['#LasVegas', '#Vegas', '#VegasLife', '#Henderson', '#NorthLasVegas', '#LasVegasCars'],
+      niche: ['#Sold', '#NewCarDay', '#JustSold', '#HappyCustomer', '#CustomerAppreciation', '#DeliveryDay'],
+      broad: ['#Chevrolet', '#Chevy', '#NewCar', '#CarSales', '#DealerLife', '#TruckLife'],
+    },
+    deals: {
+      branded: ['#GabeMovesmetal', '#FindlayChevrolet'],
+      local: ['#LasVegas', '#Vegas', '#VegasDeals', '#LasVegasAuto'],
+      niche: ['#CarDeal', '#AutoDeal', '#ZeroDown', '#LowAPR', '#SpecialOffer', '#LimitedTime'],
+      broad: ['#Chevrolet', '#Chevy', '#NewCar', '#TruckDeals', '#SUVDeals', '#CarShopping'],
+    },
+    inventory: {
+      branded: ['#GabeMovesmetal', '#FindlayChevrolet'],
+      local: ['#LasVegas', '#Vegas', '#LasVegasChevy', '#VegasTrucks'],
+      niche: ['#JustArrived', '#NewArrival', '#LotFresh', '#TestDrive', '#InStock', '#ReadyToRoll'],
+      broad: ['#Chevrolet', '#Chevy', '#Trucks', '#SUV', '#CarShopping', '#AutoSales'],
+    },
+    brand: {
+      branded: ['#GabeMovesmetal', '#FindlayChevrolet', '#GabeBarajas'],
+      local: ['#LasVegas', '#Vegas', '#VegasLife', '#VegasBusiness'],
+      niche: ['#CarSalesLife', '#SalesMotivation', '#Hustle', '#TopSalesman', '#MovingMetal'],
+      broad: ['#Motivation', '#Grind', '#Success', '#Entrepreneur', '#NeverSettle'],
+    },
+    testimonial: {
+      branded: ['#GabeMovesmetal', '#FindlayChevrolet', '#GabeBarajas'],
+      local: ['#LasVegas', '#Vegas', '#VegasAuto'],
+      niche: ['#CustomerReview', '#5Stars', '#HappyCustomer', '#Testimonial', '#TrustedDealer'],
+      broad: ['#Chevrolet', '#Chevy', '#CarBuying', '#CustomerFirst', '#Referral'],
+    },
+    walkaround: {
+      branded: ['#GabeMovesmetal', '#FindlayChevrolet'],
+      local: ['#LasVegas', '#Vegas', '#VegasCars'],
+      niche: ['#Walkaround', '#CarTour', '#VehicleTour', '#FeatureCheck', '#InsideLook'],
+      broad: ['#Chevrolet', '#Chevy', '#NewCar', '#CarReview', '#AutoReview', '#MustSee'],
+    },
+    financing: {
+      branded: ['#GabeMovesmetal', '#FindlayChevrolet'],
+      local: ['#LasVegas', '#Vegas', '#VegasAuto'],
+      niche: ['#CarFinancing', '#AutoLoan', '#CreditApproval', '#FirstTimeBuyer', '#PreApproved'],
+      broad: ['#Chevrolet', '#Chevy', '#FinanceTips', '#CarBuyingTips', '#MoneyTips'],
+    },
+    comparison: {
+      branded: ['#GabeMovesmetal', '#FindlayChevrolet'],
+      local: ['#LasVegas', '#Vegas'],
+      niche: ['#CarComparison', '#HeadToHead', '#WhichOne', '#VSPost', '#BuyersGuide'],
+      broad: ['#Chevrolet', '#Chevy', '#CarShopping', '#TruckComparison', '#SUVComparison'],
+    },
+  },
+
+  // TikTok-specific hashtag sets (TikTok uses FEWER hashtags — 3-5 trending ones, not 15)
+  tiktokHashtags: {
+    sold: ['#carsales', '#sold', '#newcar', '#cartok', '#dealerlife', '#happycustomer', '#chevrolet', '#lasvegas', '#gabemovesmetal'],
+    deals: ['#cardeal', '#carshopping', '#dealoftheday', '#cartok', '#chevrolet', '#truckdeal', '#lasvegas', '#gabemovesmetal'],
+    inventory: ['#newarrival', '#carshopping', '#cartok', '#chevrolet', '#trucks', '#newcar', '#lasvegas', '#gabemovesmetal'],
+    brand: ['#carsalesman', '#dealerlife', '#cartok', '#daynthelife', '#salesmotivation', '#lasvegas', '#gabemovesmetal'],
+    testimonial: ['#customerreview', '#5star', '#cartok', '#happycustomer', '#chevrolet', '#lasvegas', '#gabemovesmetal'],
+    walkaround: ['#carreview', '#walkaround', '#cartok', '#chevrolet', '#carshopping', '#mustsee', '#gabemovesmetal'],
+    financing: ['#carfinance', '#creditrepair', '#cartok', '#firsttimebuyer', '#financetips', '#gabemovesmetal'],
+    comparison: ['#carcomparison', '#cartok', '#whichcar', '#chevrolet', '#trucks', '#headtohead', '#gabemovesmetal'],
+  },
+
+  // Build optimized hashtag string
+  // FB/IG: 5 broad + 5 niche + 3 local + 2 branded = ~15 (IG sweet spot)
+  // TikTok: 3-5 trending tags (algorithm penalizes hashtag stuffing)
+  buildHashtags: (postType, model, platform) => {
+    if (platform === 'tiktok') {
+      const ttSet = LEAD_OPT.tiktokHashtags[postType] || LEAD_OPT.tiktokHashtags.brand;
+      const pick = (arr, n) => arr.sort(() => 0.5 - Math.random()).slice(0, n);
+      let tags = pick(ttSet, 5);
+      if (model) {
+        const modelTag = '#' + model.replace(/\s+/g, '').toLowerCase();
+        if (!tags.includes(modelTag)) tags.push(modelTag);
+      }
+      return [...new Set(tags)].join(' ');
+    }
+    // FB/IG default — full hashtag spread
+    const set = LEAD_OPT.hashtagSets[postType] || LEAD_OPT.hashtagSets.brand;
+    const pick = (arr, n) => arr.sort(() => 0.5 - Math.random()).slice(0, n);
+    let tags = [
+      ...set.branded,
+      ...pick(set.local, 3),
+      ...pick(set.niche, 5),
+      ...pick(set.broad, 5),
+    ];
+    if (model) {
+      const modelTag = '#' + model.replace(/\s+/g, '');
+      if (!tags.includes(modelTag)) tags.push(modelTag);
+    }
+    return [...new Set(tags)].join(' ');
+  },
+
+  // Caption hooks — attention-grabbing first lines (the algorithm rewards stop-the-scroll openers)
+  hooks: {
+    sold: [
+      '🚨 ANOTHER ONE OFF THE LOT!',
+      '🔑 Keys handed. Smiles earned.',
+      '💥 SOLD! Who\'s next?',
+      '🎉 Congratulations are in order!',
+      '🏆 Another happy customer just drove off!',
+      '📸 That new car smell hits different...',
+    ],
+    deals: [
+      '🚨 STOP SCROLLING — You need to see this deal.',
+      '💰 Your wallet is going to thank you.',
+      '⏰ This deal expires soon. Don\'t sleep on it.',
+      '🔥 The kind of deal your neighbor wishes they got.',
+      '📉 Prices just dropped. Seriously.',
+      '💥 If you\'ve been waiting for the right time — THIS IS IT.',
+    ],
+    inventory: [
+      '👀 Look what just hit the lot...',
+      '🆕 JUST ARRIVED and it won\'t last long.',
+      '🔥 Fresh off the truck. Come see it before it\'s gone.',
+      '😍 I had to stop and take a picture of this one.',
+      '📣 New arrival alert! This one is special.',
+      '🚗 Tell me this doesn\'t look good...',
+    ],
+    brand: [
+      '💪 Let me tell you something about this business...',
+      '🎯 Here\'s what they don\'t tell you about car sales.',
+      '🏆 The grind never stops, and neither do I.',
+      '📈 Another day, another record at Findlay.',
+      '🤝 This job isn\'t about cars — it\'s about people.',
+    ],
+    testimonial: [
+      '⭐ Don\'t take my word for it — hear from my customers.',
+      '📣 THIS is why I do what I do.',
+      '🙏 Nothing beats a happy customer review.',
+      '💯 Real customer. Real experience. Real results.',
+      '⭐⭐⭐⭐⭐ Another 5-star review!',
+    ],
+    walkaround: [
+      '🎥 Let me walk you through this beauty...',
+      '👆 SAVE THIS for when you\'re ready to buy.',
+      '📋 Everything you need to know about this one.',
+      '🔍 Let me show you why this is selling fast.',
+      '🎬 Full walkaround — see every angle.',
+    ],
+    financing: [
+      '💡 SAVE THIS — you\'ll need it when buying a car.',
+      '🏦 Think you can\'t get approved? Think again.',
+      '📊 Let me break down car financing for you.',
+      '💰 How to get the BEST deal on your next car.',
+      '🤔 First time buying? Here\'s what you need to know.',
+    ],
+    comparison: [
+      '🤔 Which one would YOU pick?',
+      '⚔️ HEAD TO HEAD — let\'s settle this.',
+      '📊 The comparison you\'ve been waiting for.',
+      '🏆 There can only be one winner...',
+      '👇 Comment which one you\'d drive home!',
+    ],
+  },
+
+  // DM-trigger CTAs — these drive direct lead capture
+  ctas: {
+    soft: [
+      'DM me "INFO" and I\'ll send you the details.',
+      'Drop a 🔥 in the comments if you want to know more.',
+      'Comment "DEAL" and I\'ll reach out personally.',
+      'Send me a message — I respond fast.',
+      'Tap that message button — let\'s talk.',
+    ],
+    medium: [
+      'DM me "PRICE" for exclusive pricing on this one.',
+      'Comment "INTERESTED" and I\'ll DM you the breakdown.',
+      'Type "MINE" in the comments and I\'ll lock this deal for you.',
+      'DM me your trade-in year/model for an instant quote.',
+      'Comment your budget range — I\'ll find the perfect match.',
+    ],
+    strong: [
+      '🚨 DM me "READY" to get pre-approved in minutes.',
+      'Comment "PAYMENT" and I\'ll DM you monthly options.',
+      'First 3 people to DM me get VIP pricing. Go!',
+      'DM me now — this one has 2 people looking at it already.',
+      'Comment "SOLD" before someone else does!',
+    ],
+    softES: [
+      'Mándame un mensaje con "INFO" y te doy todos los detalles.',
+      'Deja un 🔥 en los comentarios si te interesa.',
+      'Comenta "PRECIO" y te contacto personalmente.',
+      'Mándame mensaje — respondo rápido.',
+    ],
+    mediumES: [
+      'Escríbeme "PRECIO" para un precio exclusivo.',
+      'Comenta "INTERESADO" y te mando la info por DM.',
+      'Mándame el año/modelo de tu carro actual para una cotización.',
+    ],
+    strongES: [
+      '🚨 Escríbeme "LISTO" para pre-aprobarte en minutos.',
+      'Comenta "PAGO" y te mando las opciones de pago mensual.',
+      '¡Los primeros 3 que me escriban reciben precio VIP!',
+    ],
+  },
+
+  // Content mix recommendations (weekly)
+  contentMix: {
+    ideal: {
+      sold_customer: { pct: 25, perWeek: 2, why: 'Social proof is your #1 lead driver — people buy from winners' },
+      current_deal: { pct: 15, perWeek: 1, why: 'Urgency-driven deals convert fence-sitters; don\'t overdo or it feels spammy' },
+      inventory_highlight: { pct: 20, perWeek: 2, why: 'Showcasing inventory keeps you top-of-mind for active shoppers' },
+      personal_brand: { pct: 10, perWeek: 1, why: 'People buy from PEOPLE — let them know the real you' },
+      testimonial: { pct: 15, perWeek: 1, why: 'Third-party validation crushes objections before they start' },
+      walkaround: { pct: 10, perWeek: 1, why: 'Video/carousel walkarounds get 3x more saves — saves = future buyers' },
+      financing: { pct: 5, perWeek: 0.5, why: 'Education builds trust and targets first-time buyers (huge market)' },
+      comparison: { pct: 0, perWeek: 0.5, why: 'Comparison posts spark debates in comments = free algorithm boost' },
+    },
+    weeklyTotal: 8,
+  },
+
+  // Caption scoring — rate how optimized a caption is for lead gen
+  scoreCaption: (caption, postType) => {
+    let score = 0;
+    const checks = [];
+
+    // 1. Has a hook/attention-grabber in the first line (20 pts)
+    const firstLine = caption.split('\n')[0];
+    if (firstLine && (firstLine.includes('🚨') || firstLine.includes('🔥') || firstLine.includes('💥') || firstLine.includes('👀') || firstLine.includes('⭐') || firstLine.length < 60)) {
+      score += 20; checks.push({ name: 'Strong hook', passed: true, pts: 20 });
+    } else {
+      checks.push({ name: 'Strong hook', passed: false, pts: 0, tip: 'Start with an emoji + short punchy line to stop the scroll' });
+    }
+
+    // 2. Has a CTA / call to action (25 pts — most important)
+    const ctaPatterns = /\b(DM|dm|comment|tag|share|message|call|text|click|tap|link in bio|reach out|escr[ií]beme|comenta|manda|mensaje)\b/i;
+    if (ctaPatterns.test(caption)) {
+      score += 25; checks.push({ name: 'Clear CTA', passed: true, pts: 25 });
+    } else {
+      checks.push({ name: 'Clear CTA', passed: false, pts: 0, tip: 'Add a DM trigger like "Comment DEAL for pricing" — this is how you capture leads' });
+    }
+
+    // 3. Has hashtags (10 pts)
+    const hashCount = (caption.match(/#\w+/g) || []).length;
+    if (hashCount >= 10) {
+      score += 10; checks.push({ name: 'Hashtags (10+)', passed: true, pts: 10 });
+    } else if (hashCount >= 5) {
+      score += 5; checks.push({ name: 'Hashtags (5-9)', passed: true, pts: 5, tip: 'Aim for 12-15 hashtags for maximum IG reach' });
+    } else {
+      checks.push({ name: 'Hashtags', passed: false, pts: 0, tip: 'Add 12-15 hashtags mixing branded + local + niche' });
+    }
+
+    // 4. Mention of Findlay / #1 volume dealer (social proof) (10 pts)
+    if (/findlay|#1 volume|number one|número uno/i.test(caption)) {
+      score += 10; checks.push({ name: 'Dealership credibility', passed: true, pts: 10 });
+    } else {
+      checks.push({ name: 'Dealership credibility', passed: false, pts: 0, tip: 'Mention Findlay Chevrolet or "#1 volume dealer" for credibility' });
+    }
+
+    // 5. Urgency / scarcity language (10 pts)
+    if (/won't last|limited|hurry|expires|only \d|don't miss|last chance|act now|running out|no dura|se acaba|últim/i.test(caption)) {
+      score += 10; checks.push({ name: 'Urgency/scarcity', passed: true, pts: 10 });
+    } else {
+      if (['current_deal', 'inventory_highlight'].includes(postType)) {
+        checks.push({ name: 'Urgency/scarcity', passed: false, pts: 0, tip: 'Add urgency: "Won\'t last long" or "Only 2 left" drives action' });
+      } else {
+        score += 5; checks.push({ name: 'Urgency/scarcity', passed: true, pts: 5, tip: 'Optional for this post type' });
+      }
+    }
+
+    // 6. Bilingual / Spanish touch (5 pts)
+    if (/[áéíóúñ¿¡]|habla|español|spanish/i.test(caption)) {
+      score += 5; checks.push({ name: 'Bilingual touch', passed: true, pts: 5 });
+    } else {
+      checks.push({ name: 'Bilingual touch', passed: false, pts: 0, tip: 'Add "Hablo Español" to capture bilingual leads' });
+    }
+
+    // 7. Line breaks / readability (10 pts)
+    const lineBreaks = (caption.match(/\n/g) || []).length;
+    if (lineBreaks >= 3) {
+      score += 10; checks.push({ name: 'Readability (spacing)', passed: true, pts: 10 });
+    } else {
+      checks.push({ name: 'Readability (spacing)', passed: false, pts: 0, tip: 'Use line breaks between sections — walls of text get scrolled past' });
+    }
+
+    // 8. Caption length sweet spot (10 pts)
+    const len = caption.length;
+    if (len >= 150 && len <= 600) {
+      score += 10; checks.push({ name: 'Optimal length', passed: true, pts: 10 });
+    } else if (len < 150) {
+      checks.push({ name: 'Optimal length', passed: false, pts: 0, tip: 'Too short — aim for 150-600 chars. More text = more keywords for discovery' });
+    } else {
+      score += 5; checks.push({ name: 'Optimal length', passed: true, pts: 5, tip: 'A bit long — consider trimming. IG truncates after 125 chars in feed' });
+    }
+
+    return { score, maxScore: 100, checks };
+  },
+
+  // Coaching tips per post type
+  tips: {
+    sold_customer: [
+      'ALWAYS include a photo with the customer + vehicle — these get 3x more engagement',
+      'Tag the customer (ask permission first) — their friends see it = free referrals',
+      'Post SOLD photos within 30 minutes of delivery while energy is high',
+      'Ask the customer for a quick selfie video saying "thanks Gabe!" for Stories',
+      'Bilingual tip: Post English caption, add Spanish in first comment to double reach',
+    ],
+    current_deal: [
+      'Lead with the MONTHLY PAYMENT, not the full price — that\'s what buyers think about',
+      'Create urgency with real deadlines — "ends this Saturday" converts better than "limited time"',
+      'Use the "Comment DEAL" CTA — it triggers the algorithm AND captures the lead',
+      'Post deals Tuesday-Thursday when people are planning weekend visits',
+      'Add "Se habla Español" — bilingual deals reach 40%+ more people in Vegas',
+    ],
+    inventory_highlight: [
+      'Multiple photos > single photo — carousels get 2x more engagement on IG',
+      'Show the BEST feature first (wheels, interior, tech screen) — that\'s your scroll-stopper',
+      'Include the price if competitive — "Starting at $XX,XXX" removes a barrier to DM',
+      'Pair with Reels: 15-sec walkaround with trending audio = massive reach',
+      'Post new arrivals on Wednesdays and Fridays — shoppers browse before the weekend',
+    ],
+    personal_brand: [
+      'Show your face — posts with faces get 38% more engagement on IG',
+      'Share your WHY, not just your wins — vulnerability builds connection',
+      'Behind-the-scenes content humanizes you — show the early mornings, the grind',
+      'Celebrate milestones publicly (monthly sales record, customer count, etc.)',
+      'Engage in comments for 15 min after posting — the algorithm rewards it',
+    ],
+    testimonial: [
+      'Screenshot real reviews/texts (with permission) — authenticity beats polish',
+      'Video testimonials outperform text 5:1 — even a 10-sec phone clip works',
+      'Pair the testimonial with the customer\'s delivery photo for maximum impact',
+      'Add "Want the same experience? DM me" — direct conversion CTA',
+      'Post testimonials on Mondays — sets positive tone for the week + shoppers researching',
+    ],
+    walkaround: [
+      'Keep walkaround videos to 30-60 seconds — attention spans are short',
+      'Start with the exterior money shot, end with the driver\'s seat POV',
+      'Call out 3 standout features by name — this helps with search/discovery',
+      'Add captions/text overlay — 85% of FB/IG video is watched on mute',
+      'End with "Save this for later" — saves tell the algorithm to push it further',
+    ],
+    financing: [
+      'Use simple language — your audience isn\'t finance experts',
+      'Lead with "First time buyer?" or "Credit concerns?" to attract your target',
+      'Never promise specific rates — say "rates as low as" to stay compliant',
+      'These posts have a LONG shelf life — people save them and come back months later',
+      'Pair with a "DM me APPROVED for a free credit check" CTA',
+    ],
+    comparison: [
+      'Silverado vs. F-150, Tahoe vs. Expedition — these spark DEBATES (= free engagement)',
+      'Use a side-by-side image or carousel format for maximum visual impact',
+      'Ask "Which one would you pick?" — questions in captions boost comments 3x',
+      'Stay factual and fair — but let Chevy\'s numbers speak for themselves',
+      'Post comparisons on weekends when people have time to engage in comments',
+    ],
+  },
+
+  // ==================== TIKTOK-SPECIFIC OPTIMIZATION ====================
+  // TikTok is a DIFFERENT animal — short-form video, trending sounds, FYP algorithm
+
+  tiktok: {
+    // TikTok hooks — MUST grab attention in the first 1-3 seconds or you're dead
+    hooks: {
+      sold: [
+        'POV: Another customer just drove off in their dream car',
+        'Watch their face when they get the keys 🔑',
+        'They said they couldn\'t get approved... LOOK AT THEM NOW',
+        'From test drive to SOLD in one day 🎉',
+        'The reaction when they see the final payment 💰',
+        'Handing over the keys never gets old',
+      ],
+      deals: [
+        'This deal is actually insane and here\'s why',
+        'If you\'re looking for a truck, STOP SCROLLING',
+        'I\'m not supposed to show you this deal but...',
+        'Your car payment could be THIS low 👀',
+        'This is the deal your neighbor doesn\'t want you to know about',
+        'POV: You find out about 0% APR',
+      ],
+      inventory: [
+        'Wait for it... 😍',
+        'Tell me this isn\'t the cleanest thing you\'ve seen today',
+        'This just hit the lot and it WON\'T last',
+        'Rate this spec 1-10 👇',
+        'POV: You walk up to your new ride for the first time',
+        'I had to make a TikTok about this one',
+      ],
+      brand: [
+        'Day in the life of a car salesman at the #1 dealer',
+        'Things they don\'t tell you about car sales',
+        'How I went from broke to moving metal every day',
+        'The truth about being a car salesman',
+        'POV: It\'s 7am and you\'re already grinding',
+        'Reply to @comment here\'s what I actually make',
+      ],
+      testimonial: [
+        'When your customer gives you a 5-star review 🥹',
+        'This is why I love my job',
+        'POV: Your customer sends you THIS text',
+        'They drove 2 hours just to buy from me. Here\'s why.',
+        'The review that made my whole week',
+      ],
+      walkaround: [
+        'Let me show you something real quick',
+        'If you don\'t watch this whole thing you\'re sleeping on it',
+        'Every feature on this thing is insane 🔥',
+        'The interior on this one hits DIFFERENT',
+        'You need to see the back seat on this one',
+        '60 seconds with the new ${model} 👀',
+      ],
+      financing: [
+        'Watch this if you think you can\'t afford a new car',
+        'First time buying a car? Here\'s what nobody tells you',
+        'How to ACTUALLY get approved with bad credit',
+        'Stop doing this when you finance a car',
+        'The #1 mistake first-time car buyers make',
+        '3 things your dealer won\'t tell you (but I will)',
+      ],
+      comparison: [
+        'Silverado or F-150? Let\'s settle this RIGHT NOW',
+        'I put these two side by side and the winner is CLEAR',
+        'Which one are you picking? 👇',
+        'The numbers don\'t lie. Watch this.',
+        'POV: You\'re trying to decide between these two',
+      ],
+    },
+
+    // TikTok CTAs — different vibe than FB/IG (more casual, engagement-focused)
+    ctas: {
+      soft: [
+        'Follow for more car content 🚗',
+        'Drop a 🔥 if you\'d drive this',
+        'Save this for later 📌',
+        'Which color would you pick? Comment below 👇',
+        'Tag someone who needs to see this',
+      ],
+      medium: [
+        'Comment "INFO" and I\'ll DM you everything',
+        'Link in bio to see what we have in stock',
+        'Comment your dream car — I\'ll find it for you',
+        'DM me "DEAL" for pricing 💰',
+        'Follow + comment "MINE" and I\'ll reach out',
+      ],
+      strong: [
+        'Comment "READY" and I\'ll get you pre-approved TODAY',
+        'First 5 people to DM me get VIP pricing 🚨',
+        'Comment "PAYMENT" — I\'ll DM you what your monthly would be',
+        'This one has 3 people looking at it. DM me NOW if you want it',
+        'Link in bio — apply in 60 seconds 🔥',
+      ],
+      softES: [
+        'Sígueme para más contenido de carros 🚗',
+        'Deja un 🔥 si manejarías esto',
+        'Guárdalo para después 📌',
+        'Etiqueta a alguien que necesita ver esto',
+      ],
+      mediumES: [
+        'Comenta "INFO" y te escribo por DM',
+        'Link en mi bio para ver inventario',
+        'Escríbeme "PRECIO" para más detalles 💰',
+      ],
+      strongES: [
+        'Comenta "LISTO" y te pre-apruebo HOY',
+        '¡Los primeros 5 en escribirme reciben precio VIP! 🚨',
+        'Link en mi bio — aplica en 60 segundos 🔥',
+      ],
+    },
+
+    // TikTok tips per post type
+    tips: {
+      sold_customer: [
+        'Film the KEY HANDOFF moment — that 3-second clip is gold for TikTok',
+        'Use trending sounds behind delivery videos — the algorithm pushes them 10x harder',
+        'Show the customer\'s genuine reaction, not a posed photo — authenticity wins on TikTok',
+        'Keep it 15-30 seconds MAX — shorter TikToks get more replays = more reach',
+        'Add text overlay: "From test drive to SOLD" — 90% of TikTok is watched on mute',
+        'Post delivery TikToks between 7-8PM when the evening scroll peaks',
+      ],
+      current_deal: [
+        'Start with the PAYMENT, not the car — "Your payment could be $389/mo" hooks harder',
+        'Use the "I\'m not supposed to show you this" format — it creates curiosity',
+        'Green screen yourself in front of the vehicle with the deal details on screen',
+        'Keep deal TikToks under 20 seconds — urgency should feel fast',
+        'Pin a comment with "DM me DEAL for details" — pinned comments get 3x more action',
+        'Use the "POV" format: "POV: You find out about this deal" with the price reveal',
+      ],
+      inventory_highlight: [
+        'Trending audio + slow-mo exterior shot = viral potential on car TikTok',
+        'The "reveal" format works huge: start blurry/covered, then show the car',
+        'Film at golden hour (sunrise/sunset) — the lighting makes any car look incredible',
+        '"Rate this spec 1-10" in the caption drives massive comment engagement',
+        'Carousel TikToks (photo mode) work great for interior/exterior shots',
+        'Reply to comments with new TikToks showing the features they asked about',
+      ],
+      personal_brand: [
+        '"Day in the life" content is KING on car sales TikTok — people love BTS',
+        'Show the real grind: early mornings, lot walks, customer handshakes, the hustle',
+        'Story time format: "How I sold 3 cars in one day" with you talking to camera',
+        'Reply to hate comments with calm, professional TikToks — controversy = views',
+        'Show your commission check reactions (without exact numbers) — aspirational content performs',
+        'The "things nobody tells you about car sales" series can build you a huge following',
+      ],
+      testimonial: [
+        'Screen-record customer texts/reviews and add a trending sound behind it',
+        'Duet or stitch a customer\'s video review for double the engagement',
+        '"POV: Your customer sends you this text" with the review on screen',
+        'Ask happy customers for a 10-second video saying "Go see Gabe at Findlay!"',
+        'Compile multiple short review clips into one TikTok with a counter overlay',
+      ],
+      walkaround: [
+        'TikTok walkarounds should be 30-60 seconds MAX — not a full tour, just the highlights',
+        'Start with the BEST feature (engine sound, interior tech, wheels) not the front bumper',
+        'Use POV angles — show what the DRIVER sees, not just the outside',
+        'Trending audio behind walkarounds gets 5-10x more FYP placement than original audio',
+        'End with "Follow for more" and a question — the algorithm pushes videos with engagement',
+        'Film VERTICAL — this is TikTok, not YouTube. Fill the whole screen.',
+      ],
+      financing: [
+        '"Watch this if you think you can\'t afford a new car" — this hook gets first-time buyers',
+        'Use the green screen effect with financing tips as bullet points behind you',
+        'The "3 things your dealer won\'t tell you" format builds trust and goes viral',
+        'Keep financing TikToks educational, not salesy — the algorithm suppresses hard sells',
+        'These have INSANE shelf life on TikTok — people find them months later via search',
+        'Add "Part 1" to the caption even on standalone posts — it makes people check your page for more',
+      ],
+      comparison: [
+        'Side-by-side video transitions between the two vehicles get massive engagement',
+        '"Which one?" with a poll sticker (available on some versions) drives interaction',
+        'Let the comments debate — DO NOT argue. Just reply with facts and let it cook',
+        'Film both vehicles at the same angle/location for a fair visual comparison',
+        'These are your BEST content type for TikTok virality — controversial takes = views',
+        'The "I put them side by side and the winner is clear" hook gets people to watch till the end',
+      ],
+    },
+
+    // TikTok-specific content strategy
+    strategy: {
+      postingFrequency: '1-3 TikToks per day is ideal (consistency > quality on TikTok)',
+      videoLength: '15-60 seconds sweet spot. Under 30 seconds for deals/inventory. 30-60 for walkarounds/brand.',
+      format: 'ALWAYS vertical (9:16). Use the full screen. No black bars.',
+      audio: 'Trending sounds get 3-5x more FYP placement. Check TikTok\'s trending page weekly.',
+      captions: 'Keep TikTok captions SHORT — 1-2 lines max. The video does the talking.',
+      hashtags: '3-5 relevant hashtags only. #cartok #carsales #fyp + 2 niche ones.',
+      engagement: 'Reply to EVERY comment in the first hour. Reply to comments with new videos for 2x content.',
+      crossPost: 'Repost your best TikToks as IG Reels and FB Reels — one video, three platforms.',
+      bestContent: 'Car sales TikTok goldmine: key handoffs, customer reactions, day-in-life, deal reveals, walkarounds with trending audio',
+    },
+  },
+};
+
 // -- Meta Algorithm-Optimized Post Engine --
 // Strategy: Hook Ã¢ÂÂ Value Ã¢ÂÂ CTA Ã¢ÂÂ Hashtags (bilingual EN+ES)
 // Hashtags: 3-5 branded + 5-8 niche/location + 2-3 trending = 10-16 total (Meta sweet spot)
@@ -1458,6 +2035,126 @@ async function publishToInstagram(caption, imageUrl) {
   }
 }
 
+async function publishToTikTok(caption, videoUrl = null, imageUrl = null) {
+  try {
+    // Check if TikTok API credentials are configured
+    if (!CONFIG.TIKTOK_ACCESS_TOKEN) {
+      // No TikTok API — return as "queued" for manual posting
+      // The caption is optimized and ready to copy-paste
+      console.log(`🎵 TikTok post queued (manual): caption ready for copy-paste`);
+      return {
+        success: true,
+        platform: 'tiktok',
+        mode: 'manual',
+        note: 'TikTok caption generated — copy to TikTok app. Connect TikTok API for auto-posting.',
+        caption: caption,
+      };
+    }
+
+    // TikTok Content Posting API v2 — Direct publish
+    // Step 1: Initialize video upload (if video URL provided)
+    if (videoUrl) {
+      const initRes = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.TIKTOK_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          post_info: {
+            title: caption.substring(0, 150), // TikTok title limit
+            privacy_level: 'PUBLIC_TO_EVERYONE',
+            disable_duet: false,
+            disable_comment: false,
+            disable_stitch: false,
+          },
+          source_info: {
+            source: 'PULL_FROM_URL',
+            video_url: videoUrl,
+          },
+        }),
+      });
+      const initResult = await initRes.json();
+      if (initResult.error && initResult.error.code !== 'ok') {
+        console.error('TikTok publish error:', initResult.error.message);
+        return { success: false, platform: 'tiktok', error: initResult.error.message };
+      }
+      console.log(`🎵 TikTok video published: ${initResult.data?.publish_id}`);
+      return { success: true, platform: 'tiktok', publishId: initResult.data?.publish_id };
+    }
+
+    // Photo mode (TikTok Photo Mode — carousel-style)
+    if (imageUrl) {
+      const initRes = await fetch('https://open.tiktokapis.com/v2/post/publish/content/init/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.TIKTOK_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          post_info: {
+            title: caption.substring(0, 150),
+            privacy_level: 'PUBLIC_TO_EVERYONE',
+          },
+          source_info: {
+            source: 'PULL_FROM_URL',
+            photo_images: [imageUrl],
+          },
+          post_mode: 'DIRECT_POST',
+          media_type: 'PHOTO',
+        }),
+      });
+      const initResult = await initRes.json();
+      if (initResult.error && initResult.error.code !== 'ok') {
+        return { success: false, platform: 'tiktok', error: initResult.error?.message || 'Photo post failed' };
+      }
+      console.log(`🎵 TikTok photo post published: ${initResult.data?.publish_id}`);
+      return { success: true, platform: 'tiktok', publishId: initResult.data?.publish_id };
+    }
+
+    // No media — TikTok requires video or photo
+    return {
+      success: true,
+      platform: 'tiktok',
+      mode: 'manual',
+      note: 'TikTok requires video or photo. Caption generated — copy to TikTok app.',
+      caption: caption,
+    };
+  } catch (err) {
+    console.error('Failed to publish to TikTok:', err.message);
+    return { success: false, platform: 'tiktok', error: err.message };
+  }
+}
+
+// -- Generate TikTok-optimized caption (shorter, different hooks/CTAs) --
+function generateTikTokCaption(postType, data, language, ctaStrength = 'medium') {
+  const typeMap = {
+    sold_customer: 'sold', current_deal: 'deals', inventory_highlight: 'inventory',
+    personal_brand: 'brand', testimonial: 'testimonial', walkaround: 'walkaround',
+    financing: 'financing', comparison: 'comparison',
+  };
+  const hookType = typeMap[postType] || 'brand';
+
+  // TikTok hooks
+  const hooks = LEAD_OPT.tiktok.hooks[hookType] || LEAD_OPT.tiktok.hooks.brand;
+  let hook = hooks[Math.floor(Math.random() * hooks.length)];
+  // Replace ${model} placeholder if present
+  if (data.vehicleModel) hook = hook.replace('${model}', data.vehicleModel);
+
+  // TikTok CTAs
+  const isES = language === 'es';
+  const ctaKey = isES ? (ctaStrength + 'ES') : ctaStrength;
+  const ctaPool = LEAD_OPT.tiktok.ctas[ctaKey] || LEAD_OPT.tiktok.ctas[ctaStrength] || LEAD_OPT.tiktok.ctas.medium;
+  const cta = ctaPool[Math.floor(Math.random() * ctaPool.length)];
+
+  // TikTok hashtags (3-5, not 15)
+  const hashtags = LEAD_OPT.buildHashtags(hookType, data.vehicleModel, 'tiktok');
+
+  // Build short TikTok caption (TikTok truncates long captions — keep it punchy)
+  let caption = `${hook}\n\n${cta}\n\n${hashtags}`;
+
+  return caption;
+}
 
 // ==================== POSTING API ENDPOINTS ====================
 
@@ -1567,19 +2264,37 @@ IMPORTANT: If customer context/story is provided, weave those details naturally 
 
 // Generate a caption preview using templates (fast fallback)
 app.post('/api/posts/preview', (req, res) => {
-  const { type, data, language } = req.body;
+  const { type, data, language, ctaStrength } = req.body;
   const template = POST_TEMPLATES[type];
   if (!template) return res.status(400).json({ error: 'Unknown post type' });
 
+  const strength = ctaStrength || 'medium';
+
+  const captionEN = template.generateCaption(data, strength);
+  const captionES = template.generateCaptionES ? template.generateCaptionES(data, strength) : captionEN;
   let caption;
   if (language === 'bilingual' && template.generateBilingual) {
     caption = template.generateBilingual(data);
-  } else if (language === 'es' && template.generateCaptionES) {
-    caption = template.generateCaptionES(data);
+  } else if (language === 'es') {
+    caption = captionES;
   } else {
-    caption = template.generateCaption(data);
+    caption = captionEN;
   }
-  res.json({ caption, source: 'template' });
+
+  // Score the generated caption
+  const score = LEAD_OPT.scoreCaption(caption, type);
+
+  // Generate TikTok-optimized caption too
+  const tiktokCaption = generateTikTokCaption(type, data, language, strength);
+
+  res.json({
+    captionEN,
+    captionES,
+    caption,
+    tiktokCaption,
+    optimization: score,
+    source: 'template',
+  });
 });
 
 
@@ -1598,7 +2313,7 @@ async function scrapeDeals() {
   
   try {
     // Scrape Findlay Chevrolet specials
-    const findlayResp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/new-vehicle-specials/'), {
+    const findlayResp = await axios.get('https://www.findlaychevy.com/new-vehicles/new-vehicle-specials/', {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -1612,7 +2327,7 @@ async function scrapeDeals() {
           'Upgrade-Insecure-Requests': '1',
           'Connection': 'keep-alive'
         },
-      timeout: 30000
+      timeout: 15000
     });
     const f$ = cheerio.load(findlayResp.data);
     // Extract deal banners/slides
@@ -1638,7 +2353,7 @@ async function scrapeDeals() {
   
   try {
     // Scrape Chevy.com national offers (Las Vegas zip for local relevance)
-    const chevyResp = await axios.get(proxyUrl('https://www.chevrolet.com/shopping/offers'), {
+    const chevyResp = await axios.get('https://www.chevrolet.com/shopping/offers', {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -1652,7 +2367,7 @@ async function scrapeDeals() {
           'Upgrade-Insecure-Requests': '1',
           'Connection': 'keep-alive'
         },
-      timeout: 30000,
+      timeout: 15000,
       params: { postalcode: '89101', vehicleType: 'all' }
     });
     const c$ = cheerio.load(chevyResp.data);
@@ -1762,8 +2477,8 @@ app.post('/api/upload-photo', upload.single('photo'), (req, res) => {
 });
 
 app.post('/api/posts/publish', async (req, res) => {
-  const { type, data, platforms, language, customCaption } = req.body;
-  // platforms: ['facebook', 'instagram', 'whatsapp'] or ['all']
+  const { type, data, platforms, language, customCaption, ctaStrength } = req.body;
+  // platforms: ['facebook', 'instagram', 'whatsapp', 'tiktok'] or ['all']
 
   const template = POST_TEMPLATES[type];
   if (!template && !customCaption) {
@@ -1772,17 +2487,19 @@ app.post('/api/posts/publish', async (req, res) => {
 
   let caption = customCaption;
   if (!caption && template) {
+    const strength = ctaStrength || 'medium';
     caption = language === 'es'
-      ? (template.generateCaptionES ? template.generateCaptionES(data) : template.generateCaption(data))
-      : template.generateCaption(data);
+      ? (template.generateCaptionES ? template.generateCaptionES(data, strength) : template.generateCaption(data, strength))
+      : template.generateCaption(data, strength);
   }
 
   const targetPlatforms = platforms.includes('all')
-    ? ['facebook', 'instagram', 'whatsapp']
+    ? ['facebook', 'instagram', 'whatsapp', 'tiktok']
     : platforms;
 
   const results = [];
   const imageUrl = data?.imageUrl || null;
+  const videoUrl = data?.videoUrl || null;
 
   // Publish to each platform
   for (const platform of targetPlatforms) {
@@ -1802,6 +2519,12 @@ app.post('/api/posts/publish', async (req, res) => {
       // WhatsApp Status isn't directly supported via Cloud API for status updates.
       // Instead, we can broadcast to recent WhatsApp contacts.
       results.push({ success: true, platform: 'whatsapp', note: 'WhatsApp broadcast queued' });
+    }
+    if (platform === 'tiktok') {
+      // Generate TikTok-optimized caption (shorter, different hooks/CTAs)
+      const tiktokCaption = generateTikTokCaption(type, data, language, ctaStrength);
+      const result = await publishToTikTok(tiktokCaption, videoUrl, imageUrl);
+      results.push(result);
     }
   }
 
@@ -2503,23 +3226,13 @@ let cachedDeals = [];
 let cachedInventory = [];
 let dealsLastFetch = 0;
 let inventoryLastFetch = 0;
-const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hour cache (saves ScraperAPI credits)
-const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || '';
-
-// Route requests through ScraperAPI proxy to bypass DDC WAF on findlaychevy.com
-function proxyUrl(targetUrl) {
-  if (SCRAPER_API_KEY) {
-    console.log('[Proxy] Routing through ScraperAPI: ' + targetUrl.substring(0, 60) + '...');
-    return 'https://api.scraperapi.com?api_key=' + SCRAPER_API_KEY + '&url=' + encodeURIComponent(targetUrl);
-  }
-  return targetUrl; // Direct request (will likely get 403 from DDC)
-}
+const CACHE_TTL = 30 * 60 * 1000; // 30 min cache
 
 // Scrape Findlay Chevy inventory from DDC platform (server-rendered HTML)
 async function scrapeFindlayInventory() {
   console.log("[Scraper] Starting Findlay inventory scrape...");
   try {
-    const resp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/'), {
+    const resp = await axios.get('https://www.findlaychevy.com/new-vehicles/', {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -2534,7 +3247,7 @@ async function scrapeFindlayInventory() {
           'Connection': 'keep-alive',
           'Referer': 'https://www.google.com/'
         },
-      timeout: 30000,
+      timeout: 15000,
       maxRedirects: 5
     });
     const $ = cheerio.load(resp.data);
@@ -2588,7 +3301,7 @@ async function scrapeFindlayInventory() {
 // Scrape Chevy.com national offers for deals
 async function scrapeChevyOffers() {
   try {
-    const resp = await axios.get(proxyUrl('https://www.chevrolet.com/shopping/offers'), {
+    const resp = await axios.get('https://www.chevrolet.com/shopping/offers', {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -2603,7 +3316,7 @@ async function scrapeChevyOffers() {
           'Connection': 'keep-alive',
           'Referer': 'https://www.google.com/'
         },
-      timeout: 30000
+      timeout: 15000
     });
     const $ = cheerio.load(resp.data);
     const deals = [];
@@ -2657,7 +3370,7 @@ async function scrapeChevyOffers() {
 async function scrapeFindlayDeals() {
   try {
     // Use the main inventory page - vehicles with Findlay Discount are the "deals"
-    const resp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/'), {
+    const resp = await axios.get('https://www.findlaychevy.com/new-vehicles/', {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -2672,7 +3385,7 @@ async function scrapeFindlayDeals() {
           'Connection': 'keep-alive',
           'Referer': 'https://www.google.com/'
         },
-      timeout: 30000
+      timeout: 15000
     });
     const $ = cheerio.load(resp.data);
     const deals = [];
@@ -2778,6 +3491,132 @@ app.get('/api/live-inventory', requireAuth, async (req, res) => {
 });
 
 
+// ==================== TIKTOK OAUTH ENDPOINTS ====================
+
+// TikTok OAuth callback — handles the token exchange automatically
+app.get('/auth/tiktok/callback', async (req, res) => {
+  const { code, state } = req.query;
+
+  if (!code) {
+    return res.status(400).send('Missing authorization code. Please try the TikTok authorization again.');
+  }
+
+  try {
+    // Exchange auth code for access token
+    const tokenRes = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_key: CONFIG.TIKTOK_CLIENT_KEY,
+        client_secret: CONFIG.TIKTOK_CLIENT_SECRET,
+        code: code,
+        grant_type: 'authorization_code',
+        redirect_uri: `${CONFIG.WEBHOOK_URL.replace('/webhook', '')}/auth/tiktok/callback`,
+      }),
+    });
+    const tokenData = await tokenRes.json();
+
+    if (tokenData.access_token) {
+      // Store the token in CONFIG (in production, save to .env or database)
+      CONFIG.TIKTOK_ACCESS_TOKEN = tokenData.access_token;
+      CONFIG.TIKTOK_REFRESH_TOKEN = tokenData.refresh_token;
+      CONFIG.TIKTOK_OPEN_ID = tokenData.open_id;
+
+      console.log(`🎵 TikTok connected! Access token expires in ${tokenData.expires_in}s`);
+      console.log(`🎵 Refresh token expires in ${tokenData.refresh_expires_in}s`);
+      console.log(`🎵 Open ID: ${tokenData.open_id}`);
+
+      res.send(`
+        <html>
+        <body style="background: #000; color: #fff; font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;">
+          <div style="text-align: center; max-width: 500px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">🎵✅</div>
+            <h1 style="color: #ff0050;">TikTok Connected!</h1>
+            <p style="color: #ccc; margin-bottom: 20px;">Your Gabe Moves Metal CRM can now auto-post to TikTok.</p>
+            <p style="color: #888; font-size: 14px;">Access Token: ${tokenData.access_token.substring(0, 20)}...</p>
+            <p style="color: #d4a017; font-size: 14px; margin-top: 20px;">
+              <strong>IMPORTANT:</strong> Copy this access token to your .env file as TIKTOK_ACCESS_TOKEN to persist it across restarts.
+            </p>
+            <div style="margin-top: 30px; padding: 16px; background: #111; border-radius: 8px; text-align: left; font-size: 12px; font-family: monospace; word-break: break-all;">
+              TIKTOK_ACCESS_TOKEN=${tokenData.access_token}<br><br>
+              TIKTOK_REFRESH_TOKEN=${tokenData.refresh_token}<br><br>
+              TIKTOK_OPEN_ID=${tokenData.open_id}
+            </div>
+            <p style="color: #888; font-size: 12px; margin-top: 20px;">You can close this window and go back to your CRM.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    } else {
+      console.error('TikTok token exchange failed:', tokenData);
+      res.status(400).send(`TikTok authorization failed: ${JSON.stringify(tokenData)}`);
+    }
+  } catch (err) {
+    console.error('TikTok OAuth error:', err.message);
+    res.status(500).send(`Error connecting TikTok: ${err.message}`);
+  }
+});
+
+// TikTok token refresh endpoint
+app.post('/api/tiktok/refresh', async (req, res) => {
+  const refreshToken = CONFIG.TIKTOK_REFRESH_TOKEN || req.body.refresh_token;
+  if (!refreshToken) {
+    return res.status(400).json({ error: 'No refresh token available. Re-authorize TikTok.' });
+  }
+
+  try {
+    const tokenRes = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_key: CONFIG.TIKTOK_CLIENT_KEY,
+        client_secret: CONFIG.TIKTOK_CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
+    const tokenData = await tokenRes.json();
+
+    if (tokenData.access_token) {
+      CONFIG.TIKTOK_ACCESS_TOKEN = tokenData.access_token;
+      CONFIG.TIKTOK_REFRESH_TOKEN = tokenData.refresh_token;
+      console.log('🎵 TikTok token refreshed successfully');
+      res.json({ success: true, message: 'Token refreshed', expires_in: tokenData.expires_in });
+    } else {
+      res.status(400).json({ error: 'Refresh failed', details: tokenData });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get TikTok authorization URL (for easy access from CRM)
+app.get('/api/tiktok/auth-url', (req, res) => {
+  if (!CONFIG.TIKTOK_CLIENT_KEY) {
+    return res.json({
+      configured: false,
+      message: 'TikTok client_key not set. See TIKTOK_SETUP_GUIDE.md',
+    });
+  }
+  const baseUrl = CONFIG.WEBHOOK_URL.replace('/webhook', '');
+  const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${CONFIG.TIKTOK_CLIENT_KEY}&scope=user.info.basic,video.publish,video.upload&response_type=code&redirect_uri=${encodeURIComponent(baseUrl + '/auth/tiktok/callback')}&state=gabe_moves_metal`;
+  res.json({
+    configured: true,
+    connected: !!CONFIG.TIKTOK_ACCESS_TOKEN,
+    authUrl,
+    message: CONFIG.TIKTOK_ACCESS_TOKEN ? 'TikTok is connected!' : 'Click the authUrl to connect your TikTok account',
+  });
+});
+
+// TikTok connection status
+app.get('/api/tiktok/status', (req, res) => {
+  res.json({
+    connected: !!CONFIG.TIKTOK_ACCESS_TOKEN,
+    hasClientKey: !!CONFIG.TIKTOK_CLIENT_KEY,
+    hasClientSecret: !!CONFIG.TIKTOK_CLIENT_SECRET,
+    openId: CONFIG.TIKTOK_OPEN_ID || null,
+  });
+});
 app.listen(PORT, () => {
   // Start inventory auto-refresh
   inventoryModule.startAutoRefresh();

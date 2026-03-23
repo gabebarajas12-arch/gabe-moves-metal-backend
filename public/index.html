@@ -1855,6 +1855,9 @@
                                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                     <input type="checkbox" id="postToWA"> <span style="font-size: 13px;">WhatsApp</span>
                                 </label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="checkbox" id="postToTT" checked> <span style="font-size: 13px;">🎵 TikTok</span>
+                                </label>
                             </div>
                             <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 16px;">
                                 <label class="form-label" style="margin-bottom: 0; font-weight: 700;">Language:</label>
@@ -1879,6 +1882,8 @@
                             </div>
                             <div id="captionSource" style="display: none; font-size: 10px; color: var(--text-secondary); margin-bottom: 6px;"></div>
                             <div id="captionPreview" style="display: none; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: var(--text-primary);"></div>
+                            <!-- TikTok Caption (separate — shorter, different hooks) -->
+                            <div id="tiktokCaptionPreview" style="display: none; margin-top: 10px; background: var(--bg-primary); border: 1px solid #ff0050; border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: var(--text-primary);"></div>
                         </div>
 
                         <!-- Publish Button -->
@@ -3136,6 +3141,7 @@
             if (form) form.style.display = 'block';
             // Clear preview
             document.getElementById('captionPreview').style.display = 'none';
+            document.getElementById('tiktokCaptionPreview').style.display = 'none';
             document.getElementById('postStatus').style.display = 'none';
         }
 
@@ -3172,6 +3178,7 @@
             if (document.getElementById('postToFB').checked) platforms.push('facebook');
             if (document.getElementById('postToIG').checked) platforms.push('instagram');
             if (document.getElementById('postToWA').checked) platforms.push('whatsapp');
+            if (document.getElementById('postToTT').checked) platforms.push('tiktok');
             return platforms;
         }
 
@@ -3196,6 +3203,16 @@
                 document.getElementById('captionSource').style.display = 'block';
                 document.getElementById('copyBtn').style.display = 'inline-flex';
                 window._lastCaption = result.caption;
+
+                // TikTok caption preview (separate, shorter)
+                const ttPreview = document.getElementById('tiktokCaptionPreview');
+                if (result.tiktokCaption && document.getElementById('postToTT').checked) {
+                    ttPreview.innerHTML = '<div style="font-weight: 700; font-size: 12px; color: #ff0050; margin-bottom: 6px;">🎵 TikTok Caption (auto-optimized — shorter hooks, fewer hashtags)</div>' +
+                        '<div style="white-space: pre-wrap;">' + result.tiktokCaption + '</div>';
+                    ttPreview.style.display = 'block';
+                } else {
+                    ttPreview.style.display = 'none';
+                }
             } catch (error) {
                 console.error('Preview error:', error);
             }
@@ -3542,6 +3559,7 @@
                         if (p === 'facebook') return '📘 FB';
                         if (p === 'instagram') return '📸 IG';
                         if (p === 'whatsapp') return '📱 WA';
+                        if (p === 'tiktok') return '🎵 TT';
                         return p;
                     }).join(' · ');
 
