@@ -3757,7 +3757,7 @@
                         <td style="padding:10px 8px;text-align:center;">
                             <button onclick="editDeal(${d.id})" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:14px;" title="Edit">✏️</button>
                             <button onclick="deleteDeal(${d.id})" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:14px;" title="Delete">🗑️</button>
-                    <button onclick="createDeliveryPost({customer: '${deal.customer}', vehicle: '${deal.vehicle}', stockNumber: '${deal.stockNumber || ''}', year: ''})" style="background:var(--gold); color:#000; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:600;" title="Create delivery post">📸 Post</button>
+                    <button onclick="createDeliveryPost({customer: '${d.customerName || ''}', vehicle: '${d.vehicle || ''}', stockNumber: '${d.stockNumber || ''}', year: '${d.date ? d.date.slice(0,4) : ''}' })" style="background:var(--gold); color:#000; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:600;" title="Create delivery post">📸 Post</button>
                         </td>
                     </tr>`;
                 }).join('');

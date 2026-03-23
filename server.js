@@ -2205,33 +2205,50 @@ app.post('/api/posts/ai-generate', async (req, res) => {
     bilingual: 'Write the caption in BOTH English and Spanish. Put the English version first, then a line break with "Ã¢ÂÂ", then the Spanish version. Include "Hablo espaÃÂ±ol" with flag emojis in the Spanish section.',
   };
 
-  const prompt = `You are writing a social media post AS Gabe Barajas \u2014 a car salesman at Findlay Chevrolet in Las Vegas. Gabe is real, down to earth, and genuinely passionate about helping people find the right vehicle. He is NOT a corporate marketing department.
+  const prompt = `You are Gabe Barajas. You sell Chevys at Findlay in Vegas. You're writing a ${typeDescriptions[type] || 'social media post'}.
 
-Write a ${typeDescriptions[type] || 'social media post'} using this info:
+Here's the info:
 ${JSON.stringify(data, null, 2)}
 
-VOICE & TONE \u2014 THIS IS CRITICAL:
-- Write like a real person texting a friend about something exciting at work
-- NO generic sales phrases like "Don't miss out!", "Act now!", "Limited time!", "Incredible deal!", "Dream car!", "Look no further!"
-- NO excessive exclamation marks or ALL CAPS words
-- NO robot language \u2014 if it sounds like a car commercial, rewrite it
-- Talk like Gabe actually talks: casual, warm, confident but not pushy
-- Share the genuine excitement without the used-car-salesman energy
-- It should feel like a real post you'd see from someone you know, not an ad
-- 2-4 emojis max, placed naturally \u2014 not every other word
+${customerContext ? 'Background on this customer: ' + customerContext : ''}
 
-STRUCTURE:
-- Open with something real and specific (not a generic hook)
-- Keep it conversational \u2014 short sentences, natural line breaks
-- Include Gabe's number (702) 416-3741 casually, like "hit my line" or "text me"
-- End with 5-8 relevant hashtags (not 15) \u2014 #FindlayChevrolet #LasVegas #GabeMovesmetal plus model-specific ones
-- Total length: 4-8 lines of actual content before hashtags
+EXAMPLES OF WHAT I WANT (study these closely — match this exact energy and style):
 
-${customerContext ? 'PERSONAL CONTEXT (weave this in naturally): ' + customerContext : ''}
+For a sold customer post:
+"Man I love this job sometimes. Got to hand the keys to Maria and her family today — brand new Traverse RS 🔥 She came in last week just looking, we made the numbers work, and now her kids got the space they needed. That's what it's about right there. Congrats Maria!! If you're in the market hit my line (702) 416-3741 📲
+
+#FindlayChevrolet #LasVegas #Traverse #ChevyTraverse #GabeMovesmetal #NewCar #VegasLife"
+
+For an inventory post:
+"This Blazer EV RS just hit the lot and I already know it's not gonna last 😤 That front end is MEAN. Electric, 320 miles range, and honestly drives like nothing else in this price range. Come see it before someone else does — I'm at Findlay all day. (702) 416-3741
+
+#ChevyBlazerEV #ElectricVehicle #FindlayChevrolet #LasVegas #GabeMovesmetal #EVLife"
+
+For a deal post:
+"Yo if you've been waiting on a truck this is it. 2026 Silverado 1500 — we're at $6,200 off MSRP right now at Findlay. That's not a typo. New year models, full warranty, ready to go. Text me before they're gone (702) 416-3741 📲
+
+#Silverado #ChevySilverado #FindlayChevrolet #TruckLife #LasVegas #GabeMovesmetal"
+
+For a personal brand post:
+"12 units this month. Not saying that to flex — saying it because 2 years ago I was sleeping on my boy's couch trying to figure out my next move. This car business changed my life fr. If you're thinking about getting into sales, hit me up. And if you need a Chevy, you already know who to call 💪 (702) 416-3741
+
+#GabeMovesmetal #FindlayChevrolet #CarSales #LasVegas #Motivation #SalesLife"
+
+RULES:
+- Write EXACTLY like those examples. Same casual tone, same energy, same structure
+- Talk like you're posting on YOUR page, not writing ad copy for a corporation
+- Use "fr", "yo", "ngl", "lowkey" sparingly and naturally — like a real person would
+- NO phrases like: "Don't miss out", "Act now", "Dream car", "Look no further", "Incredible deal", "Ready to roll", "Hit the road", "Behind the wheel", "Let's make it happen"
+- NO sentences that start with "Whether you're looking for..." or "If you've been searching for..."
+- 2-3 emojis max. Place them where a real person would
+- Include (702) 416-3741 once, casually
+- End with 5-7 hashtags. Always include #FindlayChevrolet #LasVegas #GabeMovesmetal
+- Keep it 4-7 lines before hashtags
+- Sound like a 20-something guy who genuinely loves his job and wants to help people, not like ChatGPT
 
 ${languageInstructions[language] || languageInstructions.bilingual}
 
-Write ONLY the caption. Nothing else.`;
+Write ONLY the caption text. No explanation, no options, no "here's your caption".`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
