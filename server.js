@@ -1598,7 +1598,7 @@ async function scrapeDeals() {
   
   try {
     // Scrape Findlay Chevrolet specials
-    const findlayResp = await axios.get('https://www.findlaychevy.com/new-vehicles/new-vehicle-specials/', {
+    const findlayResp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/new-vehicle-specials/'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -1612,7 +1612,7 @@ async function scrapeDeals() {
           'Upgrade-Insecure-Requests': '1',
           'Connection': 'keep-alive'
         },
-      timeout: 15000
+      timeout: 30000
     });
     const f$ = cheerio.load(findlayResp.data);
     // Extract deal banners/slides
@@ -1638,7 +1638,7 @@ async function scrapeDeals() {
   
   try {
     // Scrape Chevy.com national offers (Las Vegas zip for local relevance)
-    const chevyResp = await axios.get('https://www.chevrolet.com/shopping/offers', {
+    const chevyResp = await axios.get(proxyUrl('https://www.chevrolet.com/shopping/offers'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -1652,7 +1652,7 @@ async function scrapeDeals() {
           'Upgrade-Insecure-Requests': '1',
           'Connection': 'keep-alive'
         },
-      timeout: 15000,
+      timeout: 30000,
       params: { postalcode: '89101', vehicleType: 'all' }
     });
     const c$ = cheerio.load(chevyResp.data);
@@ -2503,13 +2503,23 @@ let cachedDeals = [];
 let cachedInventory = [];
 let dealsLastFetch = 0;
 let inventoryLastFetch = 0;
-const CACHE_TTL = 30 * 60 * 1000; // 30 min cache
+const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hour cache (saves ScraperAPI credits)
+const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || '';
+
+// Route requests through ScraperAPI proxy to bypass DDC WAF on findlaychevy.com
+function proxyUrl(targetUrl) {
+  if (SCRAPER_API_KEY) {
+    console.log('[Proxy] Routing through ScraperAPI: ' + targetUrl.substring(0, 60) + '...');
+    return 'https://api.scraperapi.com?api_key=' + SCRAPER_API_KEY + '&url=' + encodeURIComponent(targetUrl);
+  }
+  return targetUrl; // Direct request (will likely get 403 from DDC)
+}
 
 // Scrape Findlay Chevy inventory from DDC platform (server-rendered HTML)
 async function scrapeFindlayInventory() {
   console.log("[Scraper] Starting Findlay inventory scrape...");
   try {
-    const resp = await axios.get('https://www.findlaychevy.com/new-vehicles/', {
+    const resp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -2524,7 +2534,7 @@ async function scrapeFindlayInventory() {
           'Connection': 'keep-alive',
           'Referer': 'https://www.google.com/'
         },
-      timeout: 15000,
+      timeout: 30000,
       maxRedirects: 5
     });
     const $ = cheerio.load(resp.data);
@@ -2578,7 +2588,7 @@ async function scrapeFindlayInventory() {
 // Scrape Chevy.com national offers for deals
 async function scrapeChevyOffers() {
   try {
-    const resp = await axios.get('https://www.chevrolet.com/shopping/offers', {
+    const resp = await axios.get(proxyUrl('https://www.chevrolet.com/shopping/offers'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -2593,7 +2603,7 @@ async function scrapeChevyOffers() {
           'Connection': 'keep-alive',
           'Referer': 'https://www.google.com/'
         },
-      timeout: 15000
+      timeout: 30000
     });
     const $ = cheerio.load(resp.data);
     const deals = [];
@@ -2647,7 +2657,7 @@ async function scrapeChevyOffers() {
 async function scrapeFindlayDeals() {
   try {
     // Use the main inventory page - vehicles with Findlay Discount are the "deals"
-    const resp = await axios.get('https://www.findlaychevy.com/new-vehicles/', {
+    const resp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -2662,7 +2672,7 @@ async function scrapeFindlayDeals() {
           'Connection': 'keep-alive',
           'Referer': 'https://www.google.com/'
         },
-      timeout: 15000
+      timeout: 30000
     });
     const $ = cheerio.load(resp.data);
     const deals = [];
