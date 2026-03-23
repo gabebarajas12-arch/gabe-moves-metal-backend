@@ -3874,93 +3874,42 @@
     let liveDealsCache = [];
     
     async function loadLiveDeals() {
-              const panel = document.getElementById('liveDealsPanel');
-              if (!panel) return;
-              panel.innerHTML = '<p style="color:var(--text-secondary);padding:12px;">Scraping latest deals from findlaychevy.com & chevy.com...</p>';
-              
-              fetch('/api/live-deals', {
-                headers: { 'Authorization': 'Bearer ' + authToken }
-              })
-              .then(r => r.json())
-              .then(data => {
+              const grid = document.getElementById('liveDealsGrid');
+              if (!grid) return;
+              grid.innerHTML = '<p style="color:var(--text-secondary);padding:12px;">Scraping latest deals from findlaychevy.com & chevy.com...</p>';
+
+              try {
+                const resp = await fetch('/api/live-deals', {
+                  headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = await resp.json();
                 const deals = data.deals || [];
                 if (deals.length === 0) {
-                  panel.innerHTML = '<p style="color:var(--text-secondary);padding:12px;">No deals found. The scraper may need a moment to warm up.</p>';
+                  grid.innerHTML = '<p style="color:var(--text-secondary);padding:12px;">No deals found. The scraper may need a moment to warm up — try again in 30 seconds.</p>';
                   return;
                 }
-                let html = '<div style="max-height:300px;overflow-y:auto;">';
-                deals.forEach((d, i) => {
-                  const name = d.vehicle || d.name || 'Unknown Vehicle';
-                  const price = d.findlayPrice || d.price || d.msrp || '';
-                  const savings = d.savings || d.discount || d.cashBack || '';
-                  const monthly = d.monthly ? '$' + d.monthly + '/mo' : '';
-                  const apr = d.apr ? d.apr + '% APR' : '';
-                  const badge = d.source === 'chevrolet.com' ? '🇺🇸 National' : '⭐ Findlay';
-                  
-                  html += '<div class="live-deal-item" style="padding:10px 12px;border-bottom:1px solid var(--border-color);cursor:pointer;" onclick="selectDealForPost(' + i + ')">';
-                  html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-                  html += '<strong style="color:var(--gold);">' + name + '</strong>';
-                  html += '<span style="font-size:11px;background:var(--card-bg);padding:2px 8px;border-radius:10px;">' + badge + '</span>';
-                  html += '</div>';
-                  html += '<div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">';
-                  if (price) html += 'Price: $' + Number(price).toLocaleString() + ' ';
-                  if (savings) html += '| Save $' + Number(savings).toLocaleString() + ' ';
-                  if (monthly) html += '| ' + monthly + ' ';
-                  if (apr) html += '| ' + apr;
-                  html += '</div></div>';
-                });
-                html += '</div>';
-                panel.innerHTML = html;
-                
-                // Store deals globally for post generation
-                window._liveDeals = deals;
-              })
-              .catch(err => {
-                panel.innerHTML = '<p style="color:var(--danger);padding:12px;">Error: ' + err.message + '</p>';
-              });
+                // Normalize deal data into a consistent format for selectDeal()
+                liveDealsCache = deals.map(d => ({
+                  model: d.vehicle || d.name || d.model || 'Chevrolet',
+                  offer_type: d.type || (d.apr ? 'APR Special' : d.cashBack ? 'Cash Back' : d.monthly ? 'Lease' : 'Special'),
+                  headline: d.vehicle || d.name || d.model || '',
+                  details: [
+                    d.findlayPrice || d.price ? 'Price: $' + Number(d.findlayPrice || d.price || d.msrp).toLocaleString() : '',
+                    d.savings || d.discount ? 'Save $' + Number(d.savings || d.discount).toLocaleString() : '',
+                    d.cashBack ? '$' + Number(d.cashBack).toLocaleString() + ' Cash Back' : '',
+                    d.monthly ? '$' + d.monthly + '/mo Lease' : '',
+                    d.apr ? d.apr + '% APR' : ''
+                  ].filter(Boolean).join(' | '),
+                  expiration: d.expirationDate || d.expiry || '',
+                  source: d.source || 'findlaychevy.com'
+                }));
+                renderLiveDeals(liveDealsCache);
+              } catch(err) {
+                grid.innerHTML = '<p style="color:var(--danger);padding:12px;">Error loading deals: ' + err.message + '</p>';
+              }
             }
 
-            function selectDealForPost(index) {
-              const deals = window._liveDeals || [];
-              const deal = deals[index];
-              if (!deal) return;
-              
-              const name = deal.vehicle || deal.name || '';
-              const price = deal.findlayPrice || deal.price || deal.msrp || '';
-              const savings = deal.savings || deal.discount || '';
-              const cashBack = deal.cashBack || deal.customerCash || '';
-              const monthly = deal.monthly || '';
-              const apr = deal.apr || '';
-              const source = deal.source || '';
-              
-              // Build deal context for caption generation
-              let dealText = name;
-              if (price) dealText += ' - Price: $' + Number(price).toLocaleString();
-              if (savings) dealText += ' | Save $' + Number(savings).toLocaleString();
-              if (cashBack) dealText += ' | $' + Number(cashBack).toLocaleString() + ' Cash Back';
-              if (monthly) dealText += ' | $' + monthly + '/mo';
-              if (apr) dealText += ' | ' + apr + '% APR';
-              dealText += ' | ' + (source === 'chevrolet.com' ? 'National Offer' : 'Findlay Chevrolet Special');
-              
-              // Set the caption/context field
-              const captionField = document.getElementById('captionText') || document.getElementById('postCaption') || document.querySelector('textarea[name="caption"]');
-              if (captionField) {
-                captionField.value = dealText;
-                captionField.dispatchEvent(new Event('input', { bubbles: true }));
-              }
-              
-              // Set customerContext if it exists
-              const ctxField = document.getElementById('customerContext');
-              if (ctxField) {
-                ctxField.value = 'Current deal: ' + dealText;
-                ctxField.dispatchEvent(new Event('input', { bubbles: true }));
-              }
-              
-              // Highlight selected deal
-              document.querySelectorAll('.live-deal-item').forEach(el => el.style.background = '');
-              const items = document.querySelectorAll('.live-deal-item');
-              if (items[index]) items[index].style.background = 'rgba(212,160,23,0.15)';
-            }
+            // selectDealForPost removed — selectDeal() handles deal selection and form auto-fill
     
     function renderLiveDeals(deals) {
       const grid = document.getElementById('liveDealsGrid');
