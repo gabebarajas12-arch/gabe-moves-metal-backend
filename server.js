@@ -2313,7 +2313,7 @@ async function scrapeDeals() {
   
   try {
     // Scrape Findlay Chevrolet specials
-    const findlayResp = await axios.get('https://www.findlaychevy.com/new-vehicles/new-vehicle-specials/', {
+    const findlayResp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/new-vehicle-specials/'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -2353,7 +2353,7 @@ async function scrapeDeals() {
   
   try {
     // Scrape Chevy.com national offers (Las Vegas zip for local relevance)
-    const chevyResp = await axios.get('https://www.chevrolet.com/shopping/offers', {
+    const chevyResp = await axios.get(proxyUrl('https://www.chevrolet.com/shopping/offers'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -3226,13 +3226,23 @@ let cachedDeals = [];
 let cachedInventory = [];
 let dealsLastFetch = 0;
 let inventoryLastFetch = 0;
-const CACHE_TTL = 30 * 60 * 1000; // 30 min cache
+const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hour cache
+
+// ScraperAPI proxy to bypass DDC WAF on findlaychevy.com
+const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || '';
+function proxyUrl(targetUrl) {
+  if (SCRAPER_API_KEY) {
+    console.log('[Proxy] Routing through ScraperAPI: ' + targetUrl.substring(0, 60) + '...');
+    return 'https://api.scraperapi.com?api_key=' + SCRAPER_API_KEY + '&url=' + encodeURIComponent(targetUrl);
+  }
+  return targetUrl;
+}
 
 // Scrape Findlay Chevy inventory from DDC platform (server-rendered HTML)
 async function scrapeFindlayInventory() {
   console.log("[Scraper] Starting Findlay inventory scrape...");
   try {
-    const resp = await axios.get('https://www.findlaychevy.com/new-vehicles/', {
+    const resp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -3301,7 +3311,7 @@ async function scrapeFindlayInventory() {
 // Scrape Chevy.com national offers for deals
 async function scrapeChevyOffers() {
   try {
-    const resp = await axios.get('https://www.chevrolet.com/shopping/offers', {
+    const resp = await axios.get(proxyUrl('https://www.chevrolet.com/shopping/offers'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -3370,7 +3380,7 @@ async function scrapeChevyOffers() {
 async function scrapeFindlayDeals() {
   try {
     // Use the main inventory page - vehicles with Findlay Discount are the "deals"
-    const resp = await axios.get('https://www.findlaychevy.com/new-vehicles/', {
+    const resp = await axios.get(proxyUrl('https://www.findlaychevy.com/new-vehicles/'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
