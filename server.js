@@ -2212,39 +2212,39 @@ ${JSON.stringify(data, null, 2)}
 
 ${customerContext ? 'Background on this customer: ' + customerContext : ''}
 
-EXAMPLES OF WHAT I WANT (study these closely — match this exact energy and style):
+EXAMPLES OF WHAT I WANT (match this tone — confident, warm, real but professional):
 
 For a sold customer post:
-"Man I love this job sometimes. Got to hand the keys to Maria and her family today — brand new Traverse RS 🔥 She came in last week just looking, we made the numbers work, and now her kids got the space they needed. That's what it's about right there. Congrats Maria!! If you're in the market hit my line (702) 416-3741 📲
+"Really proud of this one. Got to hand the keys to Maria and her family today on a brand new Traverse RS. She came in last week exploring options, we found the right numbers, and now her kids have the space they need. That's the best part of this job. Congrats Maria! If you're looking for your next vehicle, I'd love to help — (702) 416-3741
 
 #FindlayChevrolet #LasVegas #Traverse #ChevyTraverse #GabeMovesmetal #NewCar #VegasLife"
 
 For an inventory post:
-"Ngl this Blazer EV RS is one of the hardest things on our lot right now and I already know it's not gonna last 😤 That front end is MEAN. Electric, 320 miles range, and honestly drives like nothing else in this price range. Come see it before someone else does — I'm at Findlay all day. (702) 416-3741
+"This Blazer EV RS is one of the sharpest things on our lot right now. That front end speaks for itself. Electric, 320 miles of range, and it drives like nothing else in this price range. Come check it out — I'm at Findlay all day. (702) 416-3741
 
 #ChevyBlazerEV #ElectricVehicle #FindlayChevrolet #LasVegas #GabeMovesmetal #EVLife"
 
 For a deal post:
-"Yo if you've been waiting on a truck this is it. 2026 Silverado 1500 — we're at $6,200 off MSRP right now at Findlay. That's not a typo. New year models, full warranty, ready to go. Text me before they're gone (702) 416-3741 📲
+"If you've been waiting on the right time for a truck, this is worth a look. 2026 Silverado 1500 — we're at $6,200 off MSRP right now at Findlay. New year models, full warranty, ready to go. Reach out and I'll get you the details. (702) 416-3741
 
 #Silverado #ChevySilverado #FindlayChevrolet #TruckLife #LasVegas #GabeMovesmetal"
 
 For a personal brand post:
-"12 units this month. Not saying that to flex — saying it because 2 years ago I was sleeping on my boy's couch trying to figure out my next move. This car business changed my life fr. If you're thinking about getting into sales, hit me up. And if you need a Chevy, you already know who to call 💪 (702) 416-3741
+"12 units this month. Not saying that to brag — saying it because a couple years ago I wasn't sure what my next move was. This business changed everything for me. If you're thinking about getting into sales, happy to talk. And if you need a Chevy, you know who to call. (702) 416-3741
 
 #GabeMovesmetal #FindlayChevrolet #CarSales #LasVegas #Motivation #SalesLife"
 
 RULES:
-- Write EXACTLY like those examples. Same casual tone, same energy, same structure
-- Talk like you're posting on YOUR page, not writing ad copy for a corporation
-- Use "fr", "yo", "ngl", "lowkey" sparingly and naturally — like a real person would
-- NO phrases like: "Don't miss out", "Act now", "Dream car", "Look no further", "Incredible deal", "Ready to roll", "Hit the road", "Behind the wheel", "Let's make it happen", "Just got", "Just landed", "Fresh off the truck"
+- Match the tone of those examples — confident and personable, but not overly casual or slangy
+- Sound like a real salesperson who's good at what he does, not a marketing department
+- NO internet slang like "ngl", "fr", "lowkey", "bussin", "no cap"
+- NO generic ad phrases like: "Don't miss out", "Act now", "Dream car", "Look no further", "Incredible deal", "Ready to roll", "Hit the road", "Behind the wheel", "Let's make it happen", "Just got", "Just landed", "Fresh off the truck"
 - NO sentences that start with "Whether you're looking for..." or "If you've been searching for..."
-- 2-3 emojis max. Place them where a real person would
-- Include (702) 416-3741 once, casually
+- 1-2 emojis max, only if they feel natural. Zero emojis is also fine
+- Include (702) 416-3741 once, worked in naturally
 - End with 5-7 hashtags. Always include #FindlayChevrolet #LasVegas #GabeMovesmetal
 - Keep it 4-7 lines before hashtags
-- Sound like a 20-something guy who genuinely loves his job and wants to help people, not like ChatGPT
+- The vibe is: a young professional who's genuine, knows his product, and cares about helping people
 
 ${languageInstructions[language] || languageInstructions.bilingual}
 
