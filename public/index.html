@@ -2351,11 +2351,11 @@
             document.getElementById('filterLanguage').addEventListener('change', renderLeads);
 
             // Inventory filters
-            document.getElementById('filterCondition').addEventListener('change', renderInventory);
-            document.getElementById('filterModel').addEventListener('change', renderInventory);
-            document.getElementById('filterMinPrice').addEventListener('change', renderInventory);
-            document.getElementById('filterMaxPrice').addEventListener('change', renderInventory);
-            document.getElementById('matchInterest').addEventListener('change', renderInventory);
+            document.getElementById('filterCondition').addEventListener('change', renderInventoryFromCache);
+            document.getElementById('filterModel').addEventListener('change', renderInventoryFromCache);
+            document.getElementById('filterMinPrice').addEventListener('change', renderInventoryFromCache);
+            document.getElementById('filterMaxPrice').addEventListener('change', renderInventoryFromCache);
+            document.getElementById('matchInterest').addEventListener('change', renderInventoryFromCache);
 
             // Inventory refresh
             document.getElementById('refreshInventoryBtn').addEventListener('click', refreshInventory);
@@ -2840,43 +2840,48 @@
         async function loadInventory() {
               const grid = document.getElementById('inventoryGrid');
               if (!grid) return;
-              grid.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Loading live inventory from findlaychevy.com...</p>';
+              grid.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Loading inventory...</p>';
               
-              fetch('/api/live-inventory', {
-                headers: { 'Authorization': 'Bearer ' + authToken }
-              })
-              .then(r => r.json())
-              .then(data => {
-                const items = (data.inventory || []).map(v => {
-                  // Parse "New 2026 Chevrolet BrightDrop 600 EJZ" into fields
+              try {
+                const resp = await fetch('/api/live-inventory', {
+                  headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = await resp.json();
+                const raw = data.inventory || [];
+                window._inventoryCache = raw.map(v => {
+                  // Support both scraped format (name string) and structured format (year/make/model)
+                  if (v.year && v.make && v.model) {
+                    return {
+                      year: String(v.year), make: v.make, model: v.model + (v.trim ? ' ' + v.trim : ''),
+                      stock: v.stock || '', stockNumber: v.stock || '',
+                      price: v.price || v.msrp || '', msrp: v.msrp || '',
+                      vin: v.vin || '', image: v.image || '',
+                      condition: v.condition || 'New', mileage: '0',
+                      color: v.color || '', source: v.source || 'findlaychevy.com'
+                    };
+                  }
                   const nameStr = v.name || '';
                   const yearMatch = nameStr.match(/(20\d{2})/);
                   const year = yearMatch ? yearMatch[1] : '';
-                  const makeMatch = nameStr.match(/Chevrolet/i);
-                  const make = makeMatch ? 'Chevrolet' : '';
+                  const make = nameStr.match(/Chevrolet/i) ? 'Chevrolet' : '';
                   const model = nameStr.replace(/^(New|Used)\s*/i, '').replace(year, '').replace('Chevrolet', '').trim();
                   return {
                     year, make, model,
-                    stock: v.stock || '',
-                    stockNumber: v.stock || '',
-                    price: v.price || v.msrp || '',
-                    msrp: v.msrp || '',
-                    vin: v.vin || '',
-                    image: v.image || '',
+                    stock: v.stock || '', stockNumber: v.stock || '',
+                    price: v.price || v.msrp || '', msrp: v.msrp || '',
+                    vin: v.vin || '', image: v.image || '',
                     condition: nameStr.match(/^New/i) ? 'New' : 'Used',
-                    mileage: '0',
-                    source: v.source || 'findlaychevy.com'
+                    mileage: '0', source: v.source || 'findlaychevy.com'
                   };
                 });
-                renderInventory(items);
+                renderInventoryFromCache();
                 if (data.cached) {
                   const ago = Math.round((Date.now() - data.lastFetch) / 60000);
-                  grid.insertAdjacentHTML('beforeend', '<p style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:10px;">Cached ' + ago + ' min ago | ' + items.length + ' vehicles from findlaychevy.com</p>');
+                  grid.insertAdjacentHTML('beforeend', '<p style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:10px;">Cached ' + ago + ' min ago | ' + raw.length + ' vehicles</p>');
                 }
-              })
-              .catch(err => {
+              } catch(err) {
                 grid.innerHTML = '<p style="color:var(--danger);text-align:center;padding:40px;">Error loading inventory: ' + err.message + '</p>';
-              });
+              }
             }
 
         async function renderInventory() {
