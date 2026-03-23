@@ -2327,7 +2327,7 @@ async function scrapeDeals() {
           'Upgrade-Insecure-Requests': '1',
           'Connection': 'keep-alive'
         },
-      timeout: 15000
+      timeout: 60000
     });
     const f$ = cheerio.load(findlayResp.data);
     // Extract deal banners/slides
@@ -2367,7 +2367,7 @@ async function scrapeDeals() {
           'Upgrade-Insecure-Requests': '1',
           'Connection': 'keep-alive'
         },
-      timeout: 15000,
+      timeout: 60000,
       params: { postalcode: '89101', vehicleType: 'all' }
     });
     const c$ = cheerio.load(chevyResp.data);
@@ -3257,7 +3257,7 @@ async function scrapeFindlayInventory() {
           'Connection': 'keep-alive',
           'Referer': 'https://www.google.com/'
         },
-      timeout: 15000,
+      timeout: 60000,
       maxRedirects: 5
     });
     const $ = cheerio.load(resp.data);
@@ -3326,7 +3326,7 @@ async function scrapeChevyOffers() {
           'Connection': 'keep-alive',
           'Referer': 'https://www.google.com/'
         },
-      timeout: 15000
+      timeout: 60000
     });
     const $ = cheerio.load(resp.data);
     const deals = [];
@@ -3395,7 +3395,7 @@ async function scrapeFindlayDeals() {
           'Connection': 'keep-alive',
           'Referer': 'https://www.google.com/'
         },
-      timeout: 15000
+      timeout: 60000
     });
     const $ = cheerio.load(resp.data);
     const deals = [];
