@@ -36,7 +36,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-// const inventoryModule = require('./inventory'); // Disabled - using new live scrapers instead
+const inventoryModule = require("./inventory-stub"); // Lightweight stub - real data from live scrapers
 
 const app = express();
 const PORT = process.env.PORT || 3000;
