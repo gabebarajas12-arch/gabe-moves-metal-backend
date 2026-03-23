@@ -2142,7 +2142,7 @@
 
     
         <!-- Calendar Section -->
-        <div id="calendar" class="page-section" style="display:none">
+        <div id="calendar" class="page">
             <h2>Calendar</h2>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
                 <div style="display:flex;gap:8px;align-items:center">
@@ -2271,6 +2271,8 @@
                     document.getElementById('loginScreen').style.display = 'none';
                     document.getElementById('appContainer').style.display = 'flex';
                     loadDashboard();
+                    renderContentSuggestion();
+                    loadAppointments();
                 } else {
                     errEl.textContent = data.error || 'Wrong password.';
                     errEl.style.display = 'block';
@@ -2309,6 +2311,8 @@
                     document.getElementById('loginScreen').style.display = 'none';
                     document.getElementById('appContainer').style.display = 'flex';
                     loadDashboard();
+                    renderContentSuggestion();
+                    loadAppointments();
                 } else {
                     showLogin();
                 }
@@ -2332,7 +2336,7 @@
             setupNavigation();
             setupEventListeners();
             checkAuth(); // This will show login or load dashboard
-            setInterval(() => { if (authToken) loadDashboard(); renderContentSuggestion();
+            setInterval(() => { if (authToken) { loadDashboard(); renderContentSuggestion(); loadAppointments(); }
             updateScheduleInfo(); }, 30000);
         });
 
@@ -2399,7 +2403,8 @@
                 templates: 'Auto-Reply Templates',
                 posting: 'Post Creator',
                 notifications: 'Notifications',
-                deals: 'Deal Tracker'
+                deals: 'Deal Tracker',
+                calendar: 'Calendar'
             };
             document.getElementById('pageTitle').textContent = titles[page];
 
@@ -2418,6 +2423,8 @@
             } else if (page === 'deals') {
                 initDealsMonth();
                 loadDeals();
+            } else if (page === 'calendar') {
+                loadAppointments();
             }
         }
 
@@ -2888,6 +2895,25 @@
                 grid.innerHTML = '<p style="color:var(--danger);text-align:center;padding:40px;">Error loading inventory: ' + err.message + '</p>';
               }
             }
+
+        function renderInventoryFromCache() {
+            const vehicles = window._inventoryCache || [];
+            const condition = document.getElementById('filterCondition')?.value || '';
+            const model = document.getElementById('filterModel')?.value || '';
+            const minPrice = parseFloat(document.getElementById('filterMinPrice')?.value) || 0;
+            const maxPrice = parseFloat(document.getElementById('filterMaxPrice')?.value) || Infinity;
+
+            const filtered = vehicles.filter(v => {
+                if (condition && v.condition && v.condition.toLowerCase() !== condition.toLowerCase()) return false;
+                if (model && v.model && !v.model.toLowerCase().includes(model.toLowerCase())) return false;
+                const price = parseFloat(String(v.price || v.msrp || '0').replace(/[^0-9.]/g, '')) || 0;
+                if (price < minPrice) return false;
+                if (maxPrice < Infinity && price > maxPrice) return false;
+                return true;
+            });
+
+            renderInventoryGrid(filtered);
+        }
 
         async function renderInventory() {
             const condition = document.getElementById('filterCondition').value;
@@ -3399,12 +3425,7 @@
 
         // Navigate to Post Creator with a specific type selected
         function goToPostCreator(type) {
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-            const postNav = document.querySelector('[data-page="posts"]');
-            if (postNav) { postNav.classList.add('active'); }
-            const postPage = document.getElementById('posts');
-            if (postPage) postPage.style.display = 'block';
+            switchPage('posting');
             const radio = document.querySelector(`input[name="postType"][value="${type}"]`);
             if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change')); }
         }
@@ -4090,8 +4111,8 @@
         (function initCal(){ const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); })();
 
         function loadAppointments() {
-            fetch('/api/appointments', { headers: { 'Authorization': 'Bearer ' + sessionStorage.getItem('token') } })
-            .then(r => r.json()).then(data => { appointments = data; renderTodaySchedule(); renderCalendar(); })
+            fetch('/api/appointments', { headers: { 'Authorization': 'Bearer ' + authToken } })
+            .then(r => r.json()).then(data => { appointments = data.appointments || data || []; renderTodaySchedule(); renderCalendar(); })
             .catch(e => console.error('Error loading appointments:', e));
         }
 
@@ -4200,7 +4221,7 @@
             };
             const url = id ? '/api/appointments/' + id : '/api/appointments';
             const method = id ? 'PUT' : 'POST';
-            fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionStorage.getItem('token') }, body: JSON.stringify(body) })
+            fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify(body) })
             .then(r => r.json()).then(data => {
                 closeApptModal(); loadAppointments();
                 if (andSync) downloadApptIcal(data.id || id);
@@ -4209,13 +4230,13 @@
 
         function deleteAppt(id) {
             if (!confirm('Delete this appointment?')) return;
-            fetch('/api/appointments/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + sessionStorage.getItem('token') } })
+            fetch('/api/appointments/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + authToken } })
             .then(() => { loadAppointments(); closeApptModal(); })
             .catch(e => console.error('Error deleting appointment:', e));
         }
 
         function downloadApptIcal(id) {
-            fetch('/api/appointments/' + id + '/ical', { headers: { 'Authorization': 'Bearer ' + sessionStorage.getItem('token') } })
+            fetch('/api/appointments/' + id + '/ical', { headers: { 'Authorization': 'Bearer ' + authToken } })
             .then(r => r.blob()).then(blob => {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a'); a.href = url; a.download = 'appointment-' + id + '.ics';
@@ -4223,7 +4244,6 @@
             }).catch(e => console.error('Error downloading iCal:', e));
         }
 
-        setTimeout(loadAppointments, 1000);
         </script>
 </body>
 </html>
