@@ -2476,10 +2476,7 @@ function triggerInitialScrape() {
   }
 }
 
-// GET /api/deals - Return cached deals
-app.get('/api/deals', (req, res) => {
-  res.json(dealsCache);
-});
+// NOTE: /api/deals route moved below (Deal Tracker). Scraper deals served via /api/live-deals
 
 // POST /api/deals/refresh - Force refresh deals
 app.post('/api/deals/refresh', async (req, res) => {
