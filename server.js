@@ -50,7 +50,7 @@ const CONFIG = {
   META_VERIFY_TOKEN: process.env.META_VERIFY_TOKEN || 'gabe_moves_metal_2025',
   PAGE_ID: process.env.PAGE_ID || '61575074716398',
   IG_ACCOUNT_ID: process.env.IG_ACCOUNT_ID || 'YOUR_IG_ACCOUNT_ID',
-  WEBHOOK_URL: process.env.WEBHOOK_URL || 'https://your-domain.com/webhook',
+  WEBHOOK_URL: process.env.WEBHOOK_URL || 'https://gabe-moves-metal.onrender.com/webhook',
   // WhatsApp Cloud API (register 702-416-3741 in Meta Developer Console Ã¢ÂÂ WhatsApp Ã¢ÂÂ API Setup)
   // Meta assigns a Phone Number ID once registered Ã¢ÂÂ set it here or in Render env vars
   WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || 'YOUR_WA_PHONE_NUMBER_ID',
