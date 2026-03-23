@@ -1333,6 +1333,46 @@
   .deals-grid { grid-template-columns: 1fr; }
 }
 
+/* iCloud Calendar Button */
+.calendar-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: rgba(52, 199, 89, 0.08);
+  border: 1px solid rgba(52, 199, 89, 0.2);
+  border-radius: 10px;
+}
+.calendar-btn {
+  background: linear-gradient(135deg, #34c759, #30d158);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.calendar-btn:hover {
+  transform: scale(1.03);
+  box-shadow: 0 2px 10px rgba(52,199,89,0.4);
+}
+.calendar-btn-label {
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+}
+.calendar-feed-link {
+  font-size: 11px;
+  color: #34c759;
+  text-decoration: underline;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+
     </style>
 </head>
 <body>
@@ -1770,6 +1810,12 @@
                                     <span id="scheduleInfo" style="color:var(--gold);font-size:0.85rem;"></span>
                                 </div>
                             </div>
+              <!-- iCloud Calendar Integration -->
+              <div class="calendar-btn-row" id="calendarBtnRow">
+                <button type="button" class="calendar-btn" onclick="addToiCloudCalendar()">Add to iCloud Calendar</button>
+                <span class="calendar-btn-label">Sync this post to your calendar with a 15-min reminder</span>
+              </div>
+
 
                             <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 12px;">
                                 <label class="form-label" style="margin-bottom: 0; font-weight: 700;">Publish to:</label>
@@ -3728,6 +3774,90 @@
           loadLiveDeals();
         }
       };
+    }
+
+
+
+    // ============ iCLOUD CALENDAR INTEGRATION ============
+    async function addToiCloudCalendar() {
+      const scheduleSelect = document.getElementById('postSchedule');
+      const scheduleDateInput = document.getElementById('postScheduleDate');
+      const captionEl = document.getElementById('captionOutput') || document.getElementById('postCaption');
+      
+      let scheduledDate = '';
+      let scheduledTime = '10:00';
+      
+      if (scheduleSelect && scheduleSelect.value === 'custom' && scheduleDateInput && scheduleDateInput.value) {
+        const dtVal = scheduleDateInput.value;
+        if (dtVal.includes('T')) {
+          scheduledDate = dtVal.split('T')[0];
+          scheduledTime = dtVal.split('T')[1] || '10:00';
+        } else {
+          scheduledDate = dtVal;
+        }
+      } else {
+        // Auto-schedule: use the next best post day
+        const nextDay = getNextBestPostDay ? getNextBestPostDay() : new Date();
+        if (nextDay) {
+          const d = nextDay instanceof Date ? nextDay : new Date(nextDay);
+          scheduledDate = d.toISOString().split('T')[0];
+        } else {
+          scheduledDate = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+        }
+      }
+      
+      if (!scheduledDate) {
+        alert('Please select a schedule date first');
+        return;
+      }
+      
+      // Get the active post type
+      const activeCard = document.querySelector('.post-type-card.active');
+      const postType = activeCard ? activeCard.getAttribute('onclick').match(/'([^']*)'/)[1] : 'post';
+      
+      // Get caption text
+      const caption = captionEl ? captionEl.value || captionEl.textContent || '' : '';
+      const title = caption.substring(0, 60) || 'Gabe Moves Metal Post';
+      
+      try {
+        const response = await fetch('/api/calendar/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title,
+            description: caption,
+            scheduledDate: scheduledDate,
+            scheduledTime: scheduledTime,
+            postType: postType,
+            platform: 'facebook'
+          })
+        });
+        
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'gmm-post-' + scheduledDate + '.ics';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          // Show success feedback
+          const btn = document.querySelector('.calendar-btn');
+          if (btn) {
+            const orig = btn.textContent;
+            btn.textContent = 'Added to Calendar!';
+            btn.style.background = 'linear-gradient(135deg, #30d158, #34c759)';
+            setTimeout(() => { btn.textContent = orig; }, 2000);
+          }
+        } else {
+          alert('Failed to generate calendar event. Please try again.');
+        }
+      } catch (err) {
+        alert('Error creating calendar event: ' + err.message);
+      }
     }
 
 </script>
