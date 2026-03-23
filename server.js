@@ -2355,7 +2355,7 @@ async function scrapeDeals() {
   
   try {
     // Scrape Chevy.com national offers (Las Vegas zip for local relevance)
-    const chevyResp = await axios.get(proxyUrl('https://www.chevrolet.com/shopping/offers'), {
+    const chevyResp = await axios.get(proxyUrl('https://www.chevrolet.com/current-offers'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -3313,7 +3313,7 @@ async function scrapeFindlayInventory() {
 // Scrape Chevy.com national offers for deals
 async function scrapeChevyOffers() {
   try {
-    const resp = await axios.get(proxyUrl('https://www.chevrolet.com/shopping/offers'), {
+    const resp = await axios.get(proxyUrl('https://www.chevrolet.com/current-offers'), {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
