@@ -1228,6 +1228,111 @@
         .gap-10 {
             gap: 10px;
         }
+
+/* Live Deals Picker */
+.live-deals-panel {
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.live-deals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.live-deals-header h4 {
+  margin: 0;
+  color: #d4af37;
+  font-size: 14px;
+}
+.refresh-deals-btn {
+  background: linear-gradient(135deg, #d4af37, #f4d03f);
+  color: #000;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.refresh-deals-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(212,175,55,0.4);
+}
+.refresh-deals-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+.deals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.deal-card-pick {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.deal-card-pick:hover {
+  border-color: #d4af37;
+  background: rgba(212,175,55,0.1);
+  transform: translateY(-2px);
+}
+.deal-card-pick.selected {
+  border-color: #d4af37;
+  background: rgba(212,175,55,0.15);
+  box-shadow: 0 0 12px rgba(212,175,55,0.3);
+}
+.deal-card-pick .deal-model {
+  font-weight: 700;
+  color: #fff;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.deal-card-pick .deal-type {
+  font-size: 11px;
+  color: #d4af37;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.deal-card-pick .deal-headline {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+.deal-card-pick .deal-source {
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 6px;
+}
+.deals-loading {
+  text-align: center;
+  padding: 20px;
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+}
+.deals-empty {
+  text-align: center;
+  padding: 20px;
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .deals-grid { grid-template-columns: 1fr; }
+}
+
     </style>
 </head>
 <body>
@@ -1556,6 +1661,17 @@
 
                         <!-- Current Deal Form -->
                         <div id="postForm_current_deal" style="display: none;">
+              <!-- Live Deals Picker -->
+              <div class="live-deals-panel" id="liveDealsPanel">
+                <div class="live-deals-header">
+                  <h4>Live Deals from Findlay + Chevy.com</h4>
+                  <button type="button" class="refresh-deals-btn" id="refreshLiveDealsBtn" onclick="loadLiveDeals()">Refresh Deals</button>
+                </div>
+                <div id="liveDealsGrid" class="deals-grid">
+                  <div class="deals-empty">Click "Refresh Deals" to load current promotions from findlaychevy.com and chevy.com</div>
+                </div>
+              </div>
+
                             <h3 style="margin-bottom: 16px; font-size: 15px; font-weight: 700;">🔥 Current Deal / Special</h3>
                             <div class="form-group">
                                 <label class="form-label">Deal Title *</label>
@@ -3526,6 +3642,94 @@
                 document.getElementById('ytdOverlay').style.display = 'block';
             } catch(e) { alert('Error loading YTD: ' + e.message); }
         }
-    </script>
+    
+
+    // ============ LIVE DEALS PICKER ============
+    let liveDealsCache = [];
+    
+    async function loadLiveDeals() {
+      const grid = document.getElementById('liveDealsGrid');
+      const btn = document.getElementById('refreshLiveDealsBtn');
+      if (!grid) return;
+      
+      grid.innerHTML = '<div class="deals-loading">Loading live deals...</div>';
+      if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+      
+      try {
+        const res = await fetch('/api/deals');
+        const data = await res.json();
+        
+        if (data.success && data.deals && data.deals.length > 0) {
+          liveDealsCache = data.deals;
+          renderLiveDeals(data.deals);
+        } else {
+          grid.innerHTML = '<div class="deals-empty">No deals found. Try refreshing or check back later.</div>';
+        }
+      } catch (err) {
+        grid.innerHTML = '<div class="deals-empty">Could not load deals. Server may still be scraping - try again in a moment.</div>';
+      }
+      
+      if (btn) { btn.disabled = false; btn.textContent = 'Refresh Deals'; }
+    }
+    
+    function renderLiveDeals(deals) {
+      const grid = document.getElementById('liveDealsGrid');
+      if (!grid) return;
+      
+      grid.innerHTML = deals.map((deal, i) => {
+        const model = deal.model || 'Chevrolet';
+        const type = deal.offer_type || 'Special';
+        const headline = deal.headline || '';
+        const details = deal.details || '';
+        const source = deal.source || '';
+        const exp = deal.expiration || '';
+        return '<div class="deal-card-pick" onclick="selectDeal(' + i + ')" data-index="' + i + '">' +
+          '<div class="deal-type">' + type + '</div>' +
+          '<div class="deal-model">' + model + '</div>' +
+          '<div class="deal-headline">' + headline + '</div>' +
+          (exp ? '<div class="deal-source">Expires: ' + exp + '</div>' : '') +
+          '<div class="deal-source">Source: ' + source + '</div>' +
+        '</div>';
+      }).join('');
+    }
+    
+    function selectDeal(index) {
+      const deal = liveDealsCache[index];
+      if (!deal) return;
+      
+      // Highlight selected card
+      document.querySelectorAll('.deal-card-pick').forEach(c => c.classList.remove('selected'));
+      const card = document.querySelector('.deal-card-pick[data-index="' + index + '"]');
+      if (card) card.classList.add('selected');
+      
+      // Auto-fill the deal form fields
+      const titleEl = document.getElementById('postDealTitle');
+      const modelEl = document.getElementById('postDealModel');
+      const expiryEl = document.getElementById('postDealExpiry');
+      const detailsEl = document.getElementById('postDealDetails');
+      
+      if (titleEl) titleEl.value = deal.headline || deal.offer_type || '';
+      if (modelEl) modelEl.value = deal.model || '';
+      if (expiryEl) expiryEl.value = deal.expiration || '';
+      if (detailsEl) detailsEl.value = [
+        deal.headline || '',
+        deal.details || '',
+        deal.source ? 'Source: ' + deal.source : ''
+      ].filter(Boolean).join('\n');
+    }
+    
+    // Auto-load deals when Current Deal post type is selected
+    const origSelectPostType = typeof selectPostType === 'function' ? selectPostType : null;
+    if (origSelectPostType) {
+      const _origSPT = selectPostType;
+      selectPostType = function(type) {
+        _origSPT(type);
+        if (type === 'current_deal' && liveDealsCache.length === 0) {
+          loadLiveDeals();
+        }
+      };
+    }
+
+</script>
 </body>
 </html>
