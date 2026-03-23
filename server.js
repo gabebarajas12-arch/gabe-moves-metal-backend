@@ -59,6 +59,8 @@ const CONFIG = {
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || 'gabe_moves_metal_wa_2026',
   // TikTok Content Posting API (apply at developers.tiktok.com → Content Posting API)
   TIKTOK_ACCESS_TOKEN: process.env.TIKTOK_ACCESS_TOKEN || '',
+    TIKTOK_REFRESH_TOKEN: process.env.TIKTOK_REFRESH_TOKEN || '',
+      TIKTOK_OPEN_ID: process.env.TIKTOK_OPEN_ID || '',
   TIKTOK_CLIENT_KEY: process.env.TIKTOK_CLIENT_KEY || '',
   TIKTOK_CLIENT_SECRET: process.env.TIKTOK_CLIENT_SECRET || '',
   // Personal brand info
