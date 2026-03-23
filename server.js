@@ -3609,7 +3609,7 @@ app.get('/api/tiktok/auth-url', (req, res) => {
     });
   }
   const baseUrl = CONFIG.WEBHOOK_URL.replace('/webhook', '');
-  const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${CONFIG.TIKTOK_CLIENT_KEY}&scope=user.info.basic,video.publish,video.upload&response_type=code&redirect_uri=${encodeURIComponent(baseUrl + '/auth/tiktok/callback')}&state=gabe_moves_metal`;
+  const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${CONFIG.TIKTOK_CLIENT_KEY}&scope=user.info.basic,video.upload&response_type=code&redirect_uri=${encodeURIComponent(baseUrl + '/auth/tiktok/callback')}&state=gabe_moves_metal`;
   res.json({
     configured: true,
     connected: !!CONFIG.TIKTOK_ACCESS_TOKEN,
