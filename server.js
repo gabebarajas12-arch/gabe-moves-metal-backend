@@ -36,7 +36,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const inventoryModule = require('./inventory');
+// const inventoryModule = require('./inventory'); // Disabled - using new live scrapers instead
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1700,9 +1700,9 @@ async function scrapeDeals() {
   return dealsCache;
 }
 
-// Auto-refresh deals every 12 hours
-setInterval(() => { scrapeDeals().catch(console.error); }, 12 * 60 * 60 * 1000);
-// Initial scrape on server start (delayed 10s to let server boot)
+// // Auto-refresh deals every 12 hours
+// setInterval(() => { scrapeDeals().catch(console.error); }, 12 * 60 * 60 * 1000);
+// // Initial scrape on server start (delayed 10s to let server boot) // Disabled old inventory auto-refresh
 setTimeout(() => { scrapeDeals().catch(console.error); }, 10000);
 
 // GET /api/deals - Return cached deals
