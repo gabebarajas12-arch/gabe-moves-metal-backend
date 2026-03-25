@@ -1,19 +1,39 @@
 /**
  * GABE MOVES METAL — Inventory Module
  * ========================================
- * Scrapes and manages vehicle inventory from findlaychevy.com
- * Also supports CSV import for manual inventory updates.
+ * Pulls LIVE vehicle inventory from findlaychevy.com via Algolia search API.
+ * Also supports CSV/JSON import for manual inventory updates.
  *
  * Features:
- * - Scrapes new & used inventory from the dealer website
- * - CSV/JSON import for manual updates
+ * - LIVE inventory from findlaychevy.com (587+ vehicles)
  * - Smart matching: lead interest → inventory matches
  * - Availability disclaimer ("might still be available — I'll verify")
  * - Auto-refresh on configurable interval
+ * - CSV/JSON import for manual updates
+ * - Fallback to cached data if API is unavailable
+ *
+ * API: Algolia-powered search (public search credentials from the dealer website)
  */
 
 const fs = require('fs');
 const path = require('path');
+
+// ==================== ALGOLIA API CONFIG ====================
+const ALGOLIA_CONFIG = {
+  APP_ID: process.env.ALGOLIA_APP_ID || '2591J46P8G',
+  API_KEY: process.env.ALGOLIA_API_KEY || '78311e75e16dd6273d6b00cd6c21db3c',
+  INDEX: process.env.ALGOLIA_INDEX || 'findlaychevrolet_production_inventory',
+  get BASE_URL() {
+    return `https://${this.APP_ID}-1.algolia.net/1/indexes/${this.INDEX}/query`;
+  },
+};
+
+const SCRAPER_CONFIG = {
+  REFRESH_INTERVAL: 30 * 60 * 1000, // 30 minutes
+  BASE_URL: 'https://www.findlaychevy.com',
+  HITS_PER_PAGE: 500, // Algolia max per request
+};
+
 
 // ==================== INVENTORY DATA STORE ====================
 const INVENTORY_FILE = path.join(__dirname, 'inventory.json');
@@ -21,7 +41,6 @@ const INVENTORY_FILE = path.join(__dirname, 'inventory.json');
 let inventory = [];
 let lastScraped = null;
 
-// Load saved inventory on startup
 function loadInventory() {
   try {
     if (fs.existsSync(INVENTORY_FILE)) {
@@ -46,157 +65,133 @@ function saveInventory() {
 loadInventory();
 
 
-// ==================== WEBSITE SCRAPER ====================
+// ==================== ALGOLIA LIVE SCRAPER ====================
 /**
- * Scrapes inventory from findlaychevy.com
+ * Fetch LIVE inventory from findlaychevy.com's Algolia search API.
+ * This is the real deal — pulls every vehicle on the lot.
  *
- * Most Chevy dealer websites (powered by Dealer.com, DealerSocket, CDK, etc.)
- * serve inventory through a search results page with JSON data embedded or
- * via an API endpoint. This scraper handles the most common patterns.
- *
- * HOW TO FIND YOUR DEALER'S INVENTORY API:
- * 1. Go to findlaychevy.com/new-vehicles/ in Chrome
- * 2. Open DevTools (F12) → Network tab
- * 3. Filter by "XHR" or "Fetch"
- * 4. Scroll the inventory page or click "Load More"
- * 5. Look for API calls that return JSON with vehicle data
- * 6. Copy that URL and put it in INVENTORY_API_URL below
- *
- * Common patterns for Chevy dealer sites:
- * - Dealer.com: /apis/widget/INVENTORY_LISTING_DEFAULT_AUTO_NEW/*
- * - DealerSocket: /api/inventory/search
- * - CDK: /VehicleSearchResults?search=new
- * - Homenet: /api/inventory
+ * @param {string} typeFilter - 'new', 'used', or null for all
+ * @returns {Array} Normalized vehicle objects
  */
-
-const SCRAPER_CONFIG = {
-  // ⬇️ UPDATE THIS with your actual inventory API URL (see instructions above)
-  INVENTORY_API_URL: process.env.INVENTORY_API_URL || 'https://www.findlaychevy.com/apis/widget/INVENTORY_LISTING_DEFAULT_AUTO_NEW/getInventory',
-
-  // Common query params for dealer inventory APIs
-  DEFAULT_PARAMS: {
-    make: 'Chevrolet',
-    pageSize: 100,
-    sortBy: 'make',
-    order: 'asc',
-  },
-
-  // How often to re-scrape (in milliseconds)
-  REFRESH_INTERVAL: 30 * 60 * 1000, // 30 minutes
-
-  // Dealer website base URL
-  BASE_URL: 'https://www.findlaychevy.com',
-};
-
-/**
- * Fetch inventory from the dealer website's API
- * Returns normalized vehicle objects
- */
-async function scrapeInventory() {
-  console.log('🔄 Scraping inventory from dealer website...');
+async function scrapeInventory(typeFilter = null) {
+  console.log('🔄 Fetching live inventory from Algolia...');
 
   try {
-    // Try the primary API endpoint
-    const url = new URL(SCRAPER_CONFIG.INVENTORY_API_URL);
-    Object.entries(SCRAPER_CONFIG.DEFAULT_PARAMS).forEach(([k, v]) => {
-      url.searchParams.set(k, v);
-    });
+    let allHits = [];
+    let page = 0;
+    let totalPages = 1;
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-      },
-    });
+    // Build filter string
+    let filters = '';
+    if (typeFilter === 'new') filters = 'type:new';
+    else if (typeFilter === 'used') filters = 'type:CarBravo OR type:Used';
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // Paginate through all results
+    while (page < totalPages) {
+      const response = await fetch(ALGOLIA_CONFIG.BASE_URL, {
+        method: 'POST',
+        headers: {
+          'X-Algolia-Application-Id': ALGOLIA_CONFIG.APP_ID,
+          'X-Algolia-API-Key': ALGOLIA_CONFIG.API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: '',
+          hitsPerPage: SCRAPER_CONFIG.HITS_PER_PAGE,
+          page,
+          filters,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Algolia HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      allHits.push(...data.hits);
+      totalPages = data.nbPages;
+      page++;
     }
 
-    const data = await response.json();
-
-    // Normalize the data (different platforms use different field names)
-    const vehicles = normalizeInventoryData(data);
+    // Normalize all hits into our standard vehicle format
+    const vehicles = allHits.map(normalizeAlgoliaHit);
 
     if (vehicles.length > 0) {
       inventory = vehicles;
       lastScraped = new Date().toISOString();
       saveInventory();
-      console.log(`✅ Scraped ${vehicles.length} vehicles from website`);
+      console.log(`✅ Live inventory: ${vehicles.length} vehicles (${vehicles.filter(v => v.condition === 'New').length} new, ${vehicles.filter(v => v.condition === 'Used').length} used)`);
     }
 
     return vehicles;
   } catch (err) {
-    console.error('⚠️  Website scrape failed:', err.message);
-    console.log('💡 Tip: Update INVENTORY_API_URL in inventory.js or use CSV import instead');
-    console.log('   See the comments in this file for how to find your API URL');
+    console.error('⚠️  Algolia fetch failed:', err.message);
+    console.log('💡 Using cached inventory data');
     return inventory; // Return cached data
   }
 }
 
 /**
- * Normalize vehicle data from different dealer platforms
- * Handles Dealer.com, DealerSocket, CDK, and generic formats
+ * Normalize an Algolia hit into our standard vehicle format
  */
-function normalizeInventoryData(data) {
-  // Try to find the vehicle array in the response
-  let rawVehicles = [];
+function normalizeAlgoliaHit(hit) {
+  // Parse the Findlay Price from the advanced pricing HTML if available
+  let findlayPrice = hit.our_price || 0;
+  let savings = 0;
+  const pricingHtml = hit.lightning?.advancedPricingStack || '';
 
-  if (Array.isArray(data)) {
-    rawVehicles = data;
-  } else if (data.inventory) {
-    rawVehicles = data.inventory;
-  } else if (data.vehicles) {
-    rawVehicles = data.vehicles;
-  } else if (data.results) {
-    rawVehicles = data.results;
-  } else if (data.data && Array.isArray(data.data)) {
-    rawVehicles = data.data;
-  } else if (data.pageInfo && data.pageInfo.trackingData) {
-    // Dealer.com format
-    rawVehicles = data.pageInfo.trackingData;
+  const findlayPriceMatch = pricingHtml.match(/Findlay Price[\s\S]*?\$([\d,]+)/);
+  if (findlayPriceMatch) {
+    findlayPrice = parseFloat(findlayPriceMatch[1].replace(/,/g, ''));
+  }
+  const savingsMatch = pricingHtml.match(/Your Savings[\s\S]*?\$([\d,]+)/);
+  if (savingsMatch) {
+    savings = parseFloat(savingsMatch[1].replace(/,/g, ''));
   }
 
-  return rawVehicles.map(v => ({
-    // Core fields — maps from all common platform formats
-    id: v.id || v.vin || v.stockNumber || v.stock_number || generateId(),
-    vin: v.vin || v.VIN || v.vinNumber || '',
-    stockNumber: v.stockNumber || v.stock_number || v.stockNo || v.stock || '',
-    year: parseInt(v.year || v.modelYear || v.model_year || 0),
-    make: v.make || v.makeName || 'Chevrolet',
-    model: v.model || v.modelName || v.model_name || '',
-    trim: v.trim || v.trimName || v.trim_name || '',
-    body: v.body || v.bodyStyle || v.body_style || v.bodyType || '',
-    exteriorColor: v.exteriorColor || v.exterior_color || v.color || v.extColor || '',
-    interiorColor: v.interiorColor || v.interior_color || v.intColor || '',
-    mileage: parseInt(v.mileage || v.miles || v.odometer || 0),
-    price: parseFloat(v.price || v.internetPrice || v.internet_price || v.msrp || v.askingPrice || 0),
-    msrp: parseFloat(v.msrp || v.MSRP || v.sticker_price || 0),
-    condition: v.condition || v.type || (parseInt(v.mileage || 0) < 500 ? 'New' : 'Used'),
-    engine: v.engine || v.engineDescription || '',
-    transmission: v.transmission || v.trans || '',
-    drivetrain: v.drivetrain || v.driveTrain || v.drive_type || '',
-    fuelType: v.fuelType || v.fuel_type || v.fuel || '',
-    imageUrl: v.imageUrl || v.image || v.photo || v.primaryImage || v.images?.[0] || '',
-    detailUrl: v.detailUrl || v.url || v.vdpUrl || '',
-    features: v.features || v.options || [],
-    daysOnLot: v.daysOnLot || v.days_on_lot || v.age || null,
+  return {
+    id: hit.vin || hit.stock || hit.api_id,
+    vin: hit.vin || '',
+    stockNumber: hit.stock || '',
+    year: parseInt(hit.year) || 0,
+    make: hit.make || 'Chevrolet',
+    model: hit.model || '',
+    trim: hit.trim || '',
+    body: hit.body || '',
+    exteriorColor: hit.ext_color || '',
+    exteriorColorGeneric: hit.ext_color_generic || '',
+    interiorColor: hit.int_color || '',
+    mileage: parseInt(hit.miles) || 0,
+    price: findlayPrice || parseFloat(hit.our_price) || 0,
+    msrp: parseFloat(hit.msrp) || 0,
+    savings,
+    condition: hit.type === 'new' || hit.type === 'New' ? 'New' : 'Used',
+    engine: hit.engine_description || '',
+    transmission: hit.transmission_description || '',
+    drivetrain: hit.drivetrain || '',
+    fuelType: hit.fueltype || '',
+    cityMpg: hit.city_mpg || '',
+    hwyMpg: hit.hw_mpg || '',
+    cylinders: hit.cylinders || '',
+    doors: hit.doors || '',
+    imageUrl: hit.thumbnail || '',
+    detailUrl: hit.link || '',
+    features: hit.features || [],
+    daysOnLot: hit.days_in_stock || null,
+    dateInStock: hit.date_in_stock || '',
+    certified: hit.certified === '1',
+    inTransit: hit.in_transit_vehicles !== 'On-Lot',
 
     // Computed fields
-    title: `${v.year || v.modelYear || ''} ${v.make || 'Chevrolet'} ${v.model || v.modelName || ''} ${v.trim || v.trimName || ''}`.trim(),
+    title: `${hit.year || ''} ${hit.make || 'Chevrolet'} ${hit.model || ''} ${hit.trim || ''}`.trim(),
     lastUpdated: new Date().toISOString(),
-  }));
+  };
 }
 
 
 // ==================== CSV / JSON IMPORT ====================
 /**
  * Import inventory from a CSV file
- * This is useful if you can export your inventory from the DMS or download
- * it from the dealer website as a spreadsheet.
- *
- * Expected CSV columns (flexible — we map common names):
- * Stock #, VIN, Year, Make, Model, Trim, Color, Price, MSRP, Mileage, Condition
  */
 function importFromCSV(csvContent) {
   const lines = csvContent.trim().split('\n');
@@ -204,7 +199,6 @@ function importFromCSV(csvContent) {
 
   const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
 
-  // Map common CSV header names to our fields
   const headerMap = {
     'stocknumber': 'stockNumber', 'stock': 'stockNumber', 'stockno': 'stockNumber', 'stk': 'stockNumber',
     'vin': 'vin', 'vinnumber': 'vin',
@@ -228,7 +222,6 @@ function importFromCSV(csvContent) {
   const vehicles = [];
 
   for (let i = 1; i < lines.length; i++) {
-    // Handle CSV values that might contain commas in quotes
     const values = parseCSVLine(lines[i]);
     if (values.length < 3) continue;
 
@@ -241,16 +234,14 @@ function importFromCSV(csvContent) {
       }
     });
 
-    // Parse numeric fields
     if (vehicle.year) vehicle.year = parseInt(vehicle.year);
     if (vehicle.price) vehicle.price = parseFloat(vehicle.price.replace(/[$,]/g, ''));
     if (vehicle.msrp) vehicle.msrp = parseFloat(vehicle.msrp.replace(/[$,]/g, ''));
     if (vehicle.mileage) vehicle.mileage = parseInt(vehicle.mileage.replace(/,/g, ''));
 
-    // Build title
     vehicle.title = `${vehicle.year || ''} ${vehicle.make || 'Chevrolet'} ${vehicle.model || ''} ${vehicle.trim || ''}`.trim();
 
-    if (vehicle.model) { // Only add if we at least have a model
+    if (vehicle.model) {
       vehicles.push(vehicle);
     }
   }
@@ -279,12 +270,57 @@ function parseCSVLine(line) {
   return result;
 }
 
-/**
- * Import inventory from a JSON array
- */
 function importFromJSON(jsonContent) {
   const data = typeof jsonContent === 'string' ? JSON.parse(jsonContent) : jsonContent;
-  const vehicles = normalizeInventoryData(data);
+  let rawVehicles = [];
+
+  if (Array.isArray(data)) rawVehicles = data;
+  else if (data.inventory) rawVehicles = data.inventory;
+  else if (data.vehicles) rawVehicles = data.vehicles;
+  else if (data.results) rawVehicles = data.results;
+  else if (data.hits) rawVehicles = data.hits;
+
+  // If these look like Algolia hits, normalize them
+  if (rawVehicles.length > 0 && rawVehicles[0].vin && rawVehicles[0].stock) {
+    const vehicles = rawVehicles.map(normalizeAlgoliaHit);
+    inventory = vehicles;
+    lastScraped = new Date().toISOString();
+    saveInventory();
+    console.log(`📥 Imported ${vehicles.length} vehicles from JSON`);
+    return vehicles;
+  }
+
+  // Generic JSON import
+  const vehicles = rawVehicles.map(v => ({
+    id: v.id || v.vin || v.stockNumber || generateId(),
+    vin: v.vin || '',
+    stockNumber: v.stockNumber || v.stock || '',
+    year: parseInt(v.year) || 0,
+    make: v.make || 'Chevrolet',
+    model: v.model || '',
+    trim: v.trim || '',
+    body: v.body || '',
+    exteriorColor: v.exteriorColor || v.ext_color || '',
+    interiorColor: v.interiorColor || v.int_color || '',
+    mileage: parseInt(v.mileage || v.miles || 0),
+    price: parseFloat(v.price || v.our_price || 0),
+    msrp: parseFloat(v.msrp || 0),
+    condition: v.condition || v.type || 'Unknown',
+    engine: v.engine || '',
+    transmission: v.transmission || '',
+    drivetrain: v.drivetrain || '',
+    fuelType: v.fuelType || v.fueltype || '',
+    imageUrl: v.imageUrl || v.thumbnail || '',
+    detailUrl: v.detailUrl || v.link || '',
+    features: v.features || [],
+    daysOnLot: v.daysOnLot || v.days_in_stock || null,
+    title: `${v.year || ''} ${v.make || 'Chevrolet'} ${v.model || ''} ${v.trim || ''}`.trim(),
+    lastUpdated: new Date().toISOString(),
+  }));
+
+  inventory = vehicles;
+  lastScraped = new Date().toISOString();
+  saveInventory();
   console.log(`📥 Imported ${vehicles.length} vehicles from JSON`);
   return vehicles;
 }
@@ -302,7 +338,7 @@ function importFromJSON(jsonContent) {
 function matchInventory(interest, options = {}) {
   const {
     maxResults = 5,
-    condition = null, // 'New', 'Used', or null for both
+    condition = null,
     maxPrice = null,
     minPrice = null,
   } = options;
@@ -312,7 +348,6 @@ function matchInventory(interest, options = {}) {
   const query = interest.toLowerCase();
   const tokens = query.split(/\s+/);
 
-  // Model name mappings (what people say → what's in inventory)
   const modelAliases = {
     'silverado': ['silverado', '1500', '2500', '3500'],
     'tahoe': ['tahoe'],
@@ -329,29 +364,33 @@ function matchInventory(interest, options = {}) {
     'bolt': ['bolt'],
   };
 
-  // Category mappings (what people say → which models to show)
   const categoryMap = {
     'truck': ['silverado', 'colorado'],
     'pickup': ['silverado', 'colorado'],
+    'troca': ['silverado', 'colorado'],
+    'camioneta': ['silverado', 'colorado', 'tahoe', 'suburban'],
     'suv': ['tahoe', 'suburban', 'blazer', 'equinox', 'traverse', 'trailblazer', 'trax'],
     'ev': ['equinox ev', 'blazer ev', 'silverado ev', 'bolt'],
     'electric': ['equinox ev', 'blazer ev', 'silverado ev', 'bolt'],
     'sedan': ['malibu'],
     'car': ['malibu', 'camaro', 'corvette'],
+    'carro': ['malibu', 'camaro', 'corvette'],
     'sports': ['camaro', 'corvette'],
     'family': ['tahoe', 'suburban', 'traverse', 'equinox'],
+    'familia': ['tahoe', 'suburban', 'traverse', 'equinox'],
     'tow': ['silverado', 'tahoe', 'suburban'],
     'work': ['silverado', 'colorado'],
     'cheap': ['trax', 'trailblazer', 'malibu'],
     'affordable': ['trax', 'trailblazer', 'malibu', 'equinox'],
+    'barato': ['trax', 'trailblazer', 'malibu'],
     'luxury': ['suburban', 'tahoe', 'corvette'],
     'big': ['suburban', 'tahoe', 'silverado'],
+    'grande': ['suburban', 'tahoe', 'silverado'],
     'small': ['trax', 'trailblazer', 'bolt'],
     'third row': ['tahoe', 'suburban', 'traverse'],
     '3rd row': ['tahoe', 'suburban', 'traverse'],
   };
 
-  // Score each vehicle
   const scored = inventory.map(vehicle => {
     let score = 0;
     const v = {
@@ -382,7 +421,7 @@ function matchInventory(interest, options = {}) {
       }
     }
 
-    // Token matching (each word in the query)
+    // Token matching
     for (const token of tokens) {
       if (token.length < 2) continue;
       if (v.title.includes(token)) score += 20;
@@ -401,7 +440,16 @@ function matchInventory(interest, options = {}) {
     const priceMatch = query.match(/under\s*\$?(\d+)[kK]?/);
     if (priceMatch) {
       let targetPrice = parseInt(priceMatch[1]);
-      if (targetPrice < 200) targetPrice *= 1000; // "under 40K" → 40000
+      if (targetPrice < 200) targetPrice *= 1000;
+      if (v.price && v.price <= targetPrice) score += 30;
+      else if (v.price && v.price > targetPrice) score -= 50;
+    }
+
+    // Spanish price mentions
+    const pricioMatch = query.match(/menos de\s*\$?(\d+)[kK]?/);
+    if (pricioMatch) {
+      let targetPrice = parseInt(pricioMatch[1]);
+      if (targetPrice < 200) targetPrice *= 1000;
       if (v.price && v.price <= targetPrice) score += 30;
       else if (v.price && v.price > targetPrice) score -= 50;
     }
@@ -418,10 +466,15 @@ function matchInventory(interest, options = {}) {
     // Boost newer models
     if (vehicle.year >= new Date().getFullYear()) score += 10;
 
+    // Boost vehicles on the lot (not in transit)
+    if (!vehicle.inTransit) score += 5;
+
+    // Boost vehicles with big savings
+    if (vehicle.savings > 2000) score += 15;
+
     return { vehicle, score };
   });
 
-  // Filter and sort
   return scored
     .filter(s => s.score > 0)
     .sort((a, b) => b.score - a.score)
@@ -441,6 +494,10 @@ function getAvailabilityNote(vehicle) {
     ? (Date.now() - new Date(lastScraped).getTime()) / (1000 * 60 * 60)
     : 999;
 
+  if (vehicle.inTransit) {
+    return "This one is in transit to the lot — I can reserve it for you before it arrives!";
+  }
+
   if (hoursSinceUpdate < 1) {
     return "This should still be available on the lot — I'll confirm for you!";
   } else if (hoursSinceUpdate < 6) {
@@ -454,7 +511,6 @@ function getAvailabilityNote(vehicle) {
 
 /**
  * Format matched vehicles into a customer-friendly message
- * Used in auto-replies when a lead asks about a specific vehicle
  */
 function formatInventoryMessage(matches, leadFirstName) {
   if (!matches || matches.length === 0) {
@@ -468,11 +524,11 @@ function formatInventoryMessage(matches, leadFirstName) {
     msg += `${i + 1}. ${v.title}`;
     if (v.exteriorColor) msg += ` — ${v.exteriorColor}`;
     msg += `\n   ${price}`;
+    if (v.savings > 0) msg += ` (save $${v.savings.toLocaleString()}!)`;
     if (v.stockNumber) msg += ` | Stock #${v.stockNumber}`;
     msg += '\n\n';
   });
 
-  // Add the availability disclaimer
   msg += `⚠️ ${matches[0].availabilityNote}\n\n`;
   msg += `Want me to pull any of these up for you, or are you looking for something different? I can also check if we have anything coming in on the truck!`;
 
@@ -490,65 +546,64 @@ function formatInventoryForCRM(matches) {
     vin: v.vin || 'N/A',
     price: v.price,
     msrp: v.msrp,
+    savings: v.savings || 0,
     exteriorColor: v.exteriorColor || 'N/A',
     interiorColor: v.interiorColor || 'N/A',
     mileage: v.mileage,
     condition: v.condition,
     engine: v.engine || 'N/A',
     drivetrain: v.drivetrain || 'N/A',
+    fuelType: v.fuelType || 'N/A',
+    cityMpg: v.cityMpg || 'N/A',
+    hwyMpg: v.hwyMpg || 'N/A',
     daysOnLot: v.daysOnLot,
+    inTransit: v.inTransit || false,
     imageUrl: v.imageUrl,
-    detailUrl: v.detailUrl ? `${SCRAPER_CONFIG.BASE_URL}${v.detailUrl}` : null,
+    detailUrl: v.detailUrl || `${SCRAPER_CONFIG.BASE_URL}/new-vehicles/`,
+    features: v.features || [],
     matchScore: v.matchScore,
     availabilityNote: v.availabilityNote,
   }));
 }
 
 
-// ==================== SAMPLE INVENTORY DATA ====================
+// ==================== FALLBACK DEALS DATA ====================
 /**
- * If you haven't connected the scraper yet, this loads sample data
- * so you can test the matching feature immediately.
- * DELETE THIS once you connect to the real inventory.
+ * Curated deals for when live scraping is blocked
+ * Updated periodically based on current Chevy promotions
  */
-function loadSampleInventory() {
-  if (inventory.length > 0) return; // Don't overwrite real data
-
-  inventory = [
-    { id: 'S001', stockNumber: 'FC24501', vin: '1GCUYEED1RZ123456', year: 2025, make: 'Chevrolet', model: 'Silverado 1500', trim: 'RST', body: 'Crew Cab', exteriorColor: 'Summit White', interiorColor: 'Jet Black', mileage: 12, price: 52995, msrp: 55900, condition: 'New', engine: '5.3L V8', transmission: 'Auto', drivetrain: '4WD', fuelType: 'Gas', daysOnLot: 5, title: '2025 Chevrolet Silverado 1500 RST' },
-    { id: 'S002', stockNumber: 'FC24502', vin: '1GCUYEED2RZ234567', year: 2025, make: 'Chevrolet', model: 'Silverado 1500', trim: 'LT Trail Boss', body: 'Crew Cab', exteriorColor: 'Black', interiorColor: 'Jet Black', mileage: 8, price: 56490, msrp: 59750, condition: 'New', engine: '5.3L V8', transmission: 'Auto', drivetrain: '4WD', fuelType: 'Gas', daysOnLot: 12, title: '2025 Chevrolet Silverado 1500 LT Trail Boss' },
-    { id: 'S003', stockNumber: 'FC24503', vin: '1GCUYEED3RZ345678', year: 2025, make: 'Chevrolet', model: 'Silverado 1500', trim: 'High Country', body: 'Crew Cab', exteriorColor: 'Empire Beige', interiorColor: 'Jet Black/Umber', mileage: 5, price: 65990, msrp: 68500, condition: 'New', engine: '6.2L V8', transmission: 'Auto', drivetrain: '4WD', fuelType: 'Gas', daysOnLot: 3, title: '2025 Chevrolet Silverado 1500 High Country' },
-    { id: 'S004', stockNumber: 'FC24504', vin: '3GNAXKEV1RS456789', year: 2025, make: 'Chevrolet', model: 'Equinox', trim: 'RS', body: 'SUV', exteriorColor: 'Radiant Red', interiorColor: 'Jet Black', mileage: 15, price: 33290, msrp: 34700, condition: 'New', engine: '1.5L Turbo', transmission: 'Auto', drivetrain: 'FWD', fuelType: 'Gas', daysOnLot: 18, title: '2025 Chevrolet Equinox RS' },
-    { id: 'S005', stockNumber: 'FC24505', vin: '3GNAXKEV2RS567890', year: 2025, make: 'Chevrolet', model: 'Equinox EV', trim: '2RS', body: 'SUV', exteriorColor: 'Riptide Blue', interiorColor: 'Jet Black', mileage: 3, price: 34995, msrp: 36600, condition: 'New', engine: 'Electric', transmission: 'Single Speed', drivetrain: 'FWD', fuelType: 'Electric', daysOnLot: 7, title: '2025 Chevrolet Equinox EV 2RS' },
-    { id: 'S006', stockNumber: 'FC24506', vin: '1GNSKBKD5RS678901', year: 2025, make: 'Chevrolet', model: 'Tahoe', trim: 'Z71', body: 'SUV', exteriorColor: 'Midnight Blue', interiorColor: 'Jet Black', mileage: 10, price: 64500, msrp: 67100, condition: 'New', engine: '5.3L V8', transmission: 'Auto', drivetrain: '4WD', fuelType: 'Gas', daysOnLot: 8, title: '2025 Chevrolet Tahoe Z71' },
-    { id: 'S007', stockNumber: 'FC24507', vin: '1GNSKBKD6RS789012', year: 2025, make: 'Chevrolet', model: 'Tahoe', trim: 'RST', body: 'SUV', exteriorColor: 'Summit White', interiorColor: 'Jet Black', mileage: 8, price: 61990, msrp: 64500, condition: 'New', engine: '5.3L V8', transmission: 'Auto', drivetrain: '4WD', fuelType: 'Gas', daysOnLot: 15, title: '2025 Chevrolet Tahoe RST' },
-    { id: 'S008', stockNumber: 'FC24508', vin: '1GNSCCKD7RS890123', year: 2025, make: 'Chevrolet', model: 'Suburban', trim: 'Premier', body: 'SUV', exteriorColor: 'Black', interiorColor: 'Jet Black/Maple Sugar', mileage: 6, price: 76995, msrp: 79400, condition: 'New', engine: '5.3L V8', transmission: 'Auto', drivetrain: '4WD', fuelType: 'Gas', daysOnLot: 4, title: '2025 Chevrolet Suburban Premier' },
-    { id: 'S009', stockNumber: 'FC24509', vin: '2GNAXUEV8RS901234', year: 2025, make: 'Chevrolet', model: 'Blazer EV', trim: 'RS', body: 'SUV', exteriorColor: 'Radiant Red', interiorColor: 'Jet Black', mileage: 4, price: 51995, msrp: 54600, condition: 'New', engine: 'Electric', transmission: 'Single Speed', drivetrain: 'AWD', fuelType: 'Electric', daysOnLot: 6, title: '2025 Chevrolet Blazer EV RS' },
-    { id: 'S010', stockNumber: 'FC24510', vin: '1GCGTCEN0R1012345', year: 2025, make: 'Chevrolet', model: 'Colorado', trim: 'ZR2', body: 'Crew Cab', exteriorColor: 'Sterling Gray', interiorColor: 'Jet Black', mileage: 14, price: 48750, msrp: 51200, condition: 'New', engine: '2.7L Turbo', transmission: 'Auto', drivetrain: '4WD', fuelType: 'Gas', daysOnLot: 22, title: '2025 Chevrolet Colorado ZR2' },
-    { id: 'S011', stockNumber: 'FC24511', vin: '1G1YC2D45R5123456', year: 2025, make: 'Chevrolet', model: 'Corvette', trim: 'Stingray 2LT', body: 'Coupe', exteriorColor: 'Torch Red', interiorColor: 'Adrenaline Red', mileage: 7, price: 72490, msrp: 74500, condition: 'New', engine: '6.2L V8', transmission: 'Dual Clutch', drivetrain: 'RWD', fuelType: 'Gas', daysOnLot: 2, title: '2025 Chevrolet Corvette Stingray 2LT' },
-    { id: 'S012', stockNumber: 'FC24512', vin: '3GNKBHR48RS234567', year: 2025, make: 'Chevrolet', model: 'Traverse', trim: 'RS', body: 'SUV', exteriorColor: 'Lakeshore Blue', interiorColor: 'Jet Black', mileage: 9, price: 44500, msrp: 46800, condition: 'New', engine: '2.5L Turbo', transmission: 'Auto', drivetrain: 'AWD', fuelType: 'Gas', daysOnLot: 11, title: '2025 Chevrolet Traverse RS' },
-    { id: 'S013', stockNumber: 'FC24513', vin: 'KL77BHE24RC345678', year: 2025, make: 'Chevrolet', model: 'Trax', trim: '1RS', body: 'SUV', exteriorColor: 'Mosaic Black', interiorColor: 'Jet Black', mileage: 20, price: 23495, msrp: 24400, condition: 'New', engine: '1.2L Turbo', transmission: 'Auto', drivetrain: 'FWD', fuelType: 'Gas', daysOnLot: 30, title: '2025 Chevrolet Trax 1RS' },
-    { id: 'S014', stockNumber: 'FC24514', vin: 'KL79BNSL5RC456789', year: 2025, make: 'Chevrolet', model: 'Trailblazer', trim: 'ACTIV', body: 'SUV', exteriorColor: 'Nitro Yellow', interiorColor: 'Jet Black', mileage: 11, price: 28990, msrp: 30200, condition: 'New', engine: '1.3L Turbo', transmission: 'Auto', drivetrain: 'AWD', fuelType: 'Gas', daysOnLot: 14, title: '2025 Chevrolet Trailblazer ACTIV' },
-    { id: 'S015', stockNumber: 'FC24515', vin: '1GC4YREY5RF567890', year: 2025, make: 'Chevrolet', model: 'Silverado 2500HD', trim: 'LTZ', body: 'Crew Cab', exteriorColor: 'Summit White', interiorColor: 'Jet Black', mileage: 7, price: 72995, msrp: 76200, condition: 'New', engine: '6.6L V8 Duramax Diesel', transmission: 'Allison Auto', drivetrain: '4WD', fuelType: 'Diesel', daysOnLot: 9, title: '2025 Chevrolet Silverado 2500HD LTZ' },
-    // Pre-owned
-    { id: 'U001', stockNumber: 'FC24601', vin: '1GCUYEED7PZ111222', year: 2023, make: 'Chevrolet', model: 'Silverado 1500', trim: 'LT', body: 'Crew Cab', exteriorColor: 'Silver Ice', interiorColor: 'Jet Black', mileage: 18500, price: 39995, msrp: 0, condition: 'Used', engine: '5.3L V8', transmission: 'Auto', drivetrain: '4WD', fuelType: 'Gas', daysOnLot: 25, title: '2023 Chevrolet Silverado 1500 LT' },
-    { id: 'U002', stockNumber: 'FC24602', vin: '1GNSKCKD1NR222333', year: 2022, make: 'Chevrolet', model: 'Tahoe', trim: 'LT', body: 'SUV', exteriorColor: 'Black', interiorColor: 'Jet Black', mileage: 32000, price: 46990, msrp: 0, condition: 'Used', engine: '5.3L V8', transmission: 'Auto', drivetrain: '4WD', fuelType: 'Gas', daysOnLot: 19, title: '2022 Chevrolet Tahoe LT' },
-    { id: 'U003', stockNumber: 'FC24603', vin: '3GNAXKEV5MR333444', year: 2021, make: 'Chevrolet', model: 'Equinox', trim: 'LT', body: 'SUV', exteriorColor: 'Nightfall Gray', interiorColor: 'Medium Ash Gray', mileage: 41000, price: 19995, msrp: 0, condition: 'Used', engine: '1.5L Turbo', transmission: 'Auto', drivetrain: 'FWD', fuelType: 'Gas', daysOnLot: 35, title: '2021 Chevrolet Equinox LT' },
-    { id: 'U004', stockNumber: 'FC24604', vin: '1G1FH1R79L0444555', year: 2020, make: 'Chevrolet', model: 'Camaro', trim: 'SS', body: 'Coupe', exteriorColor: 'Crush Orange', interiorColor: 'Jet Black', mileage: 28000, price: 34990, msrp: 0, condition: 'Used', engine: '6.2L V8', transmission: 'Manual', drivetrain: 'RWD', fuelType: 'Gas', daysOnLot: 40, title: '2020 Chevrolet Camaro SS' },
+function getFallbackDeals() {
+  return [
+    { vehicle: '2026 Chevrolet Trax', type: 'findlay_special', savings: '752', source: 'findlaychevy.com', note: '3% off MSRP + potential GMF Bonus Cash' },
+    { vehicle: '2025 Chevrolet Silverado 1500', type: 'findlay_special', savings: '3,000+', source: 'findlaychevy.com', note: 'Findlay Discount + Customer Cash available' },
+    { vehicle: '2025 Chevrolet Equinox EV', type: 'findlay_special', savings: 'Tax Credit', source: 'findlaychevy.com', note: 'Federal EV tax credit up to $7,500' },
+    { vehicle: '2025 Chevrolet Tahoe', type: 'findlay_special', savings: '2,500+', source: 'findlaychevy.com', note: 'Findlay Discount available on select trims' },
   ];
-
-  lastScraped = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(); // Pretend scraped 3 hours ago
-  saveInventory();
-  console.log(`📦 Loaded ${inventory.length} sample vehicles for testing`);
 }
 
-loadSampleInventory();
+function getFallbackOffers() {
+  return [
+    { vehicle: 'Chevrolet Silverado 1500', type: 'national_offer', apr: '0.9', source: 'chevrolet.com', note: 'For well-qualified buyers' },
+    { vehicle: 'Chevrolet Equinox', type: 'national_offer', cashBack: '2,000', source: 'chevrolet.com', note: 'Customer cash on select models' },
+    { vehicle: 'Chevrolet Trax', type: 'national_offer', monthly: '249', source: 'chevrolet.com', note: 'Lease special, varies by region' },
+  ];
+}
 
 
 // ==================== AUTO-REFRESH ====================
 let refreshInterval = null;
 
 function startAutoRefresh() {
+  // Scrape on startup
+  scrapeInventory().then(vehicles => {
+    if (vehicles.length === 0) {
+      console.log('⚠️  No vehicles returned from Algolia — will retry on next refresh');
+    }
+  }).catch(err => {
+    console.error('Initial inventory scrape failed:', err.message);
+  });
+
+  // Set up recurring refresh
   if (refreshInterval) clearInterval(refreshInterval);
   refreshInterval = setInterval(async () => {
     console.log('⏰ Auto-refreshing inventory...');
@@ -579,7 +634,6 @@ module.exports = {
   scrapeInventory,
   importFromCSV,
   importFromJSON,
-  loadSampleInventory,
   startAutoRefresh,
 
   // Matching
@@ -588,6 +642,11 @@ module.exports = {
   formatInventoryForCRM,
   getAvailabilityNote,
 
+  // Fallback data
+  getFallbackDeals,
+  getFallbackOffers,
+
   // Config
   SCRAPER_CONFIG,
+  ALGOLIA_CONFIG,
 };
