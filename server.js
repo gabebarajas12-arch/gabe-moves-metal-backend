@@ -3359,25 +3359,19 @@ app.get('/api/live-deals', requireAuth, async (req, res) => {
 // Falls back to curated inventory when DDC WAF blocks scraping
 app.get('/api/live-inventory', requireAuth, async (req, res) => {
   try {
-    const now = Date.now();
-    if (cachedInventory.length > 0 && (now - inventoryLastFetch) < CACHE_TTL) {
-      return res.json({ inventory: cachedInventory, cached: true, lastFetch: inventoryLastFetch });
-    }
-    const scraped = await scrapeFindlayInventory();
-    if (scraped.length > 0) {
-      cachedInventory = scraped;
-      console.log('[Inventory] Live scrape: ' + scraped.length + ' vehicles');
-    } else {
-      // Fallback to curated inventory when DDC blocks us
-      cachedInventory = inventoryModule.getInventory();
-      console.log('[Inventory] Scrapers blocked - using ' + cachedInventory.length + ' fallback vehicles');
-    }
-    inventoryLastFetch = now;
-    res.json({ inventory: cachedInventory, cached: false, lastFetch: inventoryLastFetch });
+    // Use Algolia-powered inventory (reliable, 600+ vehicles, auto-refreshes every 30 min)
+    // Map fields to match what the frontend expects (image, stock, etc.)
+    const raw = inventoryModule.getInventory();
+    const vehicles = raw.map(v => ({
+      ...v,
+      image: v.imageUrl || v.image || '',
+      stock: v.stockNumber || v.stock || '',
+      color: v.exteriorColor || v.color || '',
+    }));
+    res.json({ inventory: vehicles, cached: false, lastFetch: inventoryModule.getLastScraped(), source: 'algolia', count: vehicles.length });
   } catch (err) {
     console.error('[API] live-inventory error:', err.message);
-    // Even on error, return fallback data instead of 500
-    res.json({ inventory: inventoryModule.getInventory(), cached: false, fallback: true });
+    res.json({ inventory: [], cached: false, fallback: true, error: err.message });
   }
 });
 
