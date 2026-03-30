@@ -2643,7 +2643,7 @@ app.post('/api/whatsapp/template', async (req, res) => {
 
 app.get('/privacy-policy', (req, res) => {
   res.send(`
-${customerContext ? `CUSTOMER CONTEXT/STORY: ${customerContext}\n\n` : ""}<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -2734,6 +2734,60 @@ app.get('/data-deletion', (req, res) => {
     <p><strong>Gabe Moves Metal</strong><br>
     Facebook: <a href="https://facebook.com/Gabemovesmetal1">facebook.com/Gabemovesmetal1</a><br>
     Dealership: Findlay Chevrolet, Las Vegas, NV</p>
+  </div>
+</body>
+</html>`);
+});
+
+// Terms of Service
+app.get('/terms', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service — Gabe Moves Metal</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; line-height: 1.6; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #d4a017; padding-bottom: 10px; }
+    h2 { color: #444; margin-top: 30px; }
+    .updated { color: #666; font-style: italic; margin-bottom: 30px; }
+    .contact { background: #f8f8f8; padding: 20px; border-radius: 8px; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <h1>Terms of Service</h1>
+  <p class="updated">Last updated: March 29, 2026</p>
+
+  <p><strong>Gabe Moves Metal</strong> ("we", "us", or "our") provides a personal lead generation and customer relationship management service to help connect car buyers with vehicle inventory. By using our services, you agree to the following terms.</p>
+
+  <h2>Use of Service</h2>
+  <p>Our service facilitates communication between prospective car buyers and Gabe Barajas, a sales consultant at Findlay Chevrolet in Las Vegas, NV. By messaging our Facebook Page, Instagram, or using any connected platform, you consent to receiving responses about vehicle availability, pricing, and related information.</p>
+
+  <h2>No Guarantee</h2>
+  <p>Vehicle availability, pricing, and promotions are subject to change without notice. Information provided through our messaging platforms is for informational purposes only and does not constitute a binding offer or contract for the sale of any vehicle.</p>
+
+  <h2>User Conduct</h2>
+  <p>You agree not to use our services for any unlawful purpose, to send spam or unsolicited messages, or to impersonate any person or entity. We reserve the right to block or restrict access to users who violate these terms.</p>
+
+  <h2>Intellectual Property</h2>
+  <p>The "Gabe Moves Metal" brand, logo, and associated content are the property of Gabe Barajas. You may not use our branding without written permission.</p>
+
+  <h2>Third-Party Platforms</h2>
+  <p>Our services operate through third-party platforms including Facebook, Instagram, TikTok, and WhatsApp. Your use of those platforms is governed by their respective terms of service and privacy policies.</p>
+
+  <h2>Limitation of Liability</h2>
+  <p>Gabe Moves Metal is a personal sales brand and is not responsible for any decisions made based on information provided through our messaging services. All vehicle purchases are subject to the terms and conditions of Findlay Chevrolet.</p>
+
+  <h2>Changes to Terms</h2>
+  <p>We may update these Terms of Service from time to time. Continued use of our services constitutes acceptance of the updated terms.</p>
+
+  <div class="contact">
+    <h2>Contact Us</h2>
+    <p>If you have questions about these Terms of Service, contact us:</p>
+    <p><strong>Gabe Moves Metal</strong><br>
+    Facebook: <a href="https://facebook.com/Gabemovesmetal1">facebook.com/Gabemovesmetal1</a><br>
+    Location: Las Vegas, NV</p>
   </div>
 </body>
 </html>`);
