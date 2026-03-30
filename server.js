@@ -2641,6 +2641,11 @@ app.post('/api/whatsapp/template', async (req, res) => {
 // ==================== PRIVACY POLICY & DATA DELETION ====================
 // Required for Meta App Review
 
+// TikTok domain verification file
+app.get('/tiktok7bSgYUw5VG58icGUDeaVaWPuM11yyuMK.txt', (req, res) => {
+  res.type('text/plain').send('tiktok-developers-site-verification=7bSgYUw5VG58icGUDeaVaWPuM11yyuMK');
+});
+
 app.get('/privacy-policy', (req, res) => {
   res.send(`
 <!DOCTYPE html>
