@@ -1485,6 +1485,10 @@
                     <div class="icon">▬</div>
                     <span>Calendar</span>
                 </div>
+                <div class="nav-item" data-page="intel">
+                    <div class="icon">▬</div>
+                    <span>Battlecard</span>
+                </div>
                 <div class="nav-item" data-page="notifications">
                     <div class="icon">▬</div>
                     <span>Notifications</span>
@@ -2042,6 +2046,234 @@
                 </div>
 
                 <!-- Deals page removed - merged into Dashboard -->
+
+                <!-- Calendar Page (moved inside content wrapper) -->
+                <div id="calendar" class="page">
+                    <h2>Calendar</h2>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <button onclick="calNavMonth(-1)" style="background:#333;color:#d4a017;border:1px solid #555;border-radius:6px;padding:6px 12px;cursor:pointer">&lt; Prev</button>
+                            <span id="calMonthLabel" style="font-size:1.2rem;font-weight:bold;min-width:180px;text-align:center"></span>
+                            <button onclick="calNavMonth(1)" style="background:#333;color:#d4a017;border:1px solid #555;border-radius:6px;padding:6px 12px;cursor:pointer">Next &gt;</button>
+                        </div>
+                        <div style="display:flex;gap:8px">
+                            <button onclick="calGoToday()" style="background:#333;color:#fff;border:1px solid #555;border-radius:6px;padding:6px 12px;cursor:pointer">Today</button>
+                            <button onclick="openApptModal()" style="background:linear-gradient(135deg,#d4a017,#b8860b);color:#000;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-weight:bold">+ Appointment</button>
+                        </div>
+                    </div>
+                    <div id="calGrid" class="cal-grid"></div>
+                </div>
+
+                <!-- Competitive Intel Page -->
+                <div class="page" id="intel">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                        <h2 style="font-size:20px;font-weight:700;">Competitive Intel</h2>
+                        <div style="display:flex;gap:8px;">
+                            <span id="intelLastUpdated" style="color:var(--text-secondary);font-size:13px;align-self:center;"></span>
+                            <button class="btn btn-primary" onclick="refreshCompetitiveIntel()">Refresh Intel</button>
+                        </div>
+                    </div>
+
+                    <!-- Findlay Stats Bar -->
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px;">
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--border-color);">
+                            <div style="font-size:28px;font-weight:800;color:var(--gold);">544+</div>
+                            <div style="font-size:12px;color:var(--text-secondary);">New Inventory</div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--border-color);">
+                            <div style="font-size:28px;font-weight:800;color:var(--gold);">12</div>
+                            <div style="font-size:12px;color:var(--text-secondary);">GM DOTY Streak</div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--border-color);">
+                            <div style="font-size:28px;font-weight:800;color:var(--gold);">4.6★</div>
+                            <div style="font-size:12px;color:var(--text-secondary);">KBB Rating</div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--border-color);">
+                            <div style="font-size:28px;font-weight:800;color:var(--gold);">#1</div>
+                            <div style="font-size:12px;color:var(--text-secondary);">Volume in NV</div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--border-color);">
+                            <div style="font-size:28px;font-weight:800;color:var(--gold);">969</div>
+                            <div style="font-size:12px;color:var(--text-secondary);">Yelp Reviews</div>
+                        </div>
+                    </div>
+
+                    <!-- Competitor Tabs -->
+                    <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;" id="intelTabs">
+                        <button class="btn btn-primary" onclick="showIntelTab('matrix')" id="intelTab_matrix" style="font-size:13px;">Comparison</button>
+                        <button class="btn" style="background:var(--card-bg);font-size:13px;" onclick="showIntelTab('fairway')" id="intelTab_fairway">vs Fairway</button>
+                        <button class="btn" style="background:var(--card-bg);font-size:13px;" onclick="showIntelTab('henderson')" id="intelTab_henderson">vs Henderson</button>
+                        <button class="btn" style="background:var(--card-bg);font-size:13px;" onclick="showIntelTab('team')" id="intelTab_team">vs Team</button>
+                        <button class="btn" style="background:var(--card-bg);font-size:13px;" onclick="showIntelTab('edge')" id="intelTab_edge">Your Edge</button>
+                    </div>
+
+                    <!-- Matrix Tab -->
+                    <div id="intelContent_matrix" class="intel-tab-content">
+                        <div style="background:var(--card-bg);border-radius:12px;border:1px solid var(--border-color);overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;">
+                                <thead>
+                                    <tr style="border-bottom:2px solid var(--border-color);">
+                                        <th style="text-align:left;padding:12px;font-size:12px;color:var(--text-secondary);text-transform:uppercase;">Category</th>
+                                        <th style="text-align:left;padding:12px;font-size:12px;color:var(--gold);text-transform:uppercase;">Findlay</th>
+                                        <th style="text-align:left;padding:12px;font-size:12px;color:var(--text-secondary);text-transform:uppercase;">Fairway</th>
+                                        <th style="text-align:left;padding:12px;font-size:12px;color:var(--text-secondary);text-transform:uppercase;">Henderson</th>
+                                        <th style="text-align:left;padding:12px;font-size:12px;color:var(--text-secondary);text-transform:uppercase;">Team</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:10px 12px;font-weight:600;">New Inventory</td><td style="padding:10px 12px;"><span style="color:#10b981;font-weight:700;">544+</span></td><td style="padding:10px 12px;">188</td><td style="padding:10px 12px;">~200</td><td style="padding:10px 12px;">~150</td></tr>
+                                    <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:10px 12px;font-weight:600;">GM DOTY Awards</td><td style="padding:10px 12px;"><span style="color:#10b981;font-weight:700;">12 years</span></td><td style="padding:10px 12px;">None</td><td style="padding:10px 12px;">None</td><td style="padding:10px 12px;">None</td></tr>
+                                    <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:10px 12px;font-weight:600;">Yelp Reviews</td><td style="padding:10px 12px;"><span style="color:#10b981;font-weight:700;">969</span></td><td style="padding:10px 12px;">419</td><td style="padding:10px 12px;">616</td><td style="padding:10px 12px;">~200</td></tr>
+                                    <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:10px 12px;font-weight:600;">KBB Rating</td><td style="padding:10px 12px;"><span style="color:#10b981;font-weight:700;">4.6★</span></td><td style="padding:10px 12px;">~4.2★</td><td style="padding:10px 12px;">4.3★</td><td style="padding:10px 12px;">4.4★</td></tr>
+                                    <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:10px 12px;font-weight:600;">Brands</td><td style="padding:10px 12px;">Chevrolet</td><td style="padding:10px 12px;">Chevy/Buick/GMC</td><td style="padding:10px 12px;">Chevrolet</td><td style="padding:10px 12px;">Chevrolet</td></tr>
+                                    <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:10px 12px;font-weight:600;">Free Delivery</td><td style="padding:10px 12px;"><span style="color:#10b981;font-weight:700;">100 miles</span></td><td style="padding:10px 12px;">No</td><td style="padding:10px 12px;">No</td><td style="padding:10px 12px;">No</td></tr>
+                                    <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:10px 12px;font-weight:600;">Online Buying</td><td style="padding:10px 12px;"><span style="color:#10b981;font-weight:700;">JoyDrive</span></td><td style="padding:10px 12px;">No</td><td style="padding:10px 12px;">No</td><td style="padding:10px 12px;">No</td></tr>
+                                    <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:10px 12px;font-weight:600;">EV Ready</td><td style="padding:10px 12px;"><span style="color:#10b981;font-weight:700;">Yes</span></td><td style="padding:10px 12px;">Limited</td><td style="padding:10px 12px;">Limited</td><td style="padding:10px 12px;">Standard</td></tr>
+                                    <tr><td style="padding:10px 12px;font-weight:600;">Social Media</td><td style="padding:10px 12px;"><span style="color:#10b981;font-weight:700;">Personal brand</span></td><td style="padding:10px 12px;">Basic</td><td style="padding:10px 12px;">Basic</td><td style="padding:10px 12px;">Basic</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Fairway Tab -->
+                    <div id="intelContent_fairway" class="intel-tab-content" style="display:none;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                            <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                                <h3 style="color:#ef4444;font-size:15px;margin-bottom:10px;">Where They Win</h3>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>Multi-brand:</strong> Carry Buick + GMC — one-stop shop for Tahoe vs Yukon shoppers</div>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>"Truck Mega Store":</strong> Strong truck branding — truck buyers search them first</div>
+                                <div style="font-size:14px;"><strong>Legacy:</strong> Family-owned since 1969</div>
+                            </div>
+                            <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                                <h3 style="color:#10b981;font-size:15px;margin-bottom:10px;">Where You Win</h3>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>3x inventory:</strong> 544+ vs 188</div>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>12x GM Dealer of Year</strong> — they don't have any</div>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>Free delivery 100mi</strong> — they don't offer this</div>
+                                <div style="font-size:14px;"><strong>EV selection + JoyDrive</strong> — tech-forward</div>
+                            </div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);margin-bottom:12px;">
+                            <h3 style="color:var(--gold);font-size:15px;margin-bottom:12px;">Talk Tracks</h3>
+                            <div style="background:var(--dark-bg);border-left:3px solid var(--gold);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:10px;">
+                                <div style="color:var(--gold);font-size:13px;font-weight:700;margin-bottom:4px;">"I'm also looking at Fairway"</div>
+                                <div style="font-size:14px;color:var(--text-secondary);">Fairway's a good store — been around a long time. The main difference is selection. We have over 544 vehicles right now versus their 188. More options means we match you with exactly the right vehicle. Plus we've been GM Dealer of the Year 12 years running.</div>
+                            </div>
+                            <div style="background:var(--dark-bg);border-left:3px solid var(--gold);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:10px;">
+                                <div style="color:var(--gold);font-size:13px;font-weight:700;margin-bottom:4px;">"Fairway has more trucks"</div>
+                                <div style="font-size:14px;color:var(--text-secondary);">They call themselves the Truck Mega Store, but check the numbers — we have more Silverados on the ground right now than their entire inventory. And if you want an EV, Corvette, or Traverse, we've got those too.</div>
+                            </div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                            <h3 style="color:var(--gold);font-size:15px;margin-bottom:10px;">Landmine Questions</h3>
+                            <div style="background:var(--dark-bg);padding:10px 14px 10px 36px;border-radius:8px;margin-bottom:6px;position:relative;font-size:14px;"><span style="position:absolute;left:10px;">💣</span>Ask how many vehicles they have in stock right now</div>
+                            <div style="background:var(--dark-bg);padding:10px 14px 10px 36px;border-radius:8px;margin-bottom:6px;position:relative;font-size:14px;"><span style="position:absolute;left:10px;">💣</span>Ask if they offer free home delivery</div>
+                            <div style="background:var(--dark-bg);padding:10px 14px 10px 36px;border-radius:8px;margin-bottom:6px;position:relative;font-size:14px;"><span style="position:absolute;left:10px;">💣</span>Ask about their GM Dealer of the Year awards</div>
+                            <div style="background:var(--dark-bg);padding:10px 14px 10px 36px;border-radius:8px;position:relative;font-size:14px;"><span style="position:absolute;left:10px;">💣</span>Ask to see their EV inventory</div>
+                        </div>
+                    </div>
+
+                    <!-- Henderson Tab -->
+                    <div id="intelContent_henderson" class="intel-tab-content" style="display:none;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                            <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                                <h3 style="color:#ef4444;font-size:15px;margin-bottom:10px;">Where They Win</h3>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>Henderson convenience:</strong> Closest Chevy dealer for Green Valley, Anthem residents</div>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>Repeat loyalty:</strong> Strong fleet manager, customers buying 4th vehicles there</div>
+                                <div style="font-size:14px;"><strong>VIP branding:</strong> Promote "VIP experience" for every customer</div>
+                            </div>
+                            <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                                <h3 style="color:#10b981;font-size:15px;margin-bottom:10px;">Where You Win</h3>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>2.5x inventory:</strong> 544+ vs ~200</div>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>Service reputation:</strong> They have misdiagnosed repair reports ($6K quoted, needed $749)</div>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>Volume pricing:</strong> #1 volume = better GM deals passed to customers</div>
+                                <div style="font-size:14px;"><strong>Free delivery:</strong> Henderson residents? We deliver free within 100 miles</div>
+                            </div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);margin-bottom:12px;">
+                            <h3 style="color:var(--gold);font-size:15px;margin-bottom:12px;">Talk Tracks</h3>
+                            <div style="background:var(--dark-bg);border-left:3px solid var(--gold);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:10px;">
+                                <div style="color:var(--gold);font-size:13px;font-weight:700;margin-bottom:4px;">"Henderson Chevy is closer to me"</div>
+                                <div style="font-size:14px;color:var(--text-secondary);">I totally get that — convenience matters. But we offer free delivery within 100 miles, so we'll bring the truck right to your door in Henderson. And with 544+ vehicles versus their 200, you're way more likely to find exactly what you want.</div>
+                            </div>
+                            <div style="background:var(--dark-bg);border-left:3px solid var(--gold);padding:12px 16px;border-radius:0 8px 8px 0;">
+                                <div style="color:var(--gold);font-size:13px;font-weight:700;margin-bottom:4px;">"Their service department is closer"</div>
+                                <div style="font-size:14px;color:var(--text-secondary);">Service is important for the life of the vehicle. We've won Standard for Excellence for customer satisfaction seven years in a row. Some customers have had mixed experiences with Henderson's service — check their reviews.</div>
+                            </div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                            <h3 style="color:var(--gold);font-size:15px;margin-bottom:10px;">Landmine Questions</h3>
+                            <div style="background:var(--dark-bg);padding:10px 14px 10px 36px;border-radius:8px;margin-bottom:6px;position:relative;font-size:14px;"><span style="position:absolute;left:10px;">💣</span>Ask what awards their service department has won</div>
+                            <div style="background:var(--dark-bg);padding:10px 14px 10px 36px;border-radius:8px;margin-bottom:6px;position:relative;font-size:14px;"><span style="position:absolute;left:10px;">💣</span>Ask how many Silverados they have on the lot right now</div>
+                            <div style="background:var(--dark-bg);padding:10px 14px 10px 36px;border-radius:8px;position:relative;font-size:14px;"><span style="position:absolute;left:10px;">💣</span>Ask if they can deliver to your house</div>
+                        </div>
+                    </div>
+
+                    <!-- Team Tab -->
+                    <div id="intelContent_team" class="intel-tab-content" style="display:none;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                            <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                                <h3 style="color:#ef4444;font-size:15px;margin-bottom:10px;">Where They Win</h3>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>Aggressive Costco promos:</strong> $12,500 off Silverado 1500 for Costco Executive members</div>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>Lease deals:</strong> 2026 Trax at $299/mo</div>
+                                <div style="font-size:14px;"><strong>Newer = hungry:</strong> May be more aggressive on price to build volume</div>
+                            </div>
+                            <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                                <h3 style="color:#10b981;font-size:15px;margin-bottom:10px;">Where You Win</h3>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>3.5x inventory:</strong> 544+ vs ~150</div>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>Proven track record:</strong> 12 GM DOTY awards. They have zero.</div>
+                                <div style="margin-bottom:8px;font-size:14px;"><strong>Service complaints:</strong> Reports of vehicles in shop for weeks</div>
+                                <div style="font-size:14px;"><strong>Reputation depth:</strong> 969 Yelp reviews vs ~200</div>
+                            </div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);margin-bottom:12px;">
+                            <h3 style="color:var(--gold);font-size:15px;margin-bottom:12px;">Talk Tracks</h3>
+                            <div style="background:var(--dark-bg);border-left:3px solid var(--gold);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:10px;">
+                                <div style="color:var(--gold);font-size:13px;font-weight:700;margin-bottom:4px;">"Team quoted me a Costco deal"</div>
+                                <div style="font-size:14px;color:var(--text-secondary);">We participate in the Costco Auto Program too — our volume means we can be very competitive. That $12,500 number usually combines manufacturer rebates we offer too, plus a dealer discount. Let me put numbers side by side — most of the time we match or beat it.</div>
+                            </div>
+                            <div style="background:var(--dark-bg);border-left:3px solid var(--gold);padding:12px 16px;border-radius:0 8px 8px 0;">
+                                <div style="color:var(--gold);font-size:13px;font-weight:700;margin-bottom:4px;">"Team has a great lease deal"</div>
+                                <div style="font-size:14px;color:var(--text-secondary);">That's awesome — I love a good lease deal. With our volume, GM gives us great lease support. And on a lease, you're servicing here for 2-3 years. You want the dealer that's won Standard for Excellence seven years straight.</div>
+                            </div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                            <h3 style="color:var(--gold);font-size:15px;margin-bottom:10px;">Landmine Questions</h3>
+                            <div style="background:var(--dark-bg);padding:10px 14px 10px 36px;border-radius:8px;margin-bottom:6px;position:relative;font-size:14px;"><span style="position:absolute;left:10px;">💣</span>Ask how long they've been in business</div>
+                            <div style="background:var(--dark-bg);padding:10px 14px 10px 36px;border-radius:8px;margin-bottom:6px;position:relative;font-size:14px;"><span style="position:absolute;left:10px;">💣</span>Ask about their service department reviews</div>
+                            <div style="background:var(--dark-bg);padding:10px 14px 10px 36px;border-radius:8px;position:relative;font-size:14px;"><span style="position:absolute;left:10px;">💣</span>Ask to see more than 3 options in your color/trim</div>
+                        </div>
+                    </div>
+
+                    <!-- Your Edge Tab -->
+                    <div id="intelContent_edge" class="intel-tab-content" style="display:none;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                            <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                                <h3 style="color:var(--gold);font-size:15px;margin-bottom:10px;">Findlay Differentiators</h3>
+                                <div style="margin-bottom:8px;font-size:14px;">⭐ <strong>Largest Chevy inventory in Nevada</strong> — 544+ new vehicles</div>
+                                <div style="margin-bottom:8px;font-size:14px;">⭐ <strong>Free delivery within 100 miles</strong></div>
+                                <div style="margin-bottom:8px;font-size:14px;">⭐ <strong>JoyDrive digital retailing</strong></div>
+                                <div style="margin-bottom:8px;font-size:14px;">⭐ <strong>Findlay Auto Group backing</strong> — 30+ dealerships</div>
+                                <div style="margin-bottom:8px;font-size:14px;">⭐ <strong>Bilingual (EN/ES)</strong></div>
+                                <div style="font-size:14px;">⭐ <strong>EV-ready</strong> — Equinox EV, Blazer EV in stock</div>
+                            </div>
+                            <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                                <h3 style="color:var(--gold);font-size:15px;margin-bottom:10px;">Your Personal Edge (Gabe)</h3>
+                                <div style="margin-bottom:8px;font-size:14px;">🔥 <strong>"Gabe Moves Metal" brand</strong> — personal social media presence</div>
+                                <div style="margin-bottom:8px;font-size:14px;">🔥 <strong>CRM + auto follow-up</strong> — no lead falls through the cracks</div>
+                                <div style="margin-bottom:8px;font-size:14px;">🔥 <strong>Multi-platform:</strong> FB, IG, TikTok, WhatsApp</div>
+                                <div style="margin-bottom:8px;font-size:14px;">🔥 <strong>Bilingual</strong> — serving Spanish-speaking community directly</div>
+                                <div style="font-size:14px;">🔥 <strong>Tech-forward:</strong> Custom CRM, AI content, inventory matching</div>
+                            </div>
+                        </div>
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                            <h3 style="color:var(--gold);font-size:15px;margin-bottom:10px;">2026 Market Trends to Leverage</h3>
+                            <div style="margin-bottom:8px;font-size:14px;">📱 <strong>75% of buyers</strong> say online video influenced their purchase — your TikTok/Reels game is a massive advantage</div>
+                            <div style="margin-bottom:8px;font-size:14px;">🤖 <strong>AI-powered follow-up</strong> is now a differentiator — your automated sequences put you ahead of every salesperson at competing dealers</div>
+                            <div style="margin-bottom:8px;font-size:14px;">⚡ <strong>EV demand growing</strong> — being knowledgeable about Equinox EV and Blazer EV positions you as the go-to EV person</div>
+                            <div style="font-size:14px;">🌐 <strong>71% of consumers</strong> use a mix of online + in-person — your JoyDrive + personal touch = best of both worlds</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -2226,24 +2458,6 @@
             <div id="leadDetailContent"></div>
         </div>
     </div>
-
-    
-        <!-- Calendar Section -->
-        <div id="calendar" class="page">
-            <h2>Calendar</h2>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                <div style="display:flex;gap:8px;align-items:center">
-                    <button onclick="calNavMonth(-1)" style="background:#333;color:#d4a017;border:1px solid #555;border-radius:6px;padding:6px 12px;cursor:pointer">&lt; Prev</button>
-                    <span id="calMonthLabel" style="font-size:1.2rem;font-weight:bold;min-width:180px;text-align:center"></span>
-                    <button onclick="calNavMonth(1)" style="background:#333;color:#d4a017;border:1px solid #555;border-radius:6px;padding:6px 12px;cursor:pointer">Next &gt;</button>
-                </div>
-                <div style="display:flex;gap:8px">
-                    <button onclick="calGoToday()" style="background:#333;color:#fff;border:1px solid #555;border-radius:6px;padding:6px 12px;cursor:pointer">Today</button>
-                    <button onclick="openApptModal()" style="background:linear-gradient(135deg,#d4a017,#b8860b);color:#000;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-weight:bold">+ Appointment</button>
-                </div>
-            </div>
-            <div id="calGrid" class="cal-grid"></div>
-        </div>
 
         <!-- Appointment Modal -->
         <div id="apptModalOverlay" class="appt-modal-overlay" style="display:none" onclick="if(event.target===this)closeApptModal()">
@@ -2498,7 +2712,8 @@
                 templates: 'Auto-Reply Templates',
                 posting: 'Post Creator',
                 notifications: 'Notifications',
-                calendar: 'Calendar'
+                calendar: 'Calendar',
+                intel: 'Competitive Intel'
             };
             document.getElementById('pageTitle').textContent = titles[page] || page;
 
@@ -3388,6 +3603,31 @@
             } catch (error) {
                 alert('Error enrolling lead');
             }
+        }
+
+        // ==================== COMPETITIVE INTEL ====================
+        function showIntelTab(tabName) {
+            // Hide all intel tab contents
+            document.querySelectorAll('.intel-tab-content').forEach(el => el.style.display = 'none');
+            // Show selected
+            const content = document.getElementById('intelContent_' + tabName);
+            if (content) content.style.display = 'block';
+            // Update tab buttons
+            document.querySelectorAll('#intelTabs button').forEach(btn => {
+                btn.className = 'btn';
+                btn.style.background = 'var(--card-bg)';
+            });
+            const activeBtn = document.getElementById('intelTab_' + tabName);
+            if (activeBtn) {
+                activeBtn.className = 'btn btn-primary';
+                activeBtn.style.background = '';
+            }
+        }
+
+        function refreshCompetitiveIntel() {
+            const el = document.getElementById('intelLastUpdated');
+            if (el) el.textContent = 'Last updated: ' + new Date().toLocaleDateString();
+            alert('Competitive intel refreshed! For the latest data, ask Claude to run a competitive intel update.');
         }
 
         // Inventory
