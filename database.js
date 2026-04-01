@@ -115,10 +115,33 @@ function initDatabase() {
       createdAt TEXT DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS followup_sequences (
+      id TEXT PRIMARY KEY,
+      name TEXT DEFAULT '',
+      trigger_stage TEXT DEFAULT 'New Lead',
+      steps TEXT DEFAULT '[]',
+      active INTEGER DEFAULT 1,
+      createdAt TEXT DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS followup_queue (
+      id TEXT PRIMARY KEY,
+      leadId TEXT NOT NULL,
+      sequenceId TEXT NOT NULL,
+      stepIndex INTEGER DEFAULT 0,
+      scheduledAt TEXT DEFAULT '',
+      sentAt TEXT DEFAULT '',
+      status TEXT DEFAULT 'pending',
+      platform TEXT DEFAULT '',
+      FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_convo ON messages(conversationId);
     CREATE INDEX IF NOT EXISTS idx_leads_stage ON leads(stage);
     CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
     CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(date);
+    CREATE INDEX IF NOT EXISTS idx_followup_queue_status ON followup_queue(status);
+    CREATE INDEX IF NOT EXISTS idx_followup_queue_scheduled ON followup_queue(scheduledAt);
   `);
 
   console.log('🗄️  SQLite database initialized at', DB_PATH);
@@ -477,6 +500,100 @@ const appointmentsDb = {
 };
 
 
+// ==================== FOLLOW-UP SEQUENCES ====================
+const followupSequencesDb = {
+  getAll() {
+    return db.prepare('SELECT * FROM followup_sequences ORDER BY createdAt DESC').all().map(s => ({
+      ...s,
+      steps: JSON.parse(s.steps || '[]'),
+      active: !!s.active,
+    }));
+  },
+
+  getById(id) {
+    const s = db.prepare('SELECT * FROM followup_sequences WHERE id = ?').get(id);
+    if (!s) return null;
+    return { ...s, steps: JSON.parse(s.steps || '[]'), active: !!s.active };
+  },
+
+  getActiveByTrigger(stage) {
+    const rows = db.prepare('SELECT * FROM followup_sequences WHERE trigger_stage = ? AND active = 1').all(stage);
+    return rows.map(s => ({ ...s, steps: JSON.parse(s.steps || '[]'), active: true }));
+  },
+
+  upsert(seq) {
+    db.prepare(`
+      INSERT OR REPLACE INTO followup_sequences (id, name, trigger_stage, steps, active, createdAt)
+      VALUES (@id, @name, @trigger_stage, @steps, @active, @createdAt)
+    `).run({
+      id: seq.id,
+      name: seq.name || '',
+      trigger_stage: seq.trigger_stage || 'New Lead',
+      steps: JSON.stringify(seq.steps || []),
+      active: seq.active !== false ? 1 : 0,
+      createdAt: seq.createdAt || new Date().toISOString(),
+    });
+    return this.getById(seq.id);
+  },
+
+  delete(id) {
+    db.prepare('DELETE FROM followup_sequences WHERE id = ?').run(id);
+  },
+};
+
+// ==================== FOLLOW-UP QUEUE ====================
+const followupQueueDb = {
+  getPending() {
+    return db.prepare("SELECT * FROM followup_queue WHERE status = 'pending' ORDER BY scheduledAt ASC").all();
+  },
+
+  getDue() {
+    const now = new Date().toISOString();
+    return db.prepare("SELECT * FROM followup_queue WHERE status = 'pending' AND scheduledAt <= ? ORDER BY scheduledAt ASC").all(now);
+  },
+
+  getByLead(leadId) {
+    return db.prepare('SELECT * FROM followup_queue WHERE leadId = ? ORDER BY scheduledAt ASC').all(leadId);
+  },
+
+  create(item) {
+    db.prepare(`
+      INSERT INTO followup_queue (id, leadId, sequenceId, stepIndex, scheduledAt, sentAt, status, platform)
+      VALUES (@id, @leadId, @sequenceId, @stepIndex, @scheduledAt, @sentAt, @status, @platform)
+    `).run({
+      id: item.id,
+      leadId: item.leadId,
+      sequenceId: item.sequenceId,
+      stepIndex: item.stepIndex || 0,
+      scheduledAt: item.scheduledAt || '',
+      sentAt: item.sentAt || '',
+      status: item.status || 'pending',
+      platform: item.platform || '',
+    });
+    return item;
+  },
+
+  markSent(id) {
+    db.prepare("UPDATE followup_queue SET status = 'sent', sentAt = ? WHERE id = ?").run(new Date().toISOString(), id);
+  },
+
+  markSkipped(id) {
+    db.prepare("UPDATE followup_queue SET status = 'skipped' WHERE id = ?").run(id);
+  },
+
+  cancelForLead(leadId) {
+    db.prepare("UPDATE followup_queue SET status = 'cancelled' WHERE leadId = ? AND status = 'pending'").run(leadId);
+  },
+
+  getStats() {
+    const pending = db.prepare("SELECT COUNT(*) as count FROM followup_queue WHERE status = 'pending'").get().count;
+    const sent = db.prepare("SELECT COUNT(*) as count FROM followup_queue WHERE status = 'sent'").get().count;
+    const total = db.prepare('SELECT COUNT(*) as count FROM followup_queue').get().count;
+    return { pending, sent, total };
+  },
+};
+
+
 // ==================== MIGRATION ====================
 // Import existing data.json into SQLite (run once, then data.json becomes a backup)
 function migrateFromJson() {
@@ -607,4 +724,6 @@ module.exports = {
   posts: postsDb,
   templates: templatesDb,
   appointments: appointmentsDb,
+  followupSequences: followupSequencesDb,
+  followupQueue: followupQueueDb,
 };

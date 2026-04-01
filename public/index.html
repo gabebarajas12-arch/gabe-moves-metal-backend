@@ -1644,6 +1644,50 @@
                             <div id="ytdContent"></div>
                         </div>
                     </div>
+
+                    <!-- Follow-Up Sequences -->
+                    <div style="margin-top:20px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <h3 style="font-size:18px;font-weight:700;margin:0;">Auto Follow-Up Sequences</h3>
+                                <div id="followupQueueBadge" style="background:var(--gold);color:#000;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;">0 queued</div>
+                            </div>
+                            <button class="btn btn-primary" onclick="openSequenceModal()">+ New Sequence</button>
+                        </div>
+                        <div id="sequencesList" style="display:grid;gap:12px;"></div>
+                    </div>
+
+                    <!-- Sequence Modal -->
+                    <div id="sequenceModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center;">
+                        <div style="background:var(--card-bg);border-radius:16px;padding:24px;width:90%;max-width:600px;max-height:85vh;overflow-y:auto;">
+                            <h3 id="seqModalTitle" style="font-size:18px;font-weight:700;margin-bottom:16px;">New Follow-Up Sequence</h3>
+                            <form id="sequenceForm" onsubmit="saveSequence(event)">
+                                <input type="hidden" id="seqId">
+                                <div style="margin-bottom:12px;">
+                                    <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:4px;">Sequence Name</label>
+                                    <input type="text" id="seqName" class="form-input" placeholder="e.g., New Lead Nurture" required>
+                                </div>
+                                <div style="margin-bottom:12px;">
+                                    <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:4px;">Trigger When Lead Enters Stage</label>
+                                    <select id="seqTrigger" class="form-input">
+                                        <option value="New Lead">New Lead</option>
+                                        <option value="Contacted">Contacted</option>
+                                        <option value="Appointment">Appointment</option>
+                                        <option value="Negotiation">Negotiation</option>
+                                    </select>
+                                </div>
+                                <div style="margin-bottom:12px;">
+                                    <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Follow-Up Steps</label>
+                                    <div id="seqSteps"></div>
+                                    <button type="button" onclick="addSequenceStep()" style="background:var(--dark-bg);border:1px dashed var(--border-color);color:var(--text-secondary);padding:10px;width:100%;border-radius:8px;cursor:pointer;margin-top:8px;">+ Add Step</button>
+                                </div>
+                                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+                                    <button type="button" class="btn" onclick="closeSequenceModal()" style="background:var(--dark-bg);">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Sequence</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
 
         <div class="page" id="leads">
@@ -2087,13 +2131,27 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Stage</label>
-                    <select class="form-select" id="leadStage">
+                    <select class="form-select" id="leadStage" onchange="toggleSoldPhoto()">
                         <option value="New Lead">New Lead</option>
                         <option value="Contacted">Contacted</option>
                         <option value="Appointment">Appointment</option>
                         <option value="Negotiation">Negotiation</option>
                         <option value="Sold">Sold</option>
                     </select>
+                </div>
+                <div class="form-group" id="soldPhotoGroup" style="display:none;">
+                    <label class="form-label" style="color:var(--gold);">Sold Photo (for Post Creator)</label>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="file" id="soldPhotoInput" accept="image/*" style="flex:1;" onchange="previewSoldPhoto(this)">
+                    </div>
+                    <div id="soldPhotoPreview" style="margin-top:8px;display:none;">
+                        <img id="soldPhotoImg" style="max-width:200px;border-radius:8px;border:2px solid var(--gold);">
+                    </div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Upload a photo with the customer — it'll auto-fill the Sold Post Creator</div>
+                </div>
+                <div class="form-group" id="soldVehicleGroup" style="display:none;">
+                    <label class="form-label" style="color:var(--gold);">Vehicle Sold</label>
+                    <input type="text" class="form-input" id="soldVehicleModel" placeholder="e.g., 2025 Chevy Silverado 1500 LT">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Follow-up Date</label>
@@ -2447,6 +2505,7 @@
             if (page === 'dashboard') {
                 initDealsMonth();
                 loadDeals();
+                loadFollowUpSequences();
             } else if (page === 'leads') {
                 loadLeads();
                 loadConversations();
@@ -2531,18 +2590,18 @@
         }
 
         // Leads
-        async function loadLeads() {
+        async function loadLeads(autoSelect = true) {
             try {
                 const response = await fetch(`${API_BASE}/api/leads`);
                 allLeads = await response.json();
-                renderLeads();
+                renderLeads(autoSelect);
             } catch (error) {
                 console.error('Error loading leads:', error);
                 document.getElementById('leadsList').innerHTML = '<p>Error loading leads.</p>';
             }
         }
 
-        function renderLeads() {
+        function renderLeads(autoSelect = false) {
             const stage = document.getElementById('filterStage').value;
             const source = document.getElementById('filterSource').value;
             const language = document.getElementById('filterLanguage').value;
@@ -2555,6 +2614,28 @@
                 if (search && !lead.name.toLowerCase().includes(search) &&
                     !lead.phone?.toLowerCase().includes(search)) return false;
                 return true;
+            });
+
+            // Smart sort: overdue follow-ups first, then today, then by stage priority, then newest
+            const stagePriority = { 'New Lead': 0, 'Contacted': 1, 'Appointment': 2, 'Negotiation': 3, 'Sold': 4, 'Lost': 5 };
+            const today = new Date().toISOString().split('T')[0];
+            filtered.sort((a, b) => {
+                const aDate = a.followUpDate ? a.followUpDate.split('T')[0] : '';
+                const bDate = b.followUpDate ? b.followUpDate.split('T')[0] : '';
+                const aOverdue = aDate && aDate < today ? 1 : 0;
+                const bOverdue = bDate && bDate < today ? 1 : 0;
+                const aToday = aDate === today ? 1 : 0;
+                const bToday = bDate === today ? 1 : 0;
+                // Overdue first
+                if (aOverdue !== bOverdue) return bOverdue - aOverdue;
+                // Today's follow-ups next
+                if (aToday !== bToday) return bToday - aToday;
+                // Then by stage (hot stages first)
+                const aPri = stagePriority[a.stage] ?? 99;
+                const bPri = stagePriority[b.stage] ?? 99;
+                if (aPri !== bPri) return aPri - bPri;
+                // Then newest first
+                return (b.createdAt || '').localeCompare(a.createdAt || '');
             });
 
             let html = '';
@@ -2606,6 +2687,11 @@
             });
 
             document.getElementById('leadsList').innerHTML = html || '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No leads found.</p>';
+
+            // Auto-select the hottest lead when first loading the page
+            if (autoSelect && filtered.length > 0) {
+                setTimeout(() => selectLeadInline(filtered[0].id), 100);
+            }
         }
 
         function openLeadModal(leadId = null) {
@@ -2624,10 +2710,14 @@
                 document.getElementById('leadNotes').value = lead.notes || '';
                 document.getElementById('deleteLeadBtn').style.display = 'block';
                 document.getElementById('deleteLeadBtn').onclick = () => deleteLead(leadId);
+                toggleSoldPhoto();
             } else {
                 document.getElementById('leadModalTitle').textContent = 'Add New Lead';
                 document.getElementById('leadForm').reset();
                 document.getElementById('deleteLeadBtn').style.display = 'none';
+                document.getElementById('soldPhotoGroup').style.display = 'none';
+                document.getElementById('soldVehicleGroup').style.display = 'none';
+                document.getElementById('soldPhotoPreview').style.display = 'none';
             }
             document.getElementById('leadModal').classList.add('active');
         }
@@ -2635,6 +2725,29 @@
         function closeLeadModal() {
             document.getElementById('leadModal').classList.remove('active');
             selectedLeadId = null;
+        }
+
+        function toggleSoldPhoto() {
+            const stage = document.getElementById('leadStage').value;
+            document.getElementById('soldPhotoGroup').style.display = stage === 'Sold' ? 'block' : 'none';
+            document.getElementById('soldVehicleGroup').style.display = stage === 'Sold' ? 'block' : 'none';
+            // Pre-fill vehicle from interest field
+            if (stage === 'Sold') {
+                const interest = document.getElementById('leadInterest').value;
+                const vehicleInput = document.getElementById('soldVehicleModel');
+                if (!vehicleInput.value && interest) vehicleInput.value = interest;
+            }
+        }
+
+        function previewSoldPhoto(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('soldPhotoImg').src = e.target.result;
+                    document.getElementById('soldPhotoPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
         }
 
         async function saveLead(e) {
@@ -2651,6 +2764,11 @@
                 notes: document.getElementById('leadNotes').value
             };
 
+            // Check if marking as Sold with a photo
+            const isSold = leadData.stage === 'Sold';
+            const soldPhotoFile = document.getElementById('soldPhotoInput')?.files[0];
+            const soldVehicle = document.getElementById('soldVehicleModel')?.value || leadData.interest;
+
             try {
                 const method = selectedLeadId ? 'PUT' : 'POST';
                 const url = selectedLeadId ? `${API_BASE}/api/leads/${selectedLeadId}` : `${API_BASE}/api/leads`;
@@ -2662,9 +2780,52 @@
                 });
 
                 if (response.ok) {
+                    // If sold with photo, upload photo and pre-fill Post Creator
+                    if (isSold && soldPhotoFile) {
+                        const formData = new FormData();
+                        formData.append('photo', soldPhotoFile);
+                        const uploadRes = await fetch(`${API_BASE}/api/upload-photo`, {
+                            method: 'POST',
+                            headers: { 'Authorization': 'Bearer ' + authToken },
+                            body: formData,
+                        });
+                        if (uploadRes.ok) {
+                            const uploadData = await uploadRes.json();
+                            // Store sold data for Post Creator auto-fill
+                            window.pendingSoldPost = {
+                                customerName: leadData.name,
+                                vehicleModel: soldVehicle,
+                                imageUrl: uploadData.url || uploadData.path,
+                            };
+                        }
+                    } else if (isSold) {
+                        // Even without photo, pre-fill the sold post
+                        window.pendingSoldPost = {
+                            customerName: leadData.name,
+                            vehicleModel: soldVehicle,
+                            imageUrl: '',
+                        };
+                    }
+
+                    // Cancel any pending follow-ups for sold leads
+                    if (isSold && selectedLeadId) {
+                        fetch(`${API_BASE}/api/followup/cancel/${selectedLeadId}`, {
+                            method: 'POST',
+                            headers: { 'Authorization': 'Bearer ' + authToken },
+                        }).catch(() => {});
+                    }
+
                     closeLeadModal();
-                    loadLeads();
+                    loadLeads(false);
                     loadDashboard();
+
+                    // If sold, offer to go to Post Creator
+                    if (isSold && window.pendingSoldPost) {
+                        if (confirm(`${leadData.name} marked as SOLD! Want to create a sold post now?`)) {
+                            switchPage('posting');
+                            setTimeout(() => prefillSoldPost(), 300);
+                        }
+                    }
                 } else {
                     alert('Error saving lead');
                 }
@@ -2672,6 +2833,47 @@
                 console.error('Error saving lead:', error);
                 alert('Error saving lead');
             }
+        }
+
+        function prefillSoldPost() {
+            if (!window.pendingSoldPost) return;
+            const data = window.pendingSoldPost;
+
+            // Select the sold_customer post type
+            selectPostType('sold_customer');
+
+            // Wait for form to render, then fill
+            setTimeout(() => {
+                const nameInput = document.getElementById('postCustomerName');
+                const modelInput = document.getElementById('postVehicleModel');
+                const yearInput = document.getElementById('postVehicleYear');
+                const imageUrlInput = document.getElementById('postImageUrl');
+
+                if (nameInput) nameInput.value = data.customerName;
+
+                // Parse vehicle into year + model if possible
+                if (data.vehicleModel) {
+                    const yearMatch = data.vehicleModel.match(/^(\d{4})\s+(.+)/);
+                    if (yearMatch && yearInput && modelInput) {
+                        yearInput.value = yearMatch[1];
+                        modelInput.value = yearMatch[2];
+                    } else if (modelInput) {
+                        modelInput.value = data.vehicleModel;
+                    }
+                }
+
+                if (imageUrlInput && data.imageUrl) {
+                    imageUrlInput.value = data.imageUrl;
+                    // Show preview
+                    const preview = document.getElementById('photoPreview');
+                    const previewImg = document.getElementById('photoPreviewImg');
+                    if (preview && previewImg) {
+                        previewImg.src = data.imageUrl;
+                        preview.style.display = 'block';
+                    }
+                }
+                window.pendingSoldPost = null;
+            }, 200);
         }
 
         async function deleteLead(leadId) {
@@ -2909,6 +3111,7 @@
                         ${lead.notes ? `<div style="background:var(--card-bg);padding:12px;border-radius:8px;margin-bottom:12px;"><span style="color:var(--text-secondary);font-size:12px;">Notes</span><br>${lead.notes}</div>` : ''}
                         <div style="display:flex;gap:8px;">
                             <button class="btn btn-primary" onclick="openLeadModal('${lead.id}')">Edit Lead</button>
+                            <button class="btn" style="background:var(--dark-bg);" onclick="enrollLeadInSequence('${lead.id}')">Enroll in Follow-Up</button>
                         </div>
                         <div style="margin-top:20px;padding:20px;text-align:center;color:var(--text-secondary);border:1px dashed var(--border-color);border-radius:8px;">No conversation yet for this lead.</div>
                     </div>
@@ -2985,6 +3188,205 @@
                 }
             } catch (error) {
                 console.error('Error sending reply:', error);
+            }
+        }
+
+        // ==================== FOLLOW-UP SEQUENCES ====================
+        let allSequences = [];
+        let editingStepCount = 0;
+
+        async function loadFollowUpSequences() {
+            try {
+                const [seqRes, queueRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/followup/sequences`, { headers: { 'Authorization': 'Bearer ' + authToken } }),
+                    fetch(`${API_BASE}/api/followup/queue`, { headers: { 'Authorization': 'Bearer ' + authToken } })
+                ]);
+                allSequences = await seqRes.json();
+                const queueData = await queueRes.json();
+
+                // Update badge
+                const badge = document.getElementById('followupQueueBadge');
+                if (badge) badge.textContent = `${queueData.stats.pending} queued`;
+
+                // Render sequences
+                const container = document.getElementById('sequencesList');
+                if (!container) return;
+
+                if (allSequences.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align:center;padding:30px;color:var(--text-secondary);background:var(--card-bg);border-radius:12px;border:1px dashed var(--border-color);">
+                            <div style="font-size:24px;margin-bottom:8px;">🤖</div>
+                            <div style="font-weight:600;margin-bottom:4px;">No sequences yet</div>
+                            <div style="font-size:13px;">Create your first follow-up sequence to automatically nurture leads</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = allSequences.map(seq => {
+                    const stepsPreview = seq.steps.map((s, i) => {
+                        const hrs = s.delayMinutes >= 60 ? `${Math.floor(s.delayMinutes/60)}h` : `${s.delayMinutes}m`;
+                        return `<span style="display:inline-block;background:var(--dark-bg);padding:3px 8px;border-radius:6px;font-size:11px;margin:2px;">Step ${i+1}: ${hrs} → ${s.message.substring(0,40)}...</span>`;
+                    }).join(' ');
+
+                    return `
+                        <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <div>
+                                    <span style="font-weight:700;font-size:15px;">${seq.name}</span>
+                                    <span class="badge badge-${seq.trigger_stage.toLowerCase().replace(/ /g,'')}" style="margin-left:8px;">${seq.trigger_stage}</span>
+                                    <span style="margin-left:8px;font-size:12px;color:${seq.active ? 'var(--green)' : 'var(--text-secondary)'};">${seq.active ? '● Active' : '○ Inactive'}</span>
+                                </div>
+                                <div style="display:flex;gap:6px;">
+                                    <button onclick="toggleSequence('${seq.id}')" class="btn" style="font-size:12px;padding:4px 10px;background:var(--dark-bg);">${seq.active ? 'Pause' : 'Resume'}</button>
+                                    <button onclick="editSequence('${seq.id}')" class="btn" style="font-size:12px;padding:4px 10px;background:var(--dark-bg);">Edit</button>
+                                    <button onclick="deleteSequence('${seq.id}')" class="btn" style="font-size:12px;padding:4px 10px;background:#3a1111;color:#ff6b6b;">Delete</button>
+                                </div>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-secondary);">${seq.steps.length} steps</div>
+                            <div style="margin-top:6px;line-height:1.8;">${stepsPreview}</div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading follow-up sequences:', error);
+            }
+        }
+
+        function openSequenceModal(seqId = null) {
+            editingStepCount = 0;
+            const modal = document.getElementById('sequenceModal');
+            modal.style.display = 'flex';
+
+            if (seqId) {
+                const seq = allSequences.find(s => s.id === seqId);
+                if (!seq) return;
+                document.getElementById('seqModalTitle').textContent = 'Edit Sequence';
+                document.getElementById('seqId').value = seq.id;
+                document.getElementById('seqName').value = seq.name;
+                document.getElementById('seqTrigger').value = seq.trigger_stage;
+                document.getElementById('seqSteps').innerHTML = '';
+                seq.steps.forEach(step => addSequenceStep(step));
+            } else {
+                document.getElementById('seqModalTitle').textContent = 'New Follow-Up Sequence';
+                document.getElementById('seqId').value = '';
+                document.getElementById('seqName').value = '';
+                document.getElementById('seqTrigger').value = 'New Lead';
+                document.getElementById('seqSteps').innerHTML = '';
+                // Add 3 default steps for a car sales sequence
+                addSequenceStep({ delayMinutes: 30, message: 'Hey {first_name}! Thanks for reaching out about {interest}. I\'m Gabe at Findlay Chevrolet — let me know what questions you have and I\'ll get you taken care of!' });
+                addSequenceStep({ delayMinutes: 1440, message: 'Hey {first_name}, just following up! Did you have a chance to think about the {interest}? I can get you some numbers or set up a test drive whenever works for you.' });
+                addSequenceStep({ delayMinutes: 4320, message: '{first_name}, I wanted to check in one more time. We\'ve got some great deals running at Findlay Chevy right now. Want me to send you what we have available?' });
+            }
+        }
+
+        function closeSequenceModal() {
+            document.getElementById('sequenceModal').style.display = 'none';
+        }
+
+        function addSequenceStep(step = null) {
+            editingStepCount++;
+            const container = document.getElementById('seqSteps');
+            const div = document.createElement('div');
+            div.style.cssText = 'background:var(--dark-bg);border-radius:8px;padding:12px;margin-bottom:8px;position:relative;';
+            div.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <span style="font-weight:600;font-size:13px;">Step ${editingStepCount}</span>
+                    <button type="button" onclick="this.closest('div').remove()" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:14px;">Remove</button>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:6px;">
+                    <div style="flex:0 0 120px;">
+                        <label style="display:block;font-size:11px;color:var(--text-secondary);margin-bottom:2px;">Delay After Previous</label>
+                        <select class="form-input seq-delay" style="font-size:13px;">
+                            <option value="15" ${step && step.delayMinutes === 15 ? 'selected' : ''}>15 minutes</option>
+                            <option value="30" ${step && step.delayMinutes === 30 ? 'selected' : ''}>30 minutes</option>
+                            <option value="60" ${!step || step.delayMinutes === 60 ? 'selected' : ''}>1 hour</option>
+                            <option value="180" ${step && step.delayMinutes === 180 ? 'selected' : ''}>3 hours</option>
+                            <option value="480" ${step && step.delayMinutes === 480 ? 'selected' : ''}>8 hours</option>
+                            <option value="1440" ${step && step.delayMinutes === 1440 ? 'selected' : ''}>1 day</option>
+                            <option value="2880" ${step && step.delayMinutes === 2880 ? 'selected' : ''}>2 days</option>
+                            <option value="4320" ${step && step.delayMinutes === 4320 ? 'selected' : ''}>3 days</option>
+                            <option value="10080" ${step && step.delayMinutes === 10080 ? 'selected' : ''}>1 week</option>
+                        </select>
+                    </div>
+                </div>
+                <textarea class="form-input seq-message" rows="2" placeholder="Message... Use {first_name}, {interest}, {dealership}" style="font-size:13px;">${step ? step.message : ''}</textarea>
+            `;
+            container.appendChild(div);
+        }
+
+        async function saveSequence(e) {
+            e.preventDefault();
+            const steps = [];
+            document.querySelectorAll('#seqSteps > div').forEach(div => {
+                const delay = parseInt(div.querySelector('.seq-delay').value);
+                const message = div.querySelector('.seq-message').value.trim();
+                if (message) steps.push({ delayMinutes: delay, message });
+            });
+
+            if (steps.length === 0) { alert('Add at least one step'); return; }
+
+            const data = {
+                id: document.getElementById('seqId').value || undefined,
+                name: document.getElementById('seqName').value,
+                trigger_stage: document.getElementById('seqTrigger').value,
+                steps,
+                active: true,
+            };
+
+            try {
+                await fetch(`${API_BASE}/api/followup/sequences`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify(data),
+                });
+                closeSequenceModal();
+                loadFollowUpSequences();
+            } catch (error) {
+                alert('Error saving sequence');
+            }
+        }
+
+        function editSequence(id) { openSequenceModal(id); }
+
+        async function toggleSequence(id) {
+            try {
+                await fetch(`${API_BASE}/api/followup/sequences/${id}/toggle`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': 'Bearer ' + authToken },
+                });
+                loadFollowUpSequences();
+            } catch (error) {
+                alert('Error toggling sequence');
+            }
+        }
+
+        async function deleteSequence(id) {
+            if (!confirm('Delete this follow-up sequence?')) return;
+            try {
+                await fetch(`${API_BASE}/api/followup/sequences/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + authToken },
+                });
+                loadFollowUpSequences();
+            } catch (error) {
+                alert('Error deleting sequence');
+            }
+        }
+
+        async function enrollLeadInSequence(leadId) {
+            if (allSequences.length === 0) { alert('Create a sequence first'); return; }
+            const seqId = allSequences.find(s => s.active)?.id;
+            if (!seqId) { alert('No active sequences'); return; }
+            try {
+                await fetch(`${API_BASE}/api/followup/enroll`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ leadId, sequenceId: seqId }),
+                });
+                alert('Lead enrolled in follow-up sequence!');
+            } catch (error) {
+                alert('Error enrolling lead');
             }
         }
 
