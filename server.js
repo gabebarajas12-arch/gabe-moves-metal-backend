@@ -4665,127 +4665,155 @@ let competitorInventory = {
   team: { vehicles: [], lastUpdated: null, status: 'idle' },
 };
 
-// Generic scraper: fetch page HTML, parse vehicle cards with cheerio
-async function scrapeDealer(name, url, parser) {
+// ---- Algolia-based scraper for DealerInspire sites (Fairway & Henderson) ----
+// DealerInspire uses Algolia for inventory search. The HTML is client-rendered,
+// so we hit the Algolia API directly for full inventory data.
+const ALGOLIA_APP_ID = 'V3ZOVI2QFZ';
+const ALGOLIA_API_KEY = 'ec7553dd56e6d4c8bb447a0240e7aab3';
+
+async function scrapeDealerInspire(name, indexName, dealerLabel, dealerShort, siteUrl) {
   try {
-    console.log(`[CompIntel] Scraping ${name} inventory from ${url}...`);
+    console.log(`[CompIntel] Fetching ${name} inventory via Algolia index: ${indexName}...`);
     competitorInventory[name].status = 'scraping';
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-      timeout: 15000,
-    });
-    const $ = cheerio.load(response.data);
-    const vehicles = parser($);
-    competitorInventory[name].vehicles = vehicles;
+
+    const allVehicles = [];
+    let page = 0;
+    let totalPages = 1;
+
+    // Paginate through all results (Algolia max 1000 per query, 20 per page default)
+    while (page < totalPages && page < 20) { // safety cap at 20 pages
+      const response = await axios.post(
+        `https://${ALGOLIA_APP_ID}-dsn.algolia.net/1/indexes/${indexName}/query`,
+        {
+          params: `hitsPerPage=100&page=${page}&filters=type%3Anew`,
+        },
+        {
+          headers: {
+            'X-Algolia-Application-Id': ALGOLIA_APP_ID,
+            'X-Algolia-API-Key': ALGOLIA_API_KEY,
+            'Content-Type': 'application/json',
+          },
+          timeout: 15000,
+        }
+      );
+
+      const data = response.data;
+      totalPages = data.nbPages || 1;
+
+      (data.hits || []).forEach(hit => {
+        const year = hit.api_id ? '' : (hit.year || '');
+        const make = hit.make || 'Chevrolet';
+        const model = hit.model || '';
+        const trim = hit.trim || '';
+        const title = hit.title || `${hit.year || ''} ${make} ${model} ${trim}`.trim();
+        const vin = hit.vin || '';
+        const price = hit.our_price || hit.msrp || hit.price || null;
+        const msrp = hit.msrp || null;
+        const stockNum = hit.stock || hit.stock_number || '';
+        const img = hit.photo || hit.thumbnail || '';
+
+        if (vin) {
+          allVehicles.push({
+            dealer: dealerLabel,
+            dealerShort,
+            vin,
+            year: String(hit.year || year),
+            make,
+            model,
+            trim,
+            title,
+            price: price ? parseFloat(price) : null,
+            msrp: msrp ? parseFloat(msrp) : null,
+            priceFormatted: price ? `$${parseFloat(price).toLocaleString()}` : 'Call for price',
+            stockNumber: stockNum,
+            image: img,
+            url: siteUrl,
+          });
+        }
+      });
+
+      page++;
+    }
+
+    competitorInventory[name].vehicles = allVehicles;
     competitorInventory[name].lastUpdated = new Date().toISOString();
     competitorInventory[name].status = 'ready';
-    console.log(`[CompIntel] ${name}: Found ${vehicles.length} vehicles`);
-    return vehicles;
+    console.log(`[CompIntel] ${name}: Found ${allVehicles.length} vehicles via Algolia`);
+    return allVehicles;
   } catch (error) {
-    console.error(`[CompIntel] Error scraping ${name}:`, error.message);
+    console.error(`[CompIntel] Error fetching ${name} from Algolia:`, error.message);
     competitorInventory[name].status = 'error';
     return competitorInventory[name].vehicles; // return cached
   }
 }
 
-// Fairway parser (DealerInspire platform)
-function parseFairway($) {
-  const vehicles = [];
-  // DealerInspire uses .vehicle-card or similar listing elements
-  $('[data-vin], .vehicle-card, .vehicle-card-details-container, .srp-list-item').each((i, el) => {
-    const $el = $(el);
-    const vin = $el.attr('data-vin') || $el.find('[data-vin]').attr('data-vin') || '';
-    const title = $el.find('.vehicle-card-title, .title, h2, h3').first().text().trim();
-    const price = $el.find('.final-price, .price, .vehicle-card-price, .internetPrice').first().text().trim()
-      .replace(/[^0-9.]/g, '');
-    const stockNum = $el.find('.stock-number, .stockNumber').first().text().trim()
-      .replace(/Stock.*?:/i, '').trim();
-    const img = $el.find('img').first().attr('src') || $el.find('img').first().attr('data-src') || '';
+// ---- HTML scraper for Team Chevrolet (DealerOn/Vue platform) ----
+// Team's page server-renders vehicle data in data-* attributes on [data-vehicle-information] elements
+async function scrapeTeam() {
+  const name = 'team';
+  try {
+    console.log(`[CompIntel] Scraping Team Chevrolet inventory...`);
+    competitorInventory[name].status = 'scraping';
+    const response = await axios.get('https://www.teamchevroletlv.com/searchnew.aspx', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      timeout: 20000,
+    });
+    const $ = cheerio.load(response.data);
+    const vehicles = [];
+    const seenVins = new Set();
 
-    if (title || vin) {
-      // Parse year/make/model from title
-      const parsed = parseVehicleTitle(title);
-      vehicles.push({
-        dealer: 'Fairway Chevrolet',
-        dealerShort: 'Fairway',
-        vin,
-        year: parsed.year,
-        make: parsed.make,
-        model: parsed.model,
-        trim: parsed.trim,
-        title: title || `${parsed.year} ${parsed.make} ${parsed.model}`,
-        price: price ? parseFloat(price) : null,
-        priceFormatted: price ? `$${parseFloat(price).toLocaleString()}` : 'Call for price',
-        stockNumber: stockNum,
-        image: img,
-        url: `https://www.fairwaychevy.com`,
-      });
-    }
-  });
-  return vehicles;
-}
+    // DealerOn puts all vehicle data in data-* attributes on [data-vehicle-information] elements
+    $('[data-vehicle-information]').each((i, el) => {
+      const $el = $(el);
+      const vin = $el.attr('data-vin') || '';
+      if (!vin || seenVins.has(vin)) return;
+      seenVins.add(vin);
 
-// Henderson parser (DealerInspire platform)
-function parseHenderson($) {
-  const vehicles = [];
-  $('[data-vin], .vehicle-card, .vehicle-card-details-container, .srp-list-item').each((i, el) => {
-    const $el = $(el);
-    const vin = $el.attr('data-vin') || $el.find('[data-vin]').attr('data-vin') || '';
-    const title = $el.find('.vehicle-card-title, .title, h2, h3').first().text().trim();
-    const price = $el.find('.final-price, .price, .vehicle-card-price, .internetPrice').first().text().trim()
-      .replace(/[^0-9.]/g, '');
-    const stockNum = $el.find('.stock-number, .stockNumber').first().text().trim()
-      .replace(/Stock.*?:/i, '').trim();
-    const img = $el.find('img').first().attr('src') || $el.find('img').first().attr('data-src') || '';
+      const year = $el.attr('data-year') || '';
+      const make = $el.attr('data-make') || 'Chevrolet';
+      const model = $el.attr('data-model') || '';
+      const trim = $el.attr('data-trim') || '';
+      const msrp = $el.attr('data-msrp') || '';
+      const stockNum = $el.attr('data-stocknum') || '';
+      const title = $el.attr('data-name') || `${year} ${make} ${model} ${trim}`.trim();
+      const bodyStyle = $el.attr('data-bodystyle') || '';
+      const engine = $el.attr('data-engine') || '';
+      const extColor = $el.attr('data-extcolor') || '';
 
-    if (title || vin) {
-      const parsed = parseVehicleTitle(title);
-      vehicles.push({
-        dealer: 'Henderson Chevrolet',
-        dealerShort: 'Henderson',
-        vin, year: parsed.year, make: parsed.make, model: parsed.model, trim: parsed.trim,
-        title: title || `${parsed.year} ${parsed.make} ${parsed.model}`,
-        price: price ? parseFloat(price) : null,
-        priceFormatted: price ? `$${parseFloat(price).toLocaleString()}` : 'Call for price',
-        stockNumber: stockNum, image: img,
-        url: `https://www.hendersonchevy.com`,
-      });
-    }
-  });
-  return vehicles;
-}
-
-// Team parser (ASP.NET platform)
-function parseTeam($) {
-  const vehicles = [];
-  $('.vehicle-card, .vehicleListItem, .srpVehicle, [data-vin], .vehicle-card-body, .inventory-listing').each((i, el) => {
-    const $el = $(el);
-    const vin = $el.attr('data-vin') || $el.find('[data-vin]').attr('data-vin') || '';
-    const title = $el.find('.vehicleTitle, .title, h2, h3, .vehicle-title').first().text().trim();
-    const price = $el.find('.price, .internetPrice, .finalPrice, .vehicle-price').first().text().trim()
-      .replace(/[^0-9.]/g, '');
-    const stockNum = $el.find('.stockNumber, .stock-number').first().text().trim()
-      .replace(/Stock.*?:/i, '').trim();
-    const img = $el.find('img').first().attr('src') || $el.find('img').first().attr('data-src') || '';
-
-    if (title || vin) {
-      const parsed = parseVehicleTitle(title);
       vehicles.push({
         dealer: 'Team Chevrolet',
         dealerShort: 'Team',
-        vin, year: parsed.year, make: parsed.make, model: parsed.model, trim: parsed.trim,
-        title: title || `${parsed.year} ${parsed.make} ${parsed.model}`,
-        price: price ? parseFloat(price) : null,
-        priceFormatted: price ? `$${parseFloat(price).toLocaleString()}` : 'Call for price',
-        stockNumber: stockNum, image: img,
-        url: `https://www.teamchevroletlv.com`,
+        vin,
+        year,
+        make,
+        model,
+        trim,
+        title,
+        price: msrp ? parseFloat(msrp) : null,
+        msrp: msrp ? parseFloat(msrp) : null,
+        priceFormatted: msrp ? `$${parseFloat(msrp).toLocaleString()}` : 'Call for price',
+        stockNumber: stockNum,
+        bodyStyle,
+        engine,
+        extColor,
+        image: '',
+        url: 'https://www.teamchevroletlv.com',
       });
-    }
-  });
-  return vehicles;
+    });
+
+    competitorInventory[name].vehicles = vehicles;
+    competitorInventory[name].lastUpdated = new Date().toISOString();
+    competitorInventory[name].status = 'ready';
+    console.log(`[CompIntel] team: Found ${vehicles.length} vehicles via HTML data attributes`);
+    return vehicles;
+  } catch (error) {
+    console.error(`[CompIntel] Error scraping team:`, error.message);
+    competitorInventory[name].status = 'error';
+    return competitorInventory[name].vehicles;
+  }
 }
 
 // Parse "2026 Chevrolet Silverado 1500 LT" into parts
@@ -4826,9 +4854,9 @@ function parseVehicleTitle(title) {
 // API: Scrape all competitors
 app.post('/api/competitors/scrape', requireAuth, async (req, res) => {
   const results = await Promise.allSettled([
-    scrapeDealer('fairway', 'https://www.fairwaychevy.com/new-vehicles/', parseFairway),
-    scrapeDealer('henderson', 'https://www.hendersonchevy.com/new-vehicles/', parseHenderson),
-    scrapeDealer('team', 'https://www.teamchevroletlv.com/searchnew.aspx', parseTeam),
+    scrapeDealerInspire('fairway', 'fairwaychevy_production_inventory', 'Fairway Chevrolet', 'Fairway', 'https://www.fairwaychevy.com'),
+    scrapeDealerInspire('henderson', 'hendersonchevy_production_inventory', 'Henderson Chevrolet', 'Henderson', 'https://www.hendersonchevy.com'),
+    scrapeTeam(),
   ]);
 
   res.json({
@@ -4923,9 +4951,9 @@ app.get('/api/competitors/status', requireAuth, (req, res) => {
 // Auto-scrape competitors every 6 hours
 setInterval(() => {
   console.log('[CompIntel] Auto-refreshing competitor inventory...');
-  scrapeDealer('fairway', 'https://www.fairwaychevy.com/new-vehicles/', parseFairway);
-  scrapeDealer('henderson', 'https://www.hendersonchevy.com/new-vehicles/', parseHenderson);
-  scrapeDealer('team', 'https://www.teamchevroletlv.com/searchnew.aspx', parseTeam);
+  scrapeDealerInspire('fairway', 'fairwaychevy_production_inventory', 'Fairway Chevrolet', 'Fairway', 'https://www.fairwaychevy.com');
+  scrapeDealerInspire('henderson', 'hendersonchevy_production_inventory', 'Henderson Chevrolet', 'Henderson', 'https://www.hendersonchevy.com');
+  scrapeTeam();
 }, 6 * 60 * 60 * 1000);
 
 // TikTok connection status
@@ -4944,9 +4972,9 @@ app.listen(PORT, () => {
   // Initial competitor scrape (30 seconds after boot so we don't slow startup)
   setTimeout(() => {
     console.log('[CompIntel] Running initial competitor inventory scrape...');
-    scrapeDealer('fairway', 'https://www.fairwaychevy.com/new-vehicles/', parseFairway);
-    scrapeDealer('henderson', 'https://www.hendersonchevy.com/new-vehicles/', parseHenderson);
-    scrapeDealer('team', 'https://www.teamchevroletlv.com/searchnew.aspx', parseTeam);
+    scrapeDealerInspire('fairway', 'fairwaychevy_production_inventory', 'Fairway Chevrolet', 'Fairway', 'https://www.fairwaychevy.com');
+    scrapeDealerInspire('henderson', 'hendersonchevy_production_inventory', 'Henderson Chevrolet', 'Henderson', 'https://www.hendersonchevy.com');
+    scrapeTeam();
   }, 30000);
 
   console.log(`
