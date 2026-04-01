@@ -4747,67 +4747,108 @@ async function scrapeDealerInspire(name, indexName, dealerLabel, dealerShort, si
   }
 }
 
-// ---- HTML scraper for Team Chevrolet (DealerOn/Vue platform) ----
-// Team's page server-renders vehicle data in data-* attributes on [data-vehicle-information] elements
+// ---- Scraper for Team Chevrolet (DealerOn/Vue platform) ----
+// DealerOn renders inventory client-side via Vue.js so raw HTML has minimal data.
+// Strategy: Parse JSON-LD ItemList (24 vehicles) + RSS feed (25 vehicles) for combined coverage,
+// then parse year/make/model/trim from the vehicle names and URLs.
 async function scrapeTeam() {
   const name = 'team';
   try {
     console.log(`[CompIntel] Scraping Team Chevrolet inventory...`);
     competitorInventory[name].status = 'scraping';
-    const response = await axios.get('https://www.teamchevroletlv.com/searchnew.aspx', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      timeout: 20000,
-    });
-    const $ = cheerio.load(response.data);
-    const vehicles = [];
     const seenVins = new Set();
+    const vehicles = [];
 
-    // DealerOn puts all vehicle data in data-* attributes on [data-vehicle-information] elements
-    $('[data-vehicle-information]').each((i, el) => {
-      const $el = $(el);
-      const vin = $el.attr('data-vin') || '';
-      if (!vin || seenVins.has(vin)) return;
-      seenVins.add(vin);
-
-      const year = $el.attr('data-year') || '';
-      const make = $el.attr('data-make') || 'Chevrolet';
-      const model = $el.attr('data-model') || '';
-      const trim = $el.attr('data-trim') || '';
-      const msrp = $el.attr('data-msrp') || '';
-      const stockNum = $el.attr('data-stocknum') || '';
-      const title = $el.attr('data-name') || `${year} ${make} ${model} ${trim}`.trim();
-      const bodyStyle = $el.attr('data-bodystyle') || '';
-      const engine = $el.attr('data-engine') || '';
-      const extColor = $el.attr('data-extcolor') || '';
-
-      vehicles.push({
-        dealer: 'Team Chevrolet',
-        dealerShort: 'Team',
-        vin,
-        year,
-        make,
-        model,
-        trim,
-        title,
-        price: msrp ? parseFloat(msrp) : null,
-        msrp: msrp ? parseFloat(msrp) : null,
-        priceFormatted: msrp ? `$${parseFloat(msrp).toLocaleString()}` : 'Call for price',
-        stockNumber: stockNum,
-        bodyStyle,
-        engine,
-        extColor,
-        image: '',
-        url: 'https://www.teamchevroletlv.com',
+    // Source 1: JSON-LD from the search page (structured data, ~24 vehicles)
+    try {
+      const pageRes = await axios.get('https://www.teamchevroletlv.com/searchnew.aspx', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml',
+        },
+        timeout: 20000,
       });
-    });
+      const $ = cheerio.load(pageRes.data);
+      $('script[type="application/ld+json"]').each((i, el) => {
+        try {
+          const data = JSON.parse($(el).html());
+          if (data['@type'] === 'ItemList' && data.itemListElement) {
+            data.itemListElement.forEach(item => {
+              const vin = item.identifier || '';
+              if (!vin || seenVins.has(vin)) return;
+              seenVins.add(vin);
+              const parsed = parseVehicleTitle(item.name || '');
+              vehicles.push({
+                dealer: 'Team Chevrolet',
+                dealerShort: 'Team',
+                vin,
+                year: parsed.year,
+                make: parsed.make,
+                model: parsed.model,
+                trim: parsed.trim,
+                title: item.name || `${parsed.year} ${parsed.make} ${parsed.model}`,
+                price: null,
+                msrp: null,
+                priceFormatted: 'Call for price',
+                stockNumber: '',
+                image: item.image || '',
+                url: item.url || 'https://www.teamchevroletlv.com',
+              });
+            });
+          }
+        } catch (e) {}
+      });
+      console.log(`[CompIntel] team: Got ${vehicles.length} from JSON-LD`);
+    } catch (e) {
+      console.log(`[CompIntel] team JSON-LD fetch failed: ${e.message}`);
+    }
+
+    // Source 2: RSS feed (adds ~25 more vehicles, may overlap)
+    try {
+      const rssRes = await axios.get('https://www.teamchevroletlv.com/rss-newinventory.aspx', {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        timeout: 15000,
+      });
+      const $rss = cheerio.load(rssRes.data, { xmlMode: true });
+      $rss('item').each((i, el) => {
+        const link = $rss(el).find('link').text().trim();
+        // VIN is last segment of URL (17 alphanumeric chars)
+        const urlParts = link.replace(/\/+$/, '').split('-');
+        const lastPart = urlParts[urlParts.length - 1];
+        if (!lastPart || lastPart.length !== 17) return;
+        const vin = lastPart;
+        if (seenVins.has(vin)) return;
+        seenVins.add(vin);
+
+        // Parse "new-Las+Vegas-2026-Chevrolet-Silverado+1500-RST-VIN" from URL
+        const urlPath = link.split('/').pop() || '';
+        const decoded = urlPath.replace(/\+/g, ' ').split('-');
+        // Format: [new, city, year, make, model, trim, vin]
+        const year = decoded.length > 2 ? decoded[2] : '';
+        const make = decoded.length > 3 ? decoded[3] : 'Chevrolet';
+        const model = decoded.length > 4 ? decoded[4] : '';
+        const trim = decoded.length > 5 ? decoded.slice(5, -1).join(' ') : '';
+        const title = `${year} ${make} ${model} ${trim}`.trim();
+
+        vehicles.push({
+          dealer: 'Team Chevrolet',
+          dealerShort: 'Team',
+          vin, year, make, model, trim, title,
+          price: null, msrp: null,
+          priceFormatted: 'Call for price',
+          stockNumber: '', image: '',
+          url: link || 'https://www.teamchevroletlv.com',
+        });
+      });
+      console.log(`[CompIntel] team: Total ${vehicles.length} after RSS merge`);
+    } catch (e) {
+      console.log(`[CompIntel] team RSS fetch failed: ${e.message}`);
+    }
 
     competitorInventory[name].vehicles = vehicles;
     competitorInventory[name].lastUpdated = new Date().toISOString();
     competitorInventory[name].status = 'ready';
-    console.log(`[CompIntel] team: Found ${vehicles.length} vehicles via HTML data attributes`);
+    console.log(`[CompIntel] team: Final count ${vehicles.length} vehicles`);
     return vehicles;
   } catch (error) {
     console.error(`[CompIntel] Error scraping team:`, error.message);
