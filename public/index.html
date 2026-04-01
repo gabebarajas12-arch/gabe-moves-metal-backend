@@ -2706,7 +2706,7 @@
             document.getElementById('filterModel').addEventListener('change', filterCurrentInventory);
             document.getElementById('filterMinPrice').addEventListener('change', filterCurrentInventory);
             document.getElementById('filterMaxPrice').addEventListener('change', filterCurrentInventory);
-            document.getElementById('matchInterest').addEventListener('change', filterCurrentInventory);
+            document.getElementById('matchInterest').addEventListener('input', filterCurrentInventory);
 
             // Inventory refresh
             document.getElementById('refreshInventoryBtn').addEventListener('click', refreshInventory);
@@ -3829,6 +3829,20 @@
             }
         }
 
+        function populateModelDropdown(vehicles) {
+            const select = document.getElementById('filterModel');
+            if (!select) return;
+            const current = select.value;
+            const models = new Set();
+            vehicles.forEach(v => {
+                // Normalize: strip trim to get base model
+                const m = (v.model || '').replace(/\s+(LS|LT|RST|LTZ|ZR2|Z71|Premier|High Country|Activ|RS|WT|Trail Boss|Custom|EV|1RS|2RS|3RS|1LT|2LT|3LT|1LS).*/i, '').trim();
+                if (m) models.add(m);
+            });
+            const sorted = [...models].sort();
+            select.innerHTML = '<option value="">All Models</option>' + sorted.map(m => `<option value="${m}"${m === current ? ' selected' : ''}>${m}</option>`).join('');
+        }
+
         function filterCurrentInventory() {
             const vehicles = currentInvDealer === 'findlay' ? (window._inventoryCache || []) : (window._compInventoryCache || []);
             const condition = document.getElementById('filterCondition')?.value || '';
@@ -3837,14 +3851,20 @@
             const maxPrice = parseFloat(document.getElementById('filterMaxPrice')?.value) || Infinity;
             const search = (document.getElementById('matchInterest')?.value || '').toLowerCase();
 
+            // Populate model dropdown from current vehicle set
+            populateModelDropdown(vehicles);
+
             const filtered = vehicles.filter(v => {
                 if (condition && v.condition && v.condition.toLowerCase() !== condition.toLowerCase()) return false;
-                if (modelFilter && v.model && !v.model.toLowerCase().includes(modelFilter.toLowerCase())) return false;
+                if (modelFilter) {
+                    const vModel = (v.model || '').toLowerCase();
+                    if (!vModel.includes(modelFilter.toLowerCase())) return false;
+                }
                 const price = parseFloat(String(v.price || v.msrp || '0').replace(/[^0-9.]/g, '')) || 0;
-                if (price < minPrice) return false;
+                if (minPrice && price < minPrice) return false;
                 if (maxPrice < Infinity && price > maxPrice) return false;
                 if (search) {
-                    const haystack = `${v.year} ${v.make} ${v.model} ${v.vin} ${v.stockNumber || v.stock} ${v.dealer || ''} ${v.trim || ''}`.toLowerCase();
+                    const haystack = `${v.year} ${v.make} ${v.model} ${v.trim || ''} ${v.vin} ${v.stockNumber || v.stock} ${v.dealer || ''} ${v.title || ''}`.toLowerCase();
                     if (!haystack.includes(search)) return false;
                 }
                 return true;
@@ -3980,12 +4000,30 @@
             });
         }
 
+        // Decode a VIN via NHTSA API (free, no key needed)
+        async function decodeVIN(vin) {
+            try {
+                const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`);
+                const data = await res.json();
+                const specs = {};
+                (data.Results || []).forEach(r => {
+                    if (r.Value && r.Value.trim() && r.Value !== 'Not Applicable' && r.Value !== '0') {
+                        specs[r.Variable] = r.Value.trim();
+                    }
+                });
+                return specs;
+            } catch (e) {
+                console.error('VIN decode error:', e);
+                return {};
+            }
+        }
+
         async function showComparePanel() {
             if (compareList.length < 2) { alert('Select at least 2 vehicles to compare'); return; }
             const overlay = document.getElementById('comparePanelOverlay');
             overlay.style.display = 'block';
             const content = document.getElementById('compareContent');
-            content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:20px;">Loading comparison...</p>';
+            content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Decoding VINs and comparing specs... this takes a few seconds</p>';
 
             // Gather vehicle data from all caches
             const allVehicles = [...(window._inventoryCache || []), ...(window._compInventoryCache || [])];
@@ -3996,49 +4034,145 @@
                 return;
             }
 
-            // Build comparison grid
+            // Decode all VINs in parallel
+            const decoded = await Promise.all(selected.map(v => decodeVIN(v.vin)));
+
             const cols = selected.length;
-            let html = `<div style="display:grid;grid-template-columns:180px repeat(${cols}, 1fr);gap:0;border:1px solid var(--border-color);border-radius:12px;overflow:hidden;">`;
 
-            // Header row
-            html += `<div style="padding:12px;background:var(--card-bg);border-bottom:1px solid var(--border-color);font-weight:700;color:var(--text-secondary);">Vehicle</div>`;
-            selected.forEach(v => {
+            // Vehicle header cards
+            let html = `<div style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:12px;margin-bottom:16px;">`;
+            selected.forEach((v, i) => {
                 const isFindlay = v.dealer === 'Findlay' || v.dealerShort === 'Findlay';
-                html += `<div style="padding:12px;background:var(--card-bg);border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);text-align:center;">
-                    <div style="font-weight:700;font-size:14px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}</div>
-                    <div style="font-size:12px;color:var(--text-secondary);">${v.dealer || v.dealerShort || 'Findlay'}</div>
+                const price = v.price || v.msrp || '';
+                const priceStr = price ? '$' + Number(String(price).replace(/[^0-9]/g,'')).toLocaleString() : 'Call for price';
+                const trim = decoded[i]['Trim'] || v.trim || '';
+                html += `<div style="background:var(--card-bg);border-radius:12px;padding:14px;border:2px solid ${isFindlay ? 'var(--gold)' : 'var(--border-color)'};">
+                    <div style="font-weight:700;font-size:15px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}</div>
+                    ${trim ? `<div style="font-size:13px;color:var(--text-secondary);font-weight:600;">${trim}</div>` : ''}
+                    <div style="font-size:16px;font-weight:700;color:${isFindlay ? 'var(--gold)' : 'var(--text-primary)'};margin:4px 0;">${priceStr}</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">${v.dealer || v.dealerShort || 'Findlay'} · Stock: ${v.stockNumber || v.stock || 'N/A'} · VIN: ...${(v.vin||'').slice(-6)}</div>
                 </div>`;
             });
-
-            // Data rows
-            const rows = [
-                { label: 'Price', key: v => { const p = v.price || v.msrp || ''; return p ? '$' + Number(String(p).replace(/[^0-9]/g,'')).toLocaleString() : 'Call'; }},
-                { label: 'Stock #', key: v => v.stockNumber || v.stock || 'N/A' },
-                { label: 'VIN', key: v => v.vin || 'N/A' },
-                { label: 'Condition', key: v => v.condition || 'New' },
-                { label: 'Dealer', key: v => v.dealer || v.dealerShort || 'Findlay' },
-            ];
-
-            rows.forEach((row, i) => {
-                const bgColor = i % 2 === 0 ? 'var(--dark-bg)' : 'var(--bg-primary, #0a0d14)';
-                html += `<div style="padding:10px 12px;background:${bgColor};border-bottom:1px solid var(--border-color);font-weight:600;font-size:13px;color:var(--text-secondary);">${row.label}</div>`;
-                selected.forEach(v => {
-                    html += `<div style="padding:10px 12px;background:${bgColor};border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:13px;">${row.key(v)}</div>`;
-                });
-            });
-
-            // Window sticker links row
-            html += `<div style="padding:10px 12px;background:var(--card-bg);font-weight:600;font-size:13px;color:var(--text-secondary);">Window Sticker</div>`;
-            selected.forEach(v => {
-                const stickerUrl = v.vin ? `https://cws.gm.com/vs-cws/vehshop/v2/vehicle/windowsticker?vin=${v.vin}` : '';
-                html += `<div style="padding:10px 12px;background:var(--card-bg);border-left:1px solid var(--border-color);text-align:center;">
-                    ${v.vin ? `<a href="${stickerUrl}" target="_blank" style="color:var(--gold);font-size:13px;font-weight:600;">View Sticker PDF</a>` : 'N/A'}
-                </div>`;
-            });
-
             html += '</div>';
 
-            // Clear compare button
+            // ============ SPEC COMPARISON WITH DIFF HIGHLIGHTING ============
+            const specKeys = [
+                { label: 'Trim Level', key: 'Trim' },
+                { label: 'Drive Type', key: 'Drive Type' },
+                { label: 'Engine', key: 'Engine Model' },
+                { label: 'Cylinders', key: 'Engine Number of Cylinders' },
+                { label: 'Displacement', key: 'Displacement (L)' },
+                { label: 'Turbo', key: 'Turbo' },
+                { label: 'Horsepower', key: 'Engine Brake (hp) From' },
+                { label: 'Transmission', key: 'Transmission Style' },
+                { label: 'Transmission Speeds', key: 'Transmission Speeds' },
+                { label: 'Fuel Type', key: 'Fuel Type - Primary' },
+                { label: 'Body Style', key: 'Body Class' },
+                { label: 'Doors', key: 'Doors' },
+                { label: 'Seat Rows', key: 'Number of Seat Rows' },
+                { label: 'Weight Class', key: 'Gross Vehicle Weight Rating From' },
+                { label: 'Front Airbags', key: 'Front Air Bag Locations' },
+                { label: 'Side Airbags', key: 'Side Air Bag Locations' },
+                { label: 'Curtain Airbags', key: 'Curtain Air Bag Locations' },
+                { label: 'Traction Control', key: 'Traction Control' },
+                { label: 'ABS', key: 'Anti-lock Braking System (ABS)' },
+                { label: 'ESC', key: 'Electronic Stability Control (ESC)' },
+                { label: 'Backup Camera', key: 'Backup Camera' },
+                { label: 'Blind Spot Warning', key: 'Blind Spot Warning' },
+                { label: 'Lane Departure Warning', key: 'Lane Departure Warning' },
+                { label: 'Forward Collision Warning', key: 'Forward Collision Warning' },
+                { label: 'Auto Emergency Braking', key: 'Automatic Emergency Braking (AEB)' },
+                { label: 'Adaptive Cruise', key: 'Adaptive Cruise Control (ACC)' },
+                { label: 'Plant', key: 'Plant City' },
+            ];
+
+            // Find which specs differ between vehicles
+            const hasDifference = (key) => {
+                const vals = decoded.map(d => (d[key] || '').toLowerCase());
+                return vals.some(v => v !== vals[0]);
+            };
+
+            // Split into differences and same
+            const diffSpecs = specKeys.filter(s => {
+                const vals = decoded.map(d => d[s.key] || '');
+                return vals.some(v => v) && hasDifference(s.key);
+            });
+            const sameSpecs = specKeys.filter(s => {
+                const vals = decoded.map(d => d[s.key] || '');
+                return vals.some(v => v) && !hasDifference(s.key);
+            });
+
+            // DIFFERENCES section — highlighted
+            if (diffSpecs.length > 0) {
+                html += `<div style="margin-bottom:16px;">
+                    <h3 style="font-size:16px;font-weight:700;color:#ef4444;margin-bottom:4px;">⚠ Key Differences</h3>
+                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">These specs differ between the selected vehicles — pay attention here.</p>
+                </div>`;
+                html += `<div style="border:2px solid #ef4444;border-radius:12px;overflow:hidden;margin-bottom:20px;">`;
+                html += `<div style="display:grid;grid-template-columns:160px repeat(${cols}, 1fr);gap:0;">`;
+                // Header
+                html += `<div style="padding:10px 12px;background:#ef4444;font-weight:700;font-size:12px;color:#fff;">SPEC</div>`;
+                selected.forEach(v => {
+                    const isFindlay = v.dealer === 'Findlay' || v.dealerShort === 'Findlay';
+                    html += `<div style="padding:10px 8px;background:#ef4444;border-left:1px solid rgba(255,255,255,0.2);font-weight:700;font-size:12px;color:#fff;text-align:center;">${v.dealerShort || v.dealer || 'Findlay'}</div>`;
+                });
+
+                diffSpecs.forEach((spec, i) => {
+                    const bg = i % 2 === 0 ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.04)';
+                    html += `<div style="padding:8px 12px;background:${bg};border-top:1px solid var(--border-color);font-weight:600;font-size:12px;color:#ef4444;">${spec.label}</div>`;
+                    decoded.forEach((d, vi) => {
+                        const val = d[spec.key] || '—';
+                        const isFindlay = selected[vi].dealer === 'Findlay' || selected[vi].dealerShort === 'Findlay';
+                        html += `<div style="padding:8px;background:${bg};border-top:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:12px;text-align:center;font-weight:${isFindlay ? '700' : '400'};${isFindlay ? 'color:var(--gold);' : ''}">${val}</div>`;
+                    });
+                });
+                html += '</div></div>';
+            } else {
+                html += `<div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:16px;margin-bottom:20px;text-align:center;">
+                    <span style="font-size:14px;color:#22c55e;font-weight:700;">✓ These vehicles have identical base specs</span>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Differences may be in packages/options — check the window stickers below.</div>
+                </div>`;
+            }
+
+            // MATCHING specs (collapsed by default)
+            if (sameSpecs.length > 0) {
+                html += `<details style="margin-bottom:20px;">
+                    <summary style="cursor:pointer;font-size:14px;font-weight:600;color:var(--text-secondary);padding:8px 0;">✓ ${sameSpecs.length} Matching Specs (click to expand)</summary>
+                    <div style="border:1px solid var(--border-color);border-radius:12px;overflow:hidden;margin-top:8px;">
+                    <div style="display:grid;grid-template-columns:160px repeat(${cols}, 1fr);gap:0;">`;
+                sameSpecs.forEach((spec, i) => {
+                    const bg = i % 2 === 0 ? 'var(--dark-bg)' : 'var(--card-bg)';
+                    html += `<div style="padding:6px 12px;background:${bg};border-top:1px solid var(--border-color);font-size:12px;color:var(--text-secondary);">${spec.label}</div>`;
+                    decoded.forEach(d => {
+                        html += `<div style="padding:6px 8px;background:${bg};border-top:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:12px;text-align:center;">${d[spec.key] || '—'}</div>`;
+                    });
+                });
+                html += '</div></div></details>';
+            }
+
+            // Window Stickers side-by-side for full detail
+            html += `<div style="margin-bottom:12px;">
+                <h3 style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px;">Full Window Stickers</h3>
+                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">For packages, options, and pricing breakdown — scroll each sticker side by side.</p>
+            </div>`;
+            html += `<div style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:12px;">`;
+            selected.forEach(v => {
+                const stickerUrl = v.vin ? `https://cws.gm.com/vs-cws/vehshop/v2/vehicle/windowsticker?vin=${v.vin}` : '';
+                const isFindlay = v.dealer === 'Findlay' || v.dealerShort === 'Findlay';
+                html += `<div style="background:var(--card-bg);border-radius:12px;overflow:hidden;border:1px solid ${isFindlay ? 'var(--gold)' : 'var(--border-color)'};">
+                    <div style="padding:8px 12px;background:${isFindlay ? 'rgba(212,175,55,0.15)' : 'var(--dark-bg)'};font-size:13px;font-weight:700;text-align:center;${isFindlay ? 'color:var(--gold);' : ''}">
+                        ${v.year} ${v.model || ''} — ${v.dealerShort || v.dealer || 'Findlay'}
+                        ${v.vin ? `<a href="${stickerUrl}" target="_blank" style="margin-left:8px;font-size:11px;color:var(--text-secondary);">Open full ↗</a>` : ''}
+                    </div>
+                    ${v.vin
+                        ? `<iframe src="${stickerUrl}" style="width:100%;height:70vh;border:none;background:#fff;" title="Window Sticker ${v.vin}"></iframe>`
+                        : `<div style="height:200px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);">No VIN — cannot load sticker</div>`
+                    }
+                </div>`;
+            });
+            html += '</div>';
+
+            // Clear button
             html += `<div style="text-align:center;margin-top:16px;">
                 <button class="btn" style="background:var(--card-bg);" onclick="compareList=[];updateCompareUI();closeComparePanel();">Clear Comparison</button>
             </div>`;
