@@ -1737,27 +1737,64 @@
 
                 <!-- Inventory Page -->
                 <div class="page" id="inventory">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                         <h2 style="font-size: 20px; font-weight: 700;">Inventory</h2>
-                        <button class="btn btn-primary" id="refreshInventoryBtn">Refresh</button>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <span id="compareCount" style="display:none;background:var(--gold);color:#000;padding:4px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;" onclick="showComparePanel()">Compare (0)</span>
+                            <button class="btn btn-primary" id="refreshInventoryBtn">Refresh</button>
+                        </div>
                     </div>
 
-                    <div class="filters" style="margin-bottom: 20px;">
+                    <!-- Dealer Tabs -->
+                    <div style="display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap;" id="invDealerTabs">
+                        <button class="btn btn-primary" onclick="switchInventoryDealer('findlay')" id="invTab_findlay" style="font-size:13px;">Findlay (Ours)</button>
+                        <button class="btn" style="background:var(--card-bg);font-size:13px;" onclick="switchInventoryDealer('fairway')" id="invTab_fairway">Fairway</button>
+                        <button class="btn" style="background:var(--card-bg);font-size:13px;" onclick="switchInventoryDealer('henderson')" id="invTab_henderson">Henderson</button>
+                        <button class="btn" style="background:var(--card-bg);font-size:13px;" onclick="switchInventoryDealer('team')" id="invTab_team">Team</button>
+                        <button class="btn" style="background:var(--card-bg);font-size:13px;" onclick="switchInventoryDealer('all')" id="invTab_all">All Dealers</button>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="filters" style="margin-bottom: 12px;">
                         <select class="filter-select" id="filterCondition">
                             <option value="">All Conditions</option>
                             <option value="New">New</option>
                             <option value="Used">Used</option>
-                            <option value="Certified">Certified</option>
                         </select>
                         <select class="filter-select" id="filterModel">
                             <option value="">All Models</option>
                         </select>
-                        <input type="number" class="filter-select" id="filterMinPrice" placeholder="Min Price" style="flex: 1;">
-                        <input type="number" class="filter-select" id="filterMaxPrice" placeholder="Max Price" style="flex: 1;">
-                        <input type="text" class="filter-select" id="matchInterest" placeholder="Match to lead interest" style="flex: 1;">
+                        <input type="number" class="filter-select" id="filterMinPrice" placeholder="Min $" style="flex: 1;">
+                        <input type="number" class="filter-select" id="filterMaxPrice" placeholder="Max $" style="flex: 1;">
+                        <input type="text" class="filter-select" id="matchInterest" placeholder="Search (model, VIN, stock#)" style="flex: 2;" onkeydown="if(event.key==='Enter')filterCurrentInventory()">
                     </div>
+                    <div id="invDealerStatus" style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;"></div>
 
                     <div class="inventory-grid" id="inventoryGrid"></div>
+
+                    <!-- Compare Panel (slides up when comparing) -->
+                    <div id="comparePanelOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;overflow-y:auto;padding:20px;">
+                        <div style="max-width:1200px;margin:0 auto;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                                <h2 style="font-size:20px;font-weight:700;color:var(--gold);">Vehicle Comparison</h2>
+                                <button class="btn" style="background:var(--card-bg);" onclick="closeComparePanel()">Close</button>
+                            </div>
+                            <div id="compareContent" style="display:grid;gap:16px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Window Sticker Modal -->
+                    <div id="stickerModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:1001;overflow-y:auto;padding:20px;">
+                        <div style="max-width:800px;margin:0 auto;background:var(--card-bg);border-radius:16px;overflow:hidden;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid var(--border-color);">
+                                <h3 id="stickerTitle" style="font-size:16px;font-weight:700;">Window Sticker</h3>
+                                <button onclick="closeStickerModal()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:20px;">✕</button>
+                            </div>
+                            <div id="stickerContent" style="padding:16px;text-align:center;">
+                                <p style="color:var(--text-secondary);">Loading window sticker...</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Templates Page -->
@@ -2095,35 +2132,6 @@
                         <div style="background:var(--card-bg);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--border-color);">
                             <div style="font-size:28px;font-weight:800;color:var(--gold);">969</div>
                             <div style="font-size:12px;color:var(--text-secondary);">Yelp Reviews</div>
-                        </div>
-                    </div>
-
-                    <!-- Vehicle Comparison Tool -->
-                    <div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);margin-bottom:20px;">
-                        <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;color:var(--gold);">Compare Vehicles Across Dealers</h3>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-                            <input type="text" id="compSearchModel" class="form-input" placeholder="Search model (e.g., Silverado 1500)" style="flex:1;min-width:200px;" onkeydown="if(event.key==='Enter')compareVehicles()">
-                            <select id="compSearchYear" class="form-input" style="width:100px;">
-                                <option value="">Any Year</option>
-                                <option value="2026">2026</option>
-                                <option value="2025">2025</option>
-                                <option value="2024">2024</option>
-                            </select>
-                            <button class="btn btn-primary" onclick="compareVehicles()">Compare</button>
-                            <button class="btn" style="background:var(--dark-bg);" onclick="scrapeCompetitors()">Refresh Data</button>
-                        </div>
-                        <div id="compScrapeStatus" style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;"></div>
-                        <div id="compResults" style="display:none;">
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-                                <div>
-                                    <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:8px;">Our Inventory (Findlay)</div>
-                                    <div id="compFindlayResults" style="max-height:400px;overflow-y:auto;"></div>
-                                </div>
-                                <div>
-                                    <div style="font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:8px;">Competitor Inventory</div>
-                                    <div id="compCompResults" style="max-height:400px;overflow-y:auto;"></div>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -2694,11 +2702,11 @@
             document.getElementById('filterLanguage').addEventListener('change', renderLeads);
 
             // Inventory filters
-            document.getElementById('filterCondition').addEventListener('change', renderInventoryFromCache);
-            document.getElementById('filterModel').addEventListener('change', renderInventoryFromCache);
-            document.getElementById('filterMinPrice').addEventListener('change', renderInventoryFromCache);
-            document.getElementById('filterMaxPrice').addEventListener('change', renderInventoryFromCache);
-            document.getElementById('matchInterest').addEventListener('change', renderInventoryFromCache);
+            document.getElementById('filterCondition').addEventListener('change', filterCurrentInventory);
+            document.getElementById('filterModel').addEventListener('change', filterCurrentInventory);
+            document.getElementById('filterMinPrice').addEventListener('change', filterCurrentInventory);
+            document.getElementById('filterMaxPrice').addEventListener('change', filterCurrentInventory);
+            document.getElementById('matchInterest').addEventListener('change', filterCurrentInventory);
 
             // Inventory refresh
             document.getElementById('refreshInventoryBtn').addEventListener('click', refreshInventory);
@@ -3661,199 +3669,188 @@
             scrapeCompetitors();
         }
 
-        async function scrapeCompetitors() {
-            const statusEl = document.getElementById('compScrapeStatus');
-            if (statusEl) statusEl.textContent = 'Scraping competitor inventory... this may take a moment';
-            try {
-                const res = await fetch(`${API_BASE}/api/competitors/scrape`, {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + authToken },
-                });
-                const data = await res.json();
-                if (statusEl) {
-                    statusEl.innerHTML = `<span style="color:var(--gold);">Fairway: ${data.fairway.count} vehicles</span> · <span style="color:var(--gold);">Henderson: ${data.henderson.count} vehicles</span> · <span style="color:var(--gold);">Team: ${data.team.count} vehicles</span> · Updated just now`;
-                }
-            } catch (error) {
-                if (statusEl) statusEl.textContent = 'Error scraping — try again';
-            }
-        }
-
-        async function loadCompetitorStatus() {
-            try {
-                const res = await fetch(`${API_BASE}/api/competitors/status`, {
-                    headers: { 'Authorization': 'Bearer ' + authToken },
-                });
-                const data = await res.json();
-                const statusEl = document.getElementById('compScrapeStatus');
-                if (statusEl) {
-                    const parts = [];
-                    if (data.fairway.count) parts.push(`Fairway: ${data.fairway.count}`);
-                    if (data.henderson.count) parts.push(`Henderson: ${data.henderson.count}`);
-                    if (data.team.count) parts.push(`Team: ${data.team.count}`);
-                    if (parts.length > 0) {
-                        const lastUp = data.fairway.lastUpdated ? new Date(data.fairway.lastUpdated).toLocaleString() : 'never';
-                        statusEl.textContent = parts.join(' · ') + ' · Last updated: ' + lastUp;
-                    } else {
-                        statusEl.textContent = 'No competitor data yet — click "Refresh Data" to scrape';
-                    }
-                }
-            } catch(e) {}
-        }
-
-        async function compareVehicles() {
-            const model = document.getElementById('compSearchModel').value.trim();
-            const year = document.getElementById('compSearchYear').value;
-            if (!model) { alert('Enter a model to search'); return; }
-
-            const resultsDiv = document.getElementById('compResults');
-            resultsDiv.style.display = 'block';
-            document.getElementById('compFindlayResults').innerHTML = '<div style="color:var(--text-secondary);padding:12px;">Searching...</div>';
-            document.getElementById('compCompResults').innerHTML = '<div style="color:var(--text-secondary);padding:12px;">Searching...</div>';
-
-            try {
-                const res = await fetch(`${API_BASE}/api/competitors/compare?model=${encodeURIComponent(model)}&year=${encodeURIComponent(year)}`, {
-                    headers: { 'Authorization': 'Bearer ' + authToken },
-                });
-                const data = await res.json();
-
-                // Render Findlay results
-                const findlayHtml = data.findlay.length > 0 ? data.findlay.map(v => renderCompVehicle(v, true)).join('') :
-                    '<div style="color:var(--text-secondary);padding:12px;text-align:center;">No matching vehicles in our inventory</div>';
-                document.getElementById('compFindlayResults').innerHTML = findlayHtml;
-
-                // Render competitor results
-                const compHtml = data.competitors.length > 0 ? data.competitors.map(v => renderCompVehicle(v, false)).join('') :
-                    '<div style="color:var(--text-secondary);padding:12px;text-align:center;">No matching vehicles found at competitors. Try "Refresh Data" first.</div>';
-                document.getElementById('compCompResults').innerHTML = compHtml;
-
-            } catch (error) {
-                document.getElementById('compFindlayResults').innerHTML = '<div style="color:#ef4444;padding:12px;">Error searching</div>';
-                document.getElementById('compCompResults').innerHTML = '<div style="color:#ef4444;padding:12px;">Error searching</div>';
-            }
-        }
-
-        function renderCompVehicle(v, isFindlay) {
-            const borderColor = isFindlay ? 'var(--gold)' : 'var(--border-color)';
-            const dealerBadge = !isFindlay ? `<span style="background:var(--dark-bg);padding:2px 8px;border-radius:4px;font-size:11px;color:var(--text-secondary);">${v.dealerShort || v.dealer}</span>` : '';
-            const price = v.priceFormatted || (v.price ? `$${v.price.toLocaleString()}` : 'Call for price');
-            const title = v.title || `${v.year || ''} ${v.make || 'Chevrolet'} ${v.model || ''} ${v.trim || ''}`.trim();
-            const stock = v.stockNumber ? `Stock: ${v.stockNumber}` : '';
-            const vin = v.vin ? `VIN: ...${v.vin.slice(-6)}` : '';
-
-            return `
-                <div style="background:var(--dark-bg);border-radius:8px;padding:10px;margin-bottom:6px;border-left:3px solid ${borderColor};">
-                    <div style="display:flex;justify-content:space-between;align-items:start;">
-                        <div>
-                            <div style="font-weight:700;font-size:13px;">${title}</div>
-                            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${[stock, vin].filter(Boolean).join(' · ')}</div>
-                        </div>
-                        <div style="text-align:right;">
-                            <div style="font-weight:700;font-size:14px;color:${isFindlay ? 'var(--gold)' : 'var(--text-primary)'};">${price}</div>
-                            ${dealerBadge}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
         // Inventory
+        // ==================== MULTI-DEALER INVENTORY ====================
+        let currentInvDealer = 'findlay';
+        let compareList = []; // VINs selected for comparison
+        window._inventoryCache = [];
+        window._compInventoryCache = [];
+
         async function loadInventory() {
-              const grid = document.getElementById('inventoryGrid');
-              if (!grid) return;
-              grid.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Loading inventory...</p>';
-              
-              try {
+            currentInvDealer = 'findlay';
+            updateInvTabStyles();
+            await loadFindlayInventory();
+            // Also load competitor status
+            loadCompetitorInventoryStatus();
+        }
+
+        async function loadFindlayInventory() {
+            const grid = document.getElementById('inventoryGrid');
+            if (!grid) return;
+            grid.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Loading Findlay inventory...</p>';
+
+            try {
                 const resp = await fetch('/api/live-inventory', {
-                  headers: { 'Authorization': 'Bearer ' + authToken }
+                    headers: { 'Authorization': 'Bearer ' + authToken }
                 });
                 const data = await resp.json();
                 const raw = data.inventory || [];
                 window._inventoryCache = raw.map(v => {
-                  // Support both scraped format (name string) and structured format (year/make/model)
-                  if (v.year && v.make && v.model) {
+                    if (v.year && v.make && v.model) {
+                        return {
+                            year: String(v.year), make: v.make, model: v.model + (v.trim ? ' ' + v.trim : ''),
+                            stock: v.stock || '', stockNumber: v.stock || '',
+                            price: v.price || v.msrp || '', msrp: v.msrp || '',
+                            vin: v.vin || '', image: v.image || '',
+                            condition: v.condition || 'New', dealer: 'Findlay', dealerShort: 'Findlay',
+                            source: v.source || 'findlaychevy.com'
+                        };
+                    }
+                    const nameStr = v.name || '';
+                    const yearMatch = nameStr.match(/(20\d{2})/);
+                    const year = yearMatch ? yearMatch[1] : '';
+                    const make = nameStr.match(/Chevrolet/i) ? 'Chevrolet' : '';
+                    const model = nameStr.replace(/^(New|Used)\s*/i, '').replace(year, '').replace('Chevrolet', '').trim();
                     return {
-                      year: String(v.year), make: v.make, model: v.model + (v.trim ? ' ' + v.trim : ''),
-                      stock: v.stock || '', stockNumber: v.stock || '',
-                      price: v.price || v.msrp || '', msrp: v.msrp || '',
-                      vin: v.vin || '', image: v.image || '',
-                      condition: v.condition || 'New', mileage: '0',
-                      color: v.color || '', source: v.source || 'findlaychevy.com'
+                        year, make, model,
+                        stock: v.stock || '', stockNumber: v.stock || '',
+                        price: v.price || v.msrp || '', msrp: v.msrp || '',
+                        vin: v.vin || '', image: v.image || '',
+                        condition: nameStr.match(/^New/i) ? 'New' : 'Used',
+                        dealer: 'Findlay', dealerShort: 'Findlay',
+                        source: v.source || 'findlaychevy.com'
                     };
-                  }
-                  const nameStr = v.name || '';
-                  const yearMatch = nameStr.match(/(20\d{2})/);
-                  const year = yearMatch ? yearMatch[1] : '';
-                  const make = nameStr.match(/Chevrolet/i) ? 'Chevrolet' : '';
-                  const model = nameStr.replace(/^(New|Used)\s*/i, '').replace(year, '').replace('Chevrolet', '').trim();
-                  return {
-                    year, make, model,
-                    stock: v.stock || '', stockNumber: v.stock || '',
-                    price: v.price || v.msrp || '', msrp: v.msrp || '',
-                    vin: v.vin || '', image: v.image || '',
-                    condition: nameStr.match(/^New/i) ? 'New' : 'Used',
-                    mileage: '0', source: v.source || 'findlaychevy.com'
-                  };
                 });
-                renderInventoryFromCache();
-                if (data.cached) {
-                  const ago = Math.round((Date.now() - data.lastFetch) / 60000);
-                  grid.insertAdjacentHTML('beforeend', '<p style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:10px;">Cached ' + ago + ' min ago | ' + raw.length + ' vehicles</p>');
-                }
-              } catch(err) {
+                filterCurrentInventory();
+                const statusEl = document.getElementById('invDealerStatus');
+                if (statusEl) statusEl.textContent = `Findlay Chevrolet · ${window._inventoryCache.length} vehicles` + (data.cached ? ` · Cached ${Math.round((Date.now() - data.lastFetch) / 60000)} min ago` : '');
+            } catch(err) {
                 grid.innerHTML = '<p style="color:var(--danger);text-align:center;padding:40px;">Error loading inventory: ' + err.message + '</p>';
-              }
             }
+        }
 
-        function renderInventoryFromCache() {
-            const vehicles = window._inventoryCache || [];
+        async function loadCompetitorInventory(dealer) {
+            const grid = document.getElementById('inventoryGrid');
+            if (!grid) return;
+            grid.innerHTML = `<p style="color:var(--text-secondary);text-align:center;padding:40px;">Loading ${dealer} inventory...</p>`;
+            const statusEl = document.getElementById('invDealerStatus');
+
+            try {
+                const res = await fetch(`${API_BASE}/api/competitors/inventory?dealer=${dealer}`, {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = await res.json();
+                window._compInventoryCache = data.vehicles || [];
+
+                if (window._compInventoryCache.length === 0) {
+                    if (statusEl) statusEl.innerHTML = `No data for ${dealer} yet. <a href="#" onclick="scrapeAndReload('${dealer}');return false;" style="color:var(--gold);">Click to scrape now</a>`;
+                    grid.innerHTML = `<p style="color:var(--text-secondary);text-align:center;padding:40px;">No vehicles found. Click "Refresh" to scrape ${dealer}'s website.</p>`;
+                    return;
+                }
+
+                if (statusEl) statusEl.textContent = `${dealer.charAt(0).toUpperCase() + dealer.slice(1)} · ${data.vehicles.length} vehicles · Last scraped: ${data.lastUpdated[dealer] ? new Date(data.lastUpdated[dealer]).toLocaleString() : 'never'}`;
+                filterCurrentInventory();
+            } catch(err) {
+                grid.innerHTML = `<p style="color:var(--danger);text-align:center;padding:40px;">Error: ${err.message}. Try clicking Refresh to scrape.</p>`;
+            }
+        }
+
+        async function loadAllDealerInventory() {
+            const grid = document.getElementById('inventoryGrid');
+            if (!grid) return;
+            grid.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Loading all dealers...</p>';
+
+            try {
+                const [findlayRes, compRes] = await Promise.all([
+                    fetch('/api/live-inventory', { headers: { 'Authorization': 'Bearer ' + authToken } }),
+                    fetch(`${API_BASE}/api/competitors/inventory?dealer=all`, { headers: { 'Authorization': 'Bearer ' + authToken } })
+                ]);
+                const findlayData = await findlayRes.json();
+                const compData = await compRes.json();
+
+                // Combine all
+                const findlayVehicles = (findlayData.inventory || []).map(v => {
+                    const nameStr = v.name || '';
+                    return {
+                        year: v.year ? String(v.year) : (nameStr.match(/(20\d{2})/) || ['',''])[1],
+                        make: v.make || 'Chevrolet',
+                        model: v.model ? v.model + (v.trim ? ' ' + v.trim : '') : nameStr.replace(/^(New|Used)\s*/i,'').replace(/(20\d{2})/, '').replace('Chevrolet','').trim(),
+                        stock: v.stock || '', stockNumber: v.stock || '',
+                        price: v.price || v.msrp || '', msrp: v.msrp || '',
+                        vin: v.vin || '', image: v.image || '',
+                        condition: v.condition || 'New', dealer: 'Findlay', dealerShort: 'Findlay',
+                    };
+                });
+
+                window._compInventoryCache = [...findlayVehicles, ...(compData.vehicles || [])];
+                const statusEl = document.getElementById('invDealerStatus');
+                if (statusEl) statusEl.textContent = `All Dealers · ${window._compInventoryCache.length} vehicles total`;
+                filterCurrentInventory();
+            } catch(err) {
+                grid.innerHTML = `<p style="color:var(--danger);text-align:center;padding:40px;">Error: ${err.message}</p>`;
+            }
+        }
+
+        function switchInventoryDealer(dealer) {
+            currentInvDealer = dealer;
+            updateInvTabStyles();
+            document.getElementById('matchInterest').value = '';
+
+            if (dealer === 'findlay') {
+                loadFindlayInventory();
+            } else if (dealer === 'all') {
+                loadAllDealerInventory();
+            } else {
+                loadCompetitorInventory(dealer);
+            }
+        }
+
+        function updateInvTabStyles() {
+            document.querySelectorAll('#invDealerTabs button').forEach(btn => {
+                btn.className = 'btn';
+                btn.style.background = 'var(--card-bg)';
+            });
+            const activeBtn = document.getElementById('invTab_' + currentInvDealer);
+            if (activeBtn) {
+                activeBtn.className = 'btn btn-primary';
+                activeBtn.style.background = '';
+            }
+        }
+
+        async function scrapeAndReload(dealer) {
+            const statusEl = document.getElementById('invDealerStatus');
+            if (statusEl) statusEl.textContent = `Scraping ${dealer}... please wait`;
+            await fetch(`${API_BASE}/api/competitors/scrape`, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + authToken },
+            });
+            if (currentInvDealer === dealer || currentInvDealer === 'all') {
+                switchInventoryDealer(currentInvDealer);
+            }
+        }
+
+        function filterCurrentInventory() {
+            const vehicles = currentInvDealer === 'findlay' ? (window._inventoryCache || []) : (window._compInventoryCache || []);
             const condition = document.getElementById('filterCondition')?.value || '';
-            const model = document.getElementById('filterModel')?.value || '';
+            const modelFilter = document.getElementById('filterModel')?.value || '';
             const minPrice = parseFloat(document.getElementById('filterMinPrice')?.value) || 0;
             const maxPrice = parseFloat(document.getElementById('filterMaxPrice')?.value) || Infinity;
+            const search = (document.getElementById('matchInterest')?.value || '').toLowerCase();
 
             const filtered = vehicles.filter(v => {
                 if (condition && v.condition && v.condition.toLowerCase() !== condition.toLowerCase()) return false;
-                if (model && v.model && !v.model.toLowerCase().includes(model.toLowerCase())) return false;
+                if (modelFilter && v.model && !v.model.toLowerCase().includes(modelFilter.toLowerCase())) return false;
                 const price = parseFloat(String(v.price || v.msrp || '0').replace(/[^0-9.]/g, '')) || 0;
                 if (price < minPrice) return false;
                 if (maxPrice < Infinity && price > maxPrice) return false;
+                if (search) {
+                    const haystack = `${v.year} ${v.make} ${v.model} ${v.vin} ${v.stockNumber || v.stock} ${v.dealer || ''} ${v.trim || ''}`.toLowerCase();
+                    if (!haystack.includes(search)) return false;
+                }
                 return true;
             });
 
             renderInventoryGrid(filtered);
-        }
-
-        async function renderInventory() {
-            const condition = document.getElementById('filterCondition').value;
-            const model = document.getElementById('filterModel').value;
-            const minPrice = document.getElementById('filterMinPrice').value;
-            const maxPrice = document.getElementById('filterMaxPrice').value;
-            const interest = document.getElementById('matchInterest').value;
-
-            const params = new URLSearchParams();
-            if (condition) params.append('condition', condition);
-            if (model) params.append('model', model);
-            if (minPrice) params.append('minPrice', minPrice);
-            if (maxPrice) params.append('maxPrice', maxPrice);
-            if (interest) {
-                try {
-                    const response = await fetch(`${API_BASE}/api/inventory/match?interest=${encodeURIComponent(interest)}`);
-                    const matched = await response.json();
-                    renderInventoryGrid(matched);
-                    return;
-                } catch (error) {
-                    console.error('Error matching inventory:', error);
-                }
-            }
-
-            try {
-                const url = `${API_BASE}/api/inventory${params.toString() ? '?' + params.toString() : ''}`;
-                const response = await fetch(url);
-                const vehicles = await response.json();
-                renderInventoryGrid(vehicles);
-            } catch (error) {
-                console.error('Error filtering inventory:', error);
-            }
         }
 
         function renderInventoryGrid(vehicles) {
@@ -3861,21 +3858,31 @@
             vehicles.forEach(vehicle => {
                 const imgSrc = vehicle.image || '';
                 const imgHtml = imgSrc
-                    ? `<img src="${imgSrc}" alt="${vehicle.year} ${vehicle.make} ${vehicle.model}" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div style="display:none;width:100%;height:160px;align-items:center;justify-content:center;background:#1a1a2e;border-radius:8px 8px 0 0;font-size:48px;color:var(--text-secondary);">No Image</div>`
-                    : `<div style="width:100%;height:160px;display:flex;align-items:center;justify-content:center;background:#1a1a2e;border-radius:8px 8px 0 0;font-size:48px;color:var(--text-secondary);">No Image</div>`;
+                    ? `<img src="${imgSrc}" alt="${vehicle.year} ${vehicle.make} ${vehicle.model}" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div style="display:none;width:100%;height:160px;align-items:center;justify-content:center;background:#1a1a2e;border-radius:8px 8px 0 0;font-size:48px;color:var(--text-secondary);">No Img</div>`
+                    : `<div style="width:100%;height:160px;display:flex;align-items:center;justify-content:center;background:#1a1a2e;border-radius:8px 8px 0 0;font-size:14px;color:var(--text-secondary);">No Image</div>`;
                 const stockNum = vehicle.stockNumber || vehicle.stock || '';
                 const priceVal = vehicle.price || vehicle.msrp || '';
                 const priceDisplay = priceVal ? '$' + Number(String(priceVal).replace(/[^0-9]/g,'')).toLocaleString() : 'Call for price';
+                const isFindlay = (vehicle.dealer || vehicle.dealerShort || '') === 'Findlay';
+                const dealerBadge = !isFindlay && vehicle.dealerShort ? `<div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.75);color:var(--text-secondary);padding:2px 8px;border-radius:4px;font-size:11px;">${vehicle.dealerShort}</div>` : '';
+                const isInCompare = compareList.includes(vehicle.vin);
+                const compareBtnStyle = isInCompare ? 'background:var(--gold);color:#000;' : 'background:var(--dark-bg);color:var(--text-secondary);';
+                const vin = vehicle.vin || '';
+
                 html += `
-                    <div class="inventory-card">
+                    <div class="inventory-card" style="position:relative;">
+                        ${dealerBadge}
                         ${imgHtml}
                         <div class="inventory-details" style="padding:12px;">
-                            <div class="inventory-title">${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}</div>
-                            <div class="inventory-price">${priceDisplay}</div>
-                            <div class="inventory-info">
+                            <div class="inventory-title" style="font-size:14px;font-weight:700;">${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}</div>
+                            <div class="inventory-price" style="color:var(--gold);font-weight:700;font-size:16px;">${priceDisplay}</div>
+                            <div class="inventory-info" style="font-size:12px;color:var(--text-secondary);margin:4px 0;">
                                 <div>Stock: ${stockNum || 'N/A'}</div>
-                                ${vehicle.vin ? '<div>VIN: ...' + vehicle.vin.slice(-6) + '</div>' : ''}
-                                <div>${vehicle.condition || 'New'}</div>
+                                ${vin ? '<div>VIN: ...' + vin.slice(-8) + '</div>' : ''}
+                            </div>
+                            <div style="display:flex;gap:4px;margin-top:8px;">
+                                ${vin ? `<button onclick="viewWindowSticker('${vin}','${(vehicle.year||'')} ${(vehicle.make||'')} ${(vehicle.model||'')}')" style="flex:1;padding:6px;border:1px solid var(--border-color);border-radius:6px;background:var(--dark-bg);color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;">Window Sticker</button>` : ''}
+                                ${vin ? `<button onclick="toggleCompare('${vin}')" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;${compareBtnStyle}" id="compBtn_${vin}">${isInCompare ? '✓ Added' : '+ Compare'}</button>` : ''}
                             </div>
                         </div>
                     </div>
@@ -3888,11 +3895,159 @@
 
         async function refreshInventory() {
             try {
-                await fetch(`${API_BASE}/api/inventory/refresh`, { method: 'POST' });
-                loadInventory();
+                if (currentInvDealer === 'findlay') {
+                    await fetch(`${API_BASE}/api/inventory/refresh`, { method: 'POST' });
+                    loadFindlayInventory();
+                } else {
+                    await scrapeAndReload(currentInvDealer === 'all' ? 'fairway' : currentInvDealer);
+                }
             } catch (error) {
                 console.error('Error refreshing inventory:', error);
             }
+        }
+
+        async function loadCompetitorInventoryStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/api/competitors/status`, {
+                    headers: { 'Authorization': 'Bearer ' + authToken },
+                });
+                const data = await res.json();
+                // Update tab labels with counts
+                ['fairway','henderson','team'].forEach(d => {
+                    const btn = document.getElementById('invTab_' + d);
+                    if (btn && data[d]?.count) {
+                        btn.textContent = `${d.charAt(0).toUpperCase()+d.slice(1)} (${data[d].count})`;
+                    }
+                });
+            } catch(e) {}
+        }
+
+        // ==================== WINDOW STICKER ====================
+        function viewWindowSticker(vin, title) {
+            const modal = document.getElementById('stickerModal');
+            modal.style.display = 'block';
+            document.getElementById('stickerTitle').textContent = `Window Sticker — ${title}`;
+            const content = document.getElementById('stickerContent');
+            // GM's official window sticker URL
+            const stickerUrl = `https://cws.gm.com/vs-cws/vehshop/v2/vehicle/windowsticker?vin=${vin}`;
+            content.innerHTML = `
+                <div style="margin-bottom:12px;">
+                    <a href="${stickerUrl}" target="_blank" style="color:var(--gold);font-size:14px;">Open full sticker in new tab</a>
+                    <span style="color:var(--text-secondary);font-size:12px;margin-left:8px;">VIN: ${vin}</span>
+                </div>
+                <iframe src="${stickerUrl}" style="width:100%;height:75vh;border:none;border-radius:8px;background:#fff;" onload="this.style.background='transparent'" onerror="this.outerHTML='<p style=\\'color:var(--text-secondary);padding:20px;\\'>Could not load sticker. <a href=${stickerUrl} target=_blank style=color:var(--gold)>Try opening directly</a></p>'"></iframe>
+            `;
+        }
+
+        function closeStickerModal() {
+            document.getElementById('stickerModal').style.display = 'none';
+            document.getElementById('stickerContent').innerHTML = '';
+        }
+
+        // ==================== COMPARE FEATURE ====================
+        function toggleCompare(vin) {
+            const idx = compareList.indexOf(vin);
+            if (idx > -1) {
+                compareList.splice(idx, 1);
+            } else {
+                if (compareList.length >= 4) { alert('Max 4 vehicles to compare'); return; }
+                compareList.push(vin);
+            }
+            updateCompareUI();
+        }
+
+        function updateCompareUI() {
+            const badge = document.getElementById('compareCount');
+            if (compareList.length > 0) {
+                badge.style.display = 'inline-block';
+                badge.textContent = `Compare (${compareList.length})`;
+            } else {
+                badge.style.display = 'none';
+            }
+            // Update all compare buttons
+            compareList.forEach(vin => {
+                const btn = document.getElementById('compBtn_' + vin);
+                if (btn) { btn.textContent = '✓ Added'; btn.style.background = 'var(--gold)'; btn.style.color = '#000'; }
+            });
+            // Reset removed ones
+            document.querySelectorAll('[id^="compBtn_"]').forEach(btn => {
+                const vin = btn.id.replace('compBtn_', '');
+                if (!compareList.includes(vin)) {
+                    btn.textContent = '+ Compare';
+                    btn.style.background = 'var(--dark-bg)';
+                    btn.style.color = 'var(--text-secondary)';
+                }
+            });
+        }
+
+        async function showComparePanel() {
+            if (compareList.length < 2) { alert('Select at least 2 vehicles to compare'); return; }
+            const overlay = document.getElementById('comparePanelOverlay');
+            overlay.style.display = 'block';
+            const content = document.getElementById('compareContent');
+            content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:20px;">Loading comparison...</p>';
+
+            // Gather vehicle data from all caches
+            const allVehicles = [...(window._inventoryCache || []), ...(window._compInventoryCache || [])];
+            const selected = compareList.map(vin => allVehicles.find(v => v.vin === vin)).filter(Boolean);
+
+            if (selected.length < 2) {
+                content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;">Could not find all selected vehicles. Try searching on the "All Dealers" tab first.</p>';
+                return;
+            }
+
+            // Build comparison grid
+            const cols = selected.length;
+            let html = `<div style="display:grid;grid-template-columns:180px repeat(${cols}, 1fr);gap:0;border:1px solid var(--border-color);border-radius:12px;overflow:hidden;">`;
+
+            // Header row
+            html += `<div style="padding:12px;background:var(--card-bg);border-bottom:1px solid var(--border-color);font-weight:700;color:var(--text-secondary);">Vehicle</div>`;
+            selected.forEach(v => {
+                const isFindlay = v.dealer === 'Findlay' || v.dealerShort === 'Findlay';
+                html += `<div style="padding:12px;background:var(--card-bg);border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);text-align:center;">
+                    <div style="font-weight:700;font-size:14px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}</div>
+                    <div style="font-size:12px;color:var(--text-secondary);">${v.dealer || v.dealerShort || 'Findlay'}</div>
+                </div>`;
+            });
+
+            // Data rows
+            const rows = [
+                { label: 'Price', key: v => { const p = v.price || v.msrp || ''; return p ? '$' + Number(String(p).replace(/[^0-9]/g,'')).toLocaleString() : 'Call'; }},
+                { label: 'Stock #', key: v => v.stockNumber || v.stock || 'N/A' },
+                { label: 'VIN', key: v => v.vin || 'N/A' },
+                { label: 'Condition', key: v => v.condition || 'New' },
+                { label: 'Dealer', key: v => v.dealer || v.dealerShort || 'Findlay' },
+            ];
+
+            rows.forEach((row, i) => {
+                const bgColor = i % 2 === 0 ? 'var(--dark-bg)' : 'var(--bg-primary, #0a0d14)';
+                html += `<div style="padding:10px 12px;background:${bgColor};border-bottom:1px solid var(--border-color);font-weight:600;font-size:13px;color:var(--text-secondary);">${row.label}</div>`;
+                selected.forEach(v => {
+                    html += `<div style="padding:10px 12px;background:${bgColor};border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:13px;">${row.key(v)}</div>`;
+                });
+            });
+
+            // Window sticker links row
+            html += `<div style="padding:10px 12px;background:var(--card-bg);font-weight:600;font-size:13px;color:var(--text-secondary);">Window Sticker</div>`;
+            selected.forEach(v => {
+                const stickerUrl = v.vin ? `https://cws.gm.com/vs-cws/vehshop/v2/vehicle/windowsticker?vin=${v.vin}` : '';
+                html += `<div style="padding:10px 12px;background:var(--card-bg);border-left:1px solid var(--border-color);text-align:center;">
+                    ${v.vin ? `<a href="${stickerUrl}" target="_blank" style="color:var(--gold);font-size:13px;font-weight:600;">View Sticker PDF</a>` : 'N/A'}
+                </div>`;
+            });
+
+            html += '</div>';
+
+            // Clear compare button
+            html += `<div style="text-align:center;margin-top:16px;">
+                <button class="btn" style="background:var(--card-bg);" onclick="compareList=[];updateCompareUI();closeComparePanel();">Clear Comparison</button>
+            </div>`;
+
+            content.innerHTML = html;
+        }
+
+        function closeComparePanel() {
+            document.getElementById('comparePanelOverlay').style.display = 'none';
         }
 
         // Templates
