@@ -590,11 +590,17 @@ function getStats() {
 }
 
 
+// Expose raw db instance for modules that need direct access (e.g. intelligence engine)
+function getDb() {
+  return db;
+}
+
 module.exports = {
   initDatabase,
   migrateFromJson,
   seedDefaultTemplates,
   getStats,
+  getDb,
   leads: leadsDb,
   conversations: conversationsDb,
   notifications: notificationsDb,
