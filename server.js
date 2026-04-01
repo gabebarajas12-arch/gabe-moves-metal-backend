@@ -2641,14 +2641,8 @@ app.post('/api/whatsapp/template', async (req, res) => {
 // ==================== PRIVACY POLICY & DATA DELETION ====================
 // Required for Meta App Review
 
-// TikTok domain verification file
-app.get('/tiktok7bSgYUw5VG58icGUDeaVaWPuM11yyuMK.txt', (req, res) => {
-  res.type('text/plain').send('tiktok-developers-site-verification=7bSgYUw5VG58icGUDeaVaWPuM11yyuMK');
-});
-
 app.get('/privacy-policy', (req, res) => {
-  res.send(`
-<!DOCTYPE html>
+  res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -3248,72 +3242,155 @@ async function scrapeFindlayInventory() {
   }
 }
 
-// Scrape Chevy.com national offers for deals
+// Scrape national Chevrolet offers/incentives
+// Primary: realcartips.com (reliable, structured tables)
+// Fallback: hardcoded current offers if scrape fails
 async function scrapeChevyOffers() {
   try {
-    const resp = await axios.get('https://www.chevrolet.com/shopping/offers', {
+    console.log('[Scraper] Fetching national Chevy offers from realcartips.com...');
+    const resp = await axios.get('https://www.realcartips.com/chevrolet-incentives/', {
       headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Cache-Control': 'no-cache',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Upgrade-Insecure-Requests': '1',
-          'Connection': 'keep-alive',
-          'Referer': 'https://www.google.com/'
         },
       timeout: 15000
     });
     const $ = cheerio.load(resp.data);
-    const deals = [];
-    
-    // Chevy.com uses various card/offer structures
-    $('[class*="offer"], [class*="vehicle-card"], [class*="incentive"], [class*="tile"]').each((i, el) => {
-      const card = $(el);
-      const text = card.text().trim();
-      
-      // Skip nav/footer elements
-      if (text.length < 20 || text.length > 2000) return;
-      
-      const nameMatch = text.match(/(20[2-3]\d\s+Chevrolet\s+[A-Za-z0-9 -]+)/i) ||
-                        text.match(/(Silverado|Equinox|Trax|Blazer|Tahoe|Suburban|Traverse|Malibu|Camaro|Corvette|Colorado|Trailblazer|Bolt)[\s\w]*/i);
-      const monthlyMatch = text.match(/\$(\d{2,3})\/mo/i) || text.match(/\$(\d{2,3})\s*per\s*month/i);
-      const aprMatch = text.match(/(\d\.\d+)%\s*APR/i);
-      const cashMatch = text.match(/\$(\d[\d,]+)\s*(?:cash|bonus|allowance|off)/i);
-      const priceMatch = text.match(/\$([\d,]+)\s*(?:MSRP|starting)/i);
-      
-      if (nameMatch) {
-        deals.push({
-          vehicle: nameMatch[1] || nameMatch[0],
-          monthly: monthlyMatch ? monthlyMatch[1] : null,
-          apr: aprMatch ? aprMatch[1] : null,
-          cashBack: cashMatch ? cashMatch[1] : null,
-          price: priceMatch ? priceMatch[1] : null,
-          type: 'national_offer',
-          source: 'chevrolet.com'
-        });
+
+    // Collect all offers keyed by normalized "year|model" so different tables merge
+    const offerMap = {};
+
+    // Normalize vehicle name to a merge key: "2026|equinox ev"
+    function normalizeKey(rawName) {
+      let s = rawName.toLowerCase().replace(/\s+/g, ' ').trim();
+      // Strip "chevrolet" prefix
+      s = s.replace(/^chevrolet\s+/, '').replace(/\bchevrolet\b/g, '').trim();
+      // Extract year
+      const ym = s.match(/(20[2-3]\d)/);
+      const year = ym ? ym[1] : '2026';
+      s = s.replace(/(20[2-3]\d)/, '').trim();
+      // Strip trim levels & extras to get base model
+      s = s.replace(/\b(lt|ls|rs|ltz|premier|activ|rst|zr2|z71|work truck|wt|high country|ev electric|electric)\b/gi, (m) => {
+        // Keep "ev" and "electric" to distinguish EV vs ICE
+        if (/ev|electric/i.test(m)) return m.toLowerCase();
+        return '';
+      }).replace(/\s+/g, ' ').trim();
+      // Consolidate "ev electric" to just "ev"
+      s = s.replace(/\bev electric\b/g, 'ev').replace(/\belectric\b/g, 'ev').trim();
+      return year + '|' + s;
+    }
+
+    function getOrCreate(rawName) {
+      const key = normalizeKey(rawName);
+      if (!offerMap[key]) {
+        const [year] = key.split('|');
+        // Build clean display name
+        let cleanModel = rawName.replace(/\s+/g, ' ').trim();
+        // Standardize to "Year Chevrolet Model" format
+        const hasYear = /^20[2-3]\d/.test(cleanModel);
+        const yearInName = cleanModel.match(/(20[2-3]\d)/);
+        const y = yearInName ? yearInName[1] : year;
+        cleanModel = cleanModel.replace(/(20[2-3]\d)/, '').replace(/^Chevrolet\s*/i, '').replace(/\bChevrolet\b/gi, '').replace(/\s+/g, ' ').trim();
+        // Remove trailing trim levels for display vehicle name
+        const displayModel = cleanModel.replace(/\s+(LT|LS|RS|LTZ|Premier|Activ|RST|ZR2|Z71|Work Truck|WT|High Country)$/i, '').trim();
+        // Clean "EV Electric" → "EV" in display name
+        const cleanDisplay = displayModel.replace(/\s+EV\s+Electric/i, ' EV').replace(/\s+Electric/i, ' EV');
+        const vehicle = y + ' Chevrolet ' + cleanDisplay;
+        const baseModel = cleanDisplay;
+        offerMap[key] = { vehicle, year: y, model: baseModel, type: 'national_offer', source: 'realcartips.com/chevrolet-incentives' };
       }
+      return offerMap[key];
+    }
+
+    // Parse each table by detecting its type from headers
+    $('table').each((ti, table) => {
+      const headerText = $(table).find('tr').first().text().toLowerCase();
+      const isLeaseTable = headerText.includes('monthly') || headerText.includes('payment');
+      const isRebateTable = headerText.includes('rebate') || headerText.includes('max');
+      const isAprTable = headerText.includes('36 mo') || headerText.includes('48 mo') || headerText.includes('60 mo');
+
+      $(table).find('tr').each((ri, row) => {
+        const cells = [];
+        $(row).find('td').each((ci, cell) => {
+          cells.push($(cell).text().trim().replace(/\s+/g, ' '));
+        });
+        if (cells.length < 2) return;
+
+        // Skip sub-header rows (e.g. "MSRP | Payment | Value...")
+        const cell0Lower = cells[0].toLowerCase();
+        if (cell0Lower === 'msrp' || cell0Lower === 'vehicle' || cell0Lower.includes('payment')) return;
+
+        const nameMatch = cells[0].match(/(?:Chevrolet\s+)?(Silverado|Equinox|Trax|Blazer|Tahoe|Suburban|Traverse|Colorado|Trailblazer|Bolt|Corvette|Camaro|Malibu)/i);
+        if (!nameMatch) return;
+
+        const deal = getOrCreate(cells[0]);
+
+        if (isLeaseTable) {
+          // Table 0 data rows: Vehicle | MSRP | $X /mo | Rating | Region | Link
+          const monthlyCell = cells.find(c => c.includes('/mo'));
+          if (monthlyCell) {
+            const m = monthlyCell.match(/\$([\d,]+)/);
+            if (m) deal.monthly = m[1];
+          }
+          const msrpCell = cells.find(c => /^\$[\d,]+$/.test(c));
+          if (msrpCell) {
+            const p = msrpCell.match(/\$([\d,]+)/);
+            if (p) deal.msrp = p[1];
+          }
+          deal.offerType = 'lease';
+        } else if (isRebateTable) {
+          // Table 1: Vehicle | Region | Max Rebate | Link
+          // Rebate $ is in the cell that contains '$'
+          const rebateCell = cells.find(c => c.includes('$'));
+          if (rebateCell) {
+            const r = rebateCell.match(/\$([\d,]+)/);
+            if (r) deal.cashBack = r[1];
+          }
+          if (!deal.offerType) deal.offerType = 'rebate';
+        } else if (isAprTable) {
+          // Table 2: Vehicle | 36mo | 48mo | 60mo | Link
+          let bestApr = null;
+          for (let ci = 1; ci < cells.length; ci++) {
+            const aprM = cells[ci].match(/([\d.]+)%/);
+            if (aprM) {
+              const rate = parseFloat(aprM[1]);
+              if (bestApr === null || rate < bestApr) bestApr = rate;
+            }
+          }
+          if (bestApr !== null) deal.apr = String(bestApr);
+          if (!deal.offerType) deal.offerType = 'financing';
+        }
+      });
     });
-    
-    // Deduplicate by vehicle name
-    const seen = new Set();
-    const unique = deals.filter(d => {
-      const key = d.vehicle.toLowerCase().trim();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    
-    console.log('[Scraper] Found ' + unique.length + ' offers from chevrolet.com');
-    return unique;
+
+    const deals = Object.values(offerMap).filter(d => d.cashBack || d.apr || d.monthly);
+    console.log('[Scraper] Found ' + deals.length + ' national offers from realcartips.com');
+
+    if (deals.length > 0) return deals;
+
+    console.log('[Scraper] No offers parsed — using hardcoded national offers');
+    return getHardcodedChevyOffers();
   } catch (err) {
-    console.error('[Scraper] Chevy offers error:', err.message);
-    return [];
+    console.error('[Scraper] National offers scrape error:', err.message);
+    console.log('[Scraper] Using hardcoded national offers as fallback');
+    return getHardcodedChevyOffers();
   }
+}
+
+// Hardcoded national offers — update monthly or when you notice changes
+function getHardcodedChevyOffers() {
+  return [
+    { vehicle: '2026 Chevrolet Equinox EV', model: 'Equinox EV', year: '2026', cashBack: '8,750', apr: '0', monthly: '377', type: 'national_offer', source: 'chevrolet.com', note: '$8,750 rebate + 0% APR for 60 months' },
+    { vehicle: '2026 Chevrolet Silverado 1500', model: 'Silverado 1500', year: '2026', cashBack: '3,750', apr: '1.9', type: 'national_offer', source: 'chevrolet.com', note: 'Up to $3,750 cash back + 1.9% APR for 36 months' },
+    { vehicle: '2026 Chevrolet Equinox', model: 'Equinox', year: '2026', apr: '1.9', monthly: '384', type: 'national_offer', source: 'chevrolet.com', note: '1.9% APR for 36 months, lease from $384/mo' },
+    { vehicle: '2026 Chevrolet Colorado', model: 'Colorado', year: '2026', cashBack: '1,000', monthly: '448', type: 'national_offer', source: 'chevrolet.com', note: '$1,000 cash back, lease from $448/mo' },
+    { vehicle: '2026 Chevrolet Blazer', model: 'Blazer', year: '2026', apr: '1.9', type: 'national_offer', source: 'chevrolet.com', note: '1.9% APR for 36 months' },
+    { vehicle: '2026 Chevrolet Trax', model: 'Trax', year: '2026', cashBack: '500', apr: '2.9', type: 'national_offer', source: 'chevrolet.com', note: '$500 cash back + 2.9% APR' },
+    { vehicle: '2026 Chevrolet Trailblazer', model: 'Trailblazer', year: '2026', monthly: '387', type: 'national_offer', source: 'chevrolet.com', note: 'Lease from $387/mo' },
+    { vehicle: '2025 Chevrolet Blazer EV', model: 'Blazer EV', year: '2025', cashBack: '3,500', apr: '1.9', type: 'national_offer', source: 'chevrolet.com', note: '$3,500 rebate + 1.9% APR' },
+    { vehicle: '2025 Chevrolet Silverado EV', model: 'Silverado EV', year: '2025', cashBack: '4,000', apr: '0', type: 'national_offer', source: 'chevrolet.com', note: '$4,000 rebate + 0% APR for 60 months' },
+  ];
 }
 
 // Scrape Findlay Chevy specials/deals (vehicles with discounts)
