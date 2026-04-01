@@ -4655,6 +4655,279 @@ function autoEnrollLead(leadId, stage) {
   }
 }
 
+// ============ COMPETITOR INVENTORY SCRAPER ============
+// Scrapes inventory from Fairway, Henderson, and Team Chevy websites
+// Stores results in memory for quick comparison
+
+let competitorInventory = {
+  fairway: { vehicles: [], lastUpdated: null, status: 'idle' },
+  henderson: { vehicles: [], lastUpdated: null, status: 'idle' },
+  team: { vehicles: [], lastUpdated: null, status: 'idle' },
+};
+
+// Generic scraper: fetch page HTML, parse vehicle cards with cheerio
+async function scrapeDealer(name, url, parser) {
+  try {
+    console.log(`[CompIntel] Scraping ${name} inventory from ${url}...`);
+    competitorInventory[name].status = 'scraping';
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      timeout: 15000,
+    });
+    const $ = cheerio.load(response.data);
+    const vehicles = parser($);
+    competitorInventory[name].vehicles = vehicles;
+    competitorInventory[name].lastUpdated = new Date().toISOString();
+    competitorInventory[name].status = 'ready';
+    console.log(`[CompIntel] ${name}: Found ${vehicles.length} vehicles`);
+    return vehicles;
+  } catch (error) {
+    console.error(`[CompIntel] Error scraping ${name}:`, error.message);
+    competitorInventory[name].status = 'error';
+    return competitorInventory[name].vehicles; // return cached
+  }
+}
+
+// Fairway parser (DealerInspire platform)
+function parseFairway($) {
+  const vehicles = [];
+  // DealerInspire uses .vehicle-card or similar listing elements
+  $('[data-vin], .vehicle-card, .vehicle-card-details-container, .srp-list-item').each((i, el) => {
+    const $el = $(el);
+    const vin = $el.attr('data-vin') || $el.find('[data-vin]').attr('data-vin') || '';
+    const title = $el.find('.vehicle-card-title, .title, h2, h3').first().text().trim();
+    const price = $el.find('.final-price, .price, .vehicle-card-price, .internetPrice').first().text().trim()
+      .replace(/[^0-9.]/g, '');
+    const stockNum = $el.find('.stock-number, .stockNumber').first().text().trim()
+      .replace(/Stock.*?:/i, '').trim();
+    const img = $el.find('img').first().attr('src') || $el.find('img').first().attr('data-src') || '';
+
+    if (title || vin) {
+      // Parse year/make/model from title
+      const parsed = parseVehicleTitle(title);
+      vehicles.push({
+        dealer: 'Fairway Chevrolet',
+        dealerShort: 'Fairway',
+        vin,
+        year: parsed.year,
+        make: parsed.make,
+        model: parsed.model,
+        trim: parsed.trim,
+        title: title || `${parsed.year} ${parsed.make} ${parsed.model}`,
+        price: price ? parseFloat(price) : null,
+        priceFormatted: price ? `$${parseFloat(price).toLocaleString()}` : 'Call for price',
+        stockNumber: stockNum,
+        image: img,
+        url: `https://www.fairwaychevy.com`,
+      });
+    }
+  });
+  return vehicles;
+}
+
+// Henderson parser (DealerInspire platform)
+function parseHenderson($) {
+  const vehicles = [];
+  $('[data-vin], .vehicle-card, .vehicle-card-details-container, .srp-list-item').each((i, el) => {
+    const $el = $(el);
+    const vin = $el.attr('data-vin') || $el.find('[data-vin]').attr('data-vin') || '';
+    const title = $el.find('.vehicle-card-title, .title, h2, h3').first().text().trim();
+    const price = $el.find('.final-price, .price, .vehicle-card-price, .internetPrice').first().text().trim()
+      .replace(/[^0-9.]/g, '');
+    const stockNum = $el.find('.stock-number, .stockNumber').first().text().trim()
+      .replace(/Stock.*?:/i, '').trim();
+    const img = $el.find('img').first().attr('src') || $el.find('img').first().attr('data-src') || '';
+
+    if (title || vin) {
+      const parsed = parseVehicleTitle(title);
+      vehicles.push({
+        dealer: 'Henderson Chevrolet',
+        dealerShort: 'Henderson',
+        vin, year: parsed.year, make: parsed.make, model: parsed.model, trim: parsed.trim,
+        title: title || `${parsed.year} ${parsed.make} ${parsed.model}`,
+        price: price ? parseFloat(price) : null,
+        priceFormatted: price ? `$${parseFloat(price).toLocaleString()}` : 'Call for price',
+        stockNumber: stockNum, image: img,
+        url: `https://www.hendersonchevy.com`,
+      });
+    }
+  });
+  return vehicles;
+}
+
+// Team parser (ASP.NET platform)
+function parseTeam($) {
+  const vehicles = [];
+  $('.vehicle-card, .vehicleListItem, .srpVehicle, [data-vin], .vehicle-card-body, .inventory-listing').each((i, el) => {
+    const $el = $(el);
+    const vin = $el.attr('data-vin') || $el.find('[data-vin]').attr('data-vin') || '';
+    const title = $el.find('.vehicleTitle, .title, h2, h3, .vehicle-title').first().text().trim();
+    const price = $el.find('.price, .internetPrice, .finalPrice, .vehicle-price').first().text().trim()
+      .replace(/[^0-9.]/g, '');
+    const stockNum = $el.find('.stockNumber, .stock-number').first().text().trim()
+      .replace(/Stock.*?:/i, '').trim();
+    const img = $el.find('img').first().attr('src') || $el.find('img').first().attr('data-src') || '';
+
+    if (title || vin) {
+      const parsed = parseVehicleTitle(title);
+      vehicles.push({
+        dealer: 'Team Chevrolet',
+        dealerShort: 'Team',
+        vin, year: parsed.year, make: parsed.make, model: parsed.model, trim: parsed.trim,
+        title: title || `${parsed.year} ${parsed.make} ${parsed.model}`,
+        price: price ? parseFloat(price) : null,
+        priceFormatted: price ? `$${parseFloat(price).toLocaleString()}` : 'Call for price',
+        stockNumber: stockNum, image: img,
+        url: `https://www.teamchevroletlv.com`,
+      });
+    }
+  });
+  return vehicles;
+}
+
+// Parse "2026 Chevrolet Silverado 1500 LT" into parts
+function parseVehicleTitle(title) {
+  const yearMatch = title.match(/\b(20\d{2})\b/);
+  const year = yearMatch ? yearMatch[1] : '';
+  const withoutYear = title.replace(/\b20\d{2}\b/, '').trim();
+
+  // Common Chevy models
+  const models = ['Silverado 1500', 'Silverado 2500', 'Silverado 3500', 'Silverado EV',
+    'Tahoe', 'Suburban', 'Traverse', 'Equinox', 'Equinox EV', 'Blazer', 'Blazer EV',
+    'Trax', 'Trailblazer', 'Colorado', 'Corvette', 'Camaro', 'Malibu', 'Bolt EV', 'Bolt EUV'];
+
+  let make = 'Chevrolet';
+  let model = '';
+  let trim = '';
+
+  for (const m of models) {
+    if (withoutYear.toLowerCase().includes(m.toLowerCase())) {
+      model = m;
+      // Everything after the model is the trim
+      const modelIdx = withoutYear.toLowerCase().indexOf(m.toLowerCase());
+      trim = withoutYear.substring(modelIdx + m.length).replace(/^[\s-]+/, '').trim();
+      break;
+    }
+  }
+
+  if (!model) {
+    // Fallback: remove make name, take first word(s) as model
+    const parts = withoutYear.replace(/Chevrolet|Chevy/i, '').trim().split(/\s+/);
+    model = parts.slice(0, 2).join(' ');
+    trim = parts.slice(2).join(' ');
+  }
+
+  return { year, make, model, trim };
+}
+
+// API: Scrape all competitors
+app.post('/api/competitors/scrape', requireAuth, async (req, res) => {
+  const results = await Promise.allSettled([
+    scrapeDealer('fairway', 'https://www.fairwaychevy.com/new-vehicles/', parseFairway),
+    scrapeDealer('henderson', 'https://www.hendersonchevy.com/new-vehicles/', parseHenderson),
+    scrapeDealer('team', 'https://www.teamchevroletlv.com/searchnew.aspx', parseTeam),
+  ]);
+
+  res.json({
+    fairway: { count: competitorInventory.fairway.vehicles.length, lastUpdated: competitorInventory.fairway.lastUpdated, status: competitorInventory.fairway.status },
+    henderson: { count: competitorInventory.henderson.vehicles.length, lastUpdated: competitorInventory.henderson.lastUpdated, status: competitorInventory.henderson.status },
+    team: { count: competitorInventory.team.vehicles.length, lastUpdated: competitorInventory.team.lastUpdated, status: competitorInventory.team.status },
+  });
+});
+
+// API: Get competitor inventory (with search/filter)
+app.get('/api/competitors/inventory', requireAuth, (req, res) => {
+  const { dealer, model, minPrice, maxPrice, year, search } = req.query;
+
+  let allVehicles = [];
+  if (!dealer || dealer === 'all') {
+    allVehicles = [
+      ...competitorInventory.fairway.vehicles,
+      ...competitorInventory.henderson.vehicles,
+      ...competitorInventory.team.vehicles,
+    ];
+  } else {
+    allVehicles = competitorInventory[dealer]?.vehicles || [];
+  }
+
+  // Apply filters
+  if (model) allVehicles = allVehicles.filter(v => v.model.toLowerCase().includes(model.toLowerCase()));
+  if (year) allVehicles = allVehicles.filter(v => v.year === year);
+  if (minPrice) allVehicles = allVehicles.filter(v => v.price && v.price >= parseFloat(minPrice));
+  if (maxPrice) allVehicles = allVehicles.filter(v => v.price && v.price <= parseFloat(maxPrice));
+  if (search) {
+    const q = search.toLowerCase();
+    allVehicles = allVehicles.filter(v =>
+      v.title.toLowerCase().includes(q) ||
+      v.model.toLowerCase().includes(q) ||
+      v.trim.toLowerCase().includes(q) ||
+      v.vin.toLowerCase().includes(q) ||
+      v.stockNumber.toLowerCase().includes(q)
+    );
+  }
+
+  res.json({
+    vehicles: allVehicles,
+    total: allVehicles.length,
+    lastUpdated: {
+      fairway: competitorInventory.fairway.lastUpdated,
+      henderson: competitorInventory.henderson.lastUpdated,
+      team: competitorInventory.team.lastUpdated,
+    },
+  });
+});
+
+// API: Compare a specific vehicle across dealers
+app.get('/api/competitors/compare', requireAuth, (req, res) => {
+  const { model, year } = req.query;
+  if (!model) return res.status(400).json({ error: 'model is required' });
+
+  const q = model.toLowerCase();
+  const yFilter = year || '';
+
+  // Search our inventory
+  const ourMatches = inventoryModule.matchInventory(model, { maxResults: 10 })
+    .map(v => ({ ...v, dealer: 'Findlay Chevrolet', dealerShort: 'Findlay' }));
+
+  // Search competitor inventories
+  const compMatches = [
+    ...competitorInventory.fairway.vehicles,
+    ...competitorInventory.henderson.vehicles,
+    ...competitorInventory.team.vehicles,
+  ].filter(v => {
+    const matchModel = v.model.toLowerCase().includes(q) || v.title.toLowerCase().includes(q);
+    const matchYear = !yFilter || v.year === yFilter;
+    return matchModel && matchYear;
+  });
+
+  res.json({
+    query: { model, year },
+    findlay: ourMatches,
+    competitors: compMatches,
+    totalFindings: ourMatches.length + compMatches.length,
+  });
+});
+
+// API: Get scrape status
+app.get('/api/competitors/status', requireAuth, (req, res) => {
+  res.json({
+    fairway: { count: competitorInventory.fairway.vehicles.length, lastUpdated: competitorInventory.fairway.lastUpdated, status: competitorInventory.fairway.status },
+    henderson: { count: competitorInventory.henderson.vehicles.length, lastUpdated: competitorInventory.henderson.lastUpdated, status: competitorInventory.henderson.status },
+    team: { count: competitorInventory.team.vehicles.length, lastUpdated: competitorInventory.team.lastUpdated, status: competitorInventory.team.status },
+  });
+});
+
+// Auto-scrape competitors every 6 hours
+setInterval(() => {
+  console.log('[CompIntel] Auto-refreshing competitor inventory...');
+  scrapeDealer('fairway', 'https://www.fairwaychevy.com/new-vehicles/', parseFairway);
+  scrapeDealer('henderson', 'https://www.hendersonchevy.com/new-vehicles/', parseHenderson);
+  scrapeDealer('team', 'https://www.teamchevroletlv.com/searchnew.aspx', parseTeam);
+}, 6 * 60 * 60 * 1000);
+
 // TikTok connection status
 app.get('/api/tiktok/status', (req, res) => {
   res.json({
@@ -4667,6 +4940,14 @@ app.get('/api/tiktok/status', (req, res) => {
 app.listen(PORT, () => {
   // Start inventory auto-refresh
   inventoryModule.startAutoRefresh();
+
+  // Initial competitor scrape (30 seconds after boot so we don't slow startup)
+  setTimeout(() => {
+    console.log('[CompIntel] Running initial competitor inventory scrape...');
+    scrapeDealer('fairway', 'https://www.fairwaychevy.com/new-vehicles/', parseFairway);
+    scrapeDealer('henderson', 'https://www.hendersonchevy.com/new-vehicles/', parseHenderson);
+    scrapeDealer('team', 'https://www.teamchevroletlv.com/searchnew.aspx', parseTeam);
+  }, 30000);
 
   console.log(`
   ╔══════════════════════════════════════════════════╗
