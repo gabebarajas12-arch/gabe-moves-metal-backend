@@ -2179,23 +2179,31 @@
                             <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 20px;">Deal Details</h3>
                             <div class="calc-grid">
                                 <div class="form-group">
-                                    <label>Vehicle Price</label>
+                                    <label>Selling Price <span style="font-size:11px;color:var(--text-secondary);">(after dealer discount)</span></label>
                                     <input type="number" id="vehiclePrice" placeholder="0" value="35000" />
                                 </div>
                                 <div class="form-group">
-                                    <label>Down Payment</label>
-                                    <input type="number" id="downPayment" placeholder="0" value="5000" />
+                                    <label>Rebates / Incentives <span style="font-size:11px;color:var(--text-secondary);">(not taxed)</span></label>
+                                    <input type="number" id="rebates" placeholder="0" value="0" />
                                 </div>
                                 <div class="form-group">
-                                    <label>Trade-In Value</label>
+                                    <label>Down Payment</label>
+                                    <input type="number" id="downPayment" placeholder="0" value="0" />
+                                </div>
+                                <div class="form-group">
+                                    <label>Trade-In Value (ACV)</label>
                                     <input type="number" id="tradeInValue" placeholder="0" value="0" />
+                                </div>
+                                <div class="form-group">
+                                    <label>Trade Payoff <span style="font-size:11px;color:var(--text-secondary);">(amount still owed)</span></label>
+                                    <input type="number" id="tradePayoff" placeholder="0" value="0" />
                                 </div>
                                 <div class="form-group">
                                     <label>APR %</label>
                                     <input type="number" id="apr" placeholder="6.9" value="6.9" step="0.1" />
                                 </div>
                                 <div class="form-group">
-                                    <label>Loan Term (months)</label>
+                                    <label>Loan Term</label>
                                     <select id="loanTerm">
                                         <option value="24">24 months</option>
                                         <option value="36">36 months</option>
@@ -2208,6 +2216,10 @@
                                 <div class="form-group">
                                     <label>Tax Rate %</label>
                                     <input type="number" id="taxRate" placeholder="8.375" value="8.375" step="0.01" />
+                                </div>
+                                <div class="form-group">
+                                    <label>Doc Fee <span style="font-size:11px;color:var(--text-secondary);">(taxed)</span></label>
+                                    <input type="number" id="docFee" placeholder="499" value="499" />
                                 </div>
                             </div>
                             <button class="btn btn-primary" onclick="calculateDeal()" style="width: 100%; margin-top: 20px; padding: 12px;">Calculate</button>
@@ -2222,20 +2234,40 @@
                             </div>
                             <div class="calc-result">
                                 <div class="calc-result-row">
-                                    <span>Amount Financed</span>
-                                    <span id="amountFinanced">$0.00</span>
+                                    <span>Selling Price</span>
+                                    <span id="sellingPrice">$0.00</span>
+                                </div>
+                                <div class="calc-result-row">
+                                    <span>Doc Fee</span>
+                                    <span id="docFeeDisplay">$499.00</span>
+                                </div>
+                                <div class="calc-result-row">
+                                    <span>Tax (<span id="taxRateDisplay">8.375</span>%) <span style="font-size:10px;color:var(--text-secondary);">on price + doc − trade</span></span>
+                                    <span id="taxAmount">$0.00</span>
+                                </div>
+                                <div class="calc-result-row" style="border-top: 1px solid var(--border-color); padding-top: 8px; margin-top: 5px;">
+                                    <span>Rebates / Incentives</span>
+                                    <span id="rebatesDisplay" style="color: #4CAF50;">−$0.00</span>
+                                </div>
+                                <div class="calc-result-row">
+                                    <span>Down Payment</span>
+                                    <span id="downDisplay" style="color: #4CAF50;">−$0.00</span>
+                                </div>
+                                <div class="calc-result-row">
+                                    <span>Trade Equity <span id="equityLabel" style="font-size:11px;color:var(--text-secondary);"></span></span>
+                                    <span id="tradeEquity">$0.00</span>
+                                </div>
+                                <div class="calc-result-row" style="border-top: 2px solid var(--accent-color); padding-top: 10px; margin-top: 8px;">
+                                    <span style="font-weight:700;">Amount Financed</span>
+                                    <span id="amountFinanced" style="font-weight:700;">$0.00</span>
                                 </div>
                                 <div class="calc-result-row">
                                     <span>Total Interest</span>
                                     <span id="totalInterest">$0.00</span>
                                 </div>
-                                <div class="calc-result-row">
-                                    <span>Total Cost</span>
-                                    <span id="totalCost">$0.00</span>
-                                </div>
-                                <div class="calc-result-row">
-                                    <span>Tax Amount</span>
-                                    <span id="taxAmount">$0.00</span>
+                                <div class="calc-result-row" style="border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 5px;">
+                                    <span style="font-weight:700;">Total of Payments</span>
+                                    <span id="totalCost" style="font-weight:700;">$0.00</span>
                                 </div>
                             </div>
                             <button class="btn btn-secondary" onclick="openCompareScenarios()" style="width: 100%; margin-top: 20px;">Compare Scenarios</button>
@@ -5923,28 +5955,78 @@
         }
 
         // ===== DEAL CALCULATOR FUNCTIONS =====
+        // Nevada deal structure:
+        //   Taxable amount = Selling Price + Doc Fee - Trade ACV (trade reduces taxable)
+        //   Tax = taxable amount × rate
+        //   Rebates come off AFTER tax (not taxed)
+        //   Trade equity = ACV - Payoff (negative = rolled into loan)
+        //   Amount financed = Selling Price + Doc Fee + Tax - Rebates - Down Payment - Trade Equity
         function calculateDeal() {
             const price = parseFloat(document.getElementById('vehiclePrice').value) || 0;
+            const rebates = parseFloat(document.getElementById('rebates').value) || 0;
             const down = parseFloat(document.getElementById('downPayment').value) || 0;
-            const tradeIn = parseFloat(document.getElementById('tradeInValue').value) || 0;
+            const tradeACV = parseFloat(document.getElementById('tradeInValue').value) || 0;
+            const tradePayoff = parseFloat(document.getElementById('tradePayoff').value) || 0;
             const apr = parseFloat(document.getElementById('apr').value) || 6.9;
             const months = parseInt(document.getElementById('loanTerm').value) || 60;
             const taxRate = parseFloat(document.getElementById('taxRate').value) || 8.375;
+            const docFee = parseFloat(document.getElementById('docFee').value) || 499;
 
-            const taxableAmount = price - tradeIn; // In NV, trade-in reduces taxable amount
+            // Trade equity (positive = customer has equity, negative = negative equity/upside down)
+            const tradeEquity = tradeACV - tradePayoff;
+
+            // Taxable amount: selling price + doc fee - trade ACV (NV trade-in reduces taxable)
+            const taxableAmount = Math.max(0, price + docFee - tradeACV);
             const taxAmount = taxableAmount * (taxRate / 100);
-            const totalCost = price + taxAmount;
-            const amountFinanced = totalCost - down - tradeIn;
+
+            // Amount financed = price + doc + tax - rebates - down - trade equity
+            // If trade equity is negative, it adds to the loan (negative equity rolls in)
+            const amountFinanced = price + docFee + taxAmount - rebates - down - tradeEquity;
+
+            // Update results display
+            document.getElementById('sellingPrice').textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('docFeeDisplay').textContent = '$' + docFee.toFixed(2);
+            document.getElementById('taxRateDisplay').textContent = taxRate;
+            document.getElementById('taxAmount').textContent = '$' + taxAmount.toFixed(2);
+            document.getElementById('rebatesDisplay').textContent = rebates > 0 ? '−$' + rebates.toFixed(2) : '$0.00';
+            document.getElementById('rebatesDisplay').style.color = rebates > 0 ? '#4CAF50' : 'var(--text-primary)';
+            document.getElementById('downDisplay').textContent = down > 0 ? '−$' + down.toFixed(2) : '$0.00';
+            document.getElementById('downDisplay').style.color = down > 0 ? '#4CAF50' : 'var(--text-primary)';
+
+            // Trade equity display
+            if (tradeACV > 0 || tradePayoff > 0) {
+                if (tradeEquity >= 0) {
+                    document.getElementById('tradeEquity').textContent = '−$' + tradeEquity.toFixed(2);
+                    document.getElementById('tradeEquity').style.color = '#4CAF50';
+                    document.getElementById('equityLabel').textContent = '(positive)';
+                } else {
+                    document.getElementById('tradeEquity').textContent = '+$' + Math.abs(tradeEquity).toFixed(2);
+                    document.getElementById('tradeEquity').style.color = '#f44336';
+                    document.getElementById('equityLabel').textContent = '(negative — rolled in)';
+                }
+            } else {
+                document.getElementById('tradeEquity').textContent = '$0.00';
+                document.getElementById('tradeEquity').style.color = 'var(--text-primary)';
+                document.getElementById('equityLabel').textContent = '';
+            }
+
+            if (amountFinanced <= 0) {
+                document.getElementById('monthlyPayment').textContent = '$0.00';
+                document.getElementById('amountFinanced').textContent = '$0.00';
+                document.getElementById('totalInterest').textContent = '$0.00';
+                document.getElementById('totalCost').textContent = '$0.00';
+                return;
+            }
+
             const monthlyRate = apr / 100 / 12;
             const monthlyPayment = amountFinanced * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
             const totalPaid = monthlyPayment * months;
             const totalInterest = totalPaid - amountFinanced;
 
             document.getElementById('monthlyPayment').textContent = '$' + monthlyPayment.toFixed(2);
-            document.getElementById('amountFinanced').textContent = '$' + amountFinanced.toFixed(2);
+            document.getElementById('amountFinanced').textContent = '$' + amountFinanced.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('totalInterest').textContent = '$' + totalInterest.toFixed(2);
-            document.getElementById('totalCost').textContent = '$' + totalCost.toFixed(2);
-            document.getElementById('taxAmount').textContent = '$' + taxAmount.toFixed(2);
+            document.getElementById('totalCost').textContent = '$' + totalPaid.toFixed(2);
         }
 
         function openCompareScenarios() {
@@ -5991,17 +6073,21 @@
         function getCurrentCalculation() {
             return {
                 price: parseFloat(document.getElementById('vehiclePrice').value) || 0,
+                rebates: parseFloat(document.getElementById('rebates').value) || 0,
                 down: parseFloat(document.getElementById('downPayment').value) || 0,
-                tradeIn: parseFloat(document.getElementById('tradeInValue').value) || 0,
-                taxRate: parseFloat(document.getElementById('taxRate').value) || 8.375
+                tradeACV: parseFloat(document.getElementById('tradeInValue').value) || 0,
+                tradePayoff: parseFloat(document.getElementById('tradePayoff').value) || 0,
+                taxRate: parseFloat(document.getElementById('taxRate').value) || 8.375,
+                docFee: parseFloat(document.getElementById('docFee').value) || 499
             };
         }
 
-        function calculateScenario(currentCalcs, months, apr) {
-            const taxableAmount = currentCalcs.price - currentCalcs.tradeIn;
-            const taxAmount = taxableAmount * (currentCalcs.taxRate / 100);
-            const totalCost = currentCalcs.price + taxAmount;
-            const amountFinanced = totalCost - currentCalcs.down - currentCalcs.tradeIn;
+        function calculateScenario(c, months, apr) {
+            const tradeEquity = c.tradeACV - c.tradePayoff;
+            const taxableAmount = Math.max(0, c.price + c.docFee - c.tradeACV);
+            const taxAmount = taxableAmount * (c.taxRate / 100);
+            const amountFinanced = c.price + c.docFee + taxAmount - c.rebates - c.down - tradeEquity;
+            if (amountFinanced <= 0) return { monthlyPayment: 0, totalInterest: 0, totalCost: 0 };
             const monthlyRate = apr / 100 / 12;
             const monthlyPayment = amountFinanced * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
             const totalPaid = monthlyPayment * months;
@@ -6010,7 +6096,7 @@
             return {
                 monthlyPayment,
                 totalInterest,
-                totalCost: totalCost + totalInterest
+                totalCost: totalPaid
             };
         }
 

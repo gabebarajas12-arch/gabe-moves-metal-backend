@@ -5376,43 +5376,54 @@ app.post('/api/analytics/track-response', requireAuth, (req, res) => {
 // ==================== PAYMENT CALCULATOR ====================
 app.post('/api/calculator/payment', (req, res) => {
   try {
-    const { vehiclePrice, downPayment, tradeValue, apr, termMonths, taxRate } = req.body;
+    const { vehiclePrice, downPayment, tradeValue, tradePayoff, rebates, apr, termMonths, taxRate, docFee } = req.body;
 
     if (!vehiclePrice || !apr || !termMonths) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Calculate taxable amount
-    const netPrice = vehiclePrice - (tradeValue || 0);
-    const taxPct = (taxRate || 8.375) / 100; // taxRate comes in as 8.375, not 0.08375
-    const taxAmount = netPrice * taxPct;
-    const totalCost = netPrice + taxAmount;
-    const amountFinanced = totalCost - (downPayment || 0);
+    // Nevada deal math:
+    // Trade equity = ACV - payoff (negative = upside down, rolls into loan)
+    const tradeACV = tradeValue || 0;
+    const payoff = tradePayoff || 0;
+    const tradeEquity = tradeACV - payoff;
+    const dealerDocFee = docFee || 499;
+    const dealerRebates = rebates || 0;
+
+    // Taxable amount = selling price + doc fee - trade ACV
+    const taxableAmount = Math.max(0, vehiclePrice + dealerDocFee - tradeACV);
+    const taxPct = (taxRate || 8.375) / 100;
+    const taxAmount = taxableAmount * taxPct;
+
+    // Amount financed = price + doc + tax - rebates - down - trade equity
+    const amountFinanced = vehiclePrice + dealerDocFee + taxAmount - dealerRebates - (downPayment || 0) - tradeEquity;
 
     if (amountFinanced <= 0) {
       return res.json({
-        monthlyPayment: 0,
-        totalInterest: 0,
-        totalCost,
-        amountFinanced: 0,
-        taxAmount,
+        monthlyPayment: 0, totalInterest: 0, amountFinanced: 0,
+        taxAmount: Math.round(taxAmount * 100) / 100,
+        tradeEquity: Math.round(tradeEquity * 100) / 100,
+        docFee: dealerDocFee, rebates: dealerRebates,
       });
     }
 
     // Standard amortization formula: M = P * [r(1+r)^n] / [(1+r)^n - 1]
-    // where P = principal, r = monthly rate, n = number of months
     const monthlyRate = apr / 100 / 12;
     const numerator = monthlyRate * Math.pow(1 + monthlyRate, termMonths);
     const denominator = Math.pow(1 + monthlyRate, termMonths) - 1;
     const monthlyPayment = amountFinanced * (numerator / denominator);
-    const totalInterest = (monthlyPayment * termMonths) - amountFinanced;
+    const totalPaid = monthlyPayment * termMonths;
+    const totalInterest = totalPaid - amountFinanced;
 
     res.json({
       monthlyPayment: Math.round(monthlyPayment * 100) / 100,
       totalInterest: Math.round(totalInterest * 100) / 100,
-      totalCost: Math.round(totalCost * 100) / 100,
+      totalOfPayments: Math.round(totalPaid * 100) / 100,
       amountFinanced: Math.round(amountFinanced * 100) / 100,
       taxAmount: Math.round(taxAmount * 100) / 100,
+      tradeEquity: Math.round(tradeEquity * 100) / 100,
+      docFee: dealerDocFee,
+      rebates: dealerRebates,
     });
   } catch (error) {
     console.error('[Payment Calculator] Error:', error.message);
