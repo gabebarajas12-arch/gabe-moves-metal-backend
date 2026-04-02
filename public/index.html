@@ -4446,19 +4446,9 @@
 
         // ==================== WINDOW STICKER ====================
         function viewWindowSticker(vin, title) {
-            const modal = document.getElementById('stickerModal');
-            modal.style.display = 'block';
-            document.getElementById('stickerTitle').textContent = `Window Sticker — ${title}`;
-            const content = document.getElementById('stickerContent');
-            // GM's official window sticker URL
+            // GM blocks iframe embedding — open directly in new tab
             const stickerUrl = `https://cws.gm.com/vs-cws/vehshop/v2/vehicle/windowsticker?vin=${vin}`;
-            content.innerHTML = `
-                <div style="margin-bottom:12px;">
-                    <a href="${stickerUrl}" target="_blank" style="color:var(--gold);font-size:14px;">Open full sticker in new tab</a>
-                    <span style="color:var(--text-secondary);font-size:12px;margin-left:8px;">VIN: ${vin}</span>
-                </div>
-                <iframe src="${stickerUrl}" style="width:100%;height:75vh;border:none;border-radius:8px;background:#fff;" onload="this.style.background='transparent'" onerror="this.outerHTML='<p style=\\'color:var(--text-secondary);padding:20px;\\'>Could not load sticker. <a href=${stickerUrl} target=_blank style=color:var(--gold)>Try opening directly</a></p>'"></iframe>
-            `;
+            window.open(stickerUrl, '_blank');
         }
 
         function closeStickerModal() {
@@ -4574,20 +4564,75 @@
             const mileages = selected.map(v => parseInt(v.mileage) || 0);
             const daysArr = selected.map(v => parseInt(v.daysOnLot) || 0);
 
-            // Build features per vehicle
-            const vehicleFeatures = selected.map(v => new Set(v.features || []));
+            // Build features per vehicle — VIN decode ONLY (manufacturer data, not dealer websites)
+            // VIN decode is the source of truth — dealer sites are often wrong
+            const VIN_FEATURE_KEYS = [
+                { key: 'Backup Camera', label: 'Backup Camera', cat: 'Safety Tech' },
+                { key: 'Blind Spot Warning', label: 'Blind Spot Monitor', cat: 'Safety Tech' },
+                { key: 'Lane Departure Warning', label: 'Lane Departure Warning', cat: 'Safety Tech' },
+                { key: 'Lane Keep Assist', label: 'Lane Keep Assist', cat: 'Safety Tech' },
+                { key: 'Forward Collision Warning', label: 'Forward Collision Warning', cat: 'Safety Tech' },
+                { key: 'Adaptive Cruise Control (ACC)', label: 'Adaptive Cruise Control', cat: 'Safety Tech' },
+                { key: 'Automatic Emergency Braking (AEB)', label: 'Auto Emergency Braking', cat: 'Safety Tech' },
+                { key: 'Pedestrian Automatic Emergency Braking (PAEB)', label: 'Pedestrian Auto Braking', cat: 'Safety Tech' },
+                { key: 'Rear Cross Traffic Alert', label: 'Rear Cross Traffic Alert', cat: 'Safety Tech' },
+                { key: 'Parking Assist', label: 'Parking Assist', cat: 'Safety Tech' },
+                { key: 'Traction Control', label: 'Traction Control', cat: 'Safety Tech' },
+                { key: 'Electronic Stability Control (ESC)', label: 'Stability Control', cat: 'Safety Tech' },
+                { key: 'Anti-lock Braking System (ABS)', label: 'ABS', cat: 'Safety Tech' },
+                { key: 'Daytime Running Light (DRL)', label: 'Daytime Running Lights', cat: 'Safety Tech' },
+                { key: 'Headlamp Light Source', label: null, cat: 'Safety Tech' }, // parsed below
+                { key: 'Turbo', label: 'Turbo Engine', cat: 'Performance' },
+                { key: 'Keyless Ignition', label: 'Push Button Start', cat: 'Convenience' },
+                { key: 'SAE Automation Level', label: null, cat: 'Technology' }, // parsed below
+                { key: 'Semiautomatic Headlamp Beam Switching', label: 'Auto High Beams', cat: 'Technology' },
+                { key: 'Adaptive Driving Beam (ADB)', label: 'Adaptive Headlights', cat: 'Technology' },
+                { key: 'Top Speed (MPH)', label: null, cat: 'Performance' },
+            ];
+
+            const vehicleFeatures = selected.map((v, i) => {
+                const feats = new Set();
+                // Use VIN decode as the sole source of truth
+                VIN_FEATURE_KEYS.forEach(vf => {
+                    const val = decoded[i][vf.key];
+                    if (val && val !== 'Not Applicable' && val.toLowerCase() !== 'no' && val !== '0') {
+                        if (vf.label) {
+                            feats.add(vf.label);
+                        } else if (vf.key === 'Headlamp Light Source') {
+                            if (val.toLowerCase().includes('led')) feats.add('LED Headlights');
+                        }
+                    }
+                });
+                // Drivetrain from VIN
+                const drive = decoded[i]['Drive Type'] || '';
+                if (drive.match(/4WD|4x4/i)) feats.add('4WD');
+                else if (drive.match(/AWD|All.Wheel/i)) feats.add('AWD');
+                // Engine type
+                const disp = decoded[i]['Displacement (L)'] || '';
+                const cyl = decoded[i]['Engine Number of Cylinders'] || '';
+                if (disp && cyl) feats.add(`${disp}L ${cyl}-Cyl Engine`);
+                // Airbag config
+                const sideAir = decoded[i]['Side Air Bag Locations'] || '';
+                if (sideAir && sideAir !== 'Not Applicable') feats.add('Side Airbags');
+                const curtainAir = decoded[i]['Curtain Air Bag Locations'] || '';
+                if (curtainAir && curtainAir !== 'Not Applicable') feats.add('Curtain Airbags');
+                const kneeAir = decoded[i]['Knee Air Bag Locations'] || '';
+                if (kneeAir && kneeAir !== 'Not Applicable') feats.add('Knee Airbags');
+                return feats;
+            });
+
             const allFeatureSet = new Set();
             vehicleFeatures.forEach(s => s.forEach(f => allFeatureSet.add(f)));
             const allFeatureList = [...allFeatureSet].sort();
 
-            // Categorize differences
-            const featureDiffs = []; // {feature, category, hasIt: [bool, bool...]}
+            // Only compare features where at least one vehicle differs
+            const featureDiffs = [];
             const featureShared = [];
             allFeatureList.forEach(f => {
                 const hasIt = vehicleFeatures.map(s => s.has(f));
                 if (hasIt.every(Boolean)) {
                     featureShared.push(f);
-                } else {
+                } else if (hasIt.some(Boolean)) {
                     featureDiffs.push({ feature: f, category: categorizeFeature(f), hasIt });
                 }
             });
@@ -4853,17 +4898,22 @@
             // ============ WINDOW STICKERS ============
             html += `<div style="margin-bottom:12px;">
                 <h3 style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:4px;">Window Stickers</h3>
-                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">Full MSRP breakdown, packages, and options from GM.</p>
+                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">Full MSRP breakdown, packages, and options from GM. Opens in new tab (GM blocks embedded viewing).</p>
             </div>`;
             html += `<div style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:12px;">`;
             selected.forEach(v => {
                 const stickerUrl = v.vin ? `https://cws.gm.com/vs-cws/vehshop/v2/vehicle/windowsticker?vin=${v.vin}` : '';
                 const isFindlay = v.dealer === 'Findlay' || v.dealerShort === 'Findlay';
+                const detailUrl = v.url || v.detailUrl || '#';
                 html += `<div style="background:var(--card-bg);border-radius:12px;overflow:hidden;border:1px solid ${isFindlay ? 'var(--gold)' : 'var(--border-color)'};">
-                    <div style="padding:8px 12px;background:${isFindlay ? 'rgba(212,175,55,0.15)' : 'var(--dark-bg)'};font-size:13px;font-weight:700;text-align:center;${isFindlay ? 'color:var(--gold);' : ''}">
-                        ${v.year} ${v.model || ''} ${v.vin ? `<a href="${stickerUrl}" target="_blank" style="margin-left:6px;font-size:11px;color:var(--text-secondary);">Open ↗</a>` : ''}
+                    <div style="padding:14px;text-align:center;">
+                        <div style="font-size:14px;font-weight:700;margin-bottom:4px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}</div>
+                        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;">VIN: ${v.vin || 'N/A'}</div>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            ${v.vin ? `<a href="${stickerUrl}" target="_blank" style="display:block;padding:10px;background:var(--gold);color:#000;font-weight:700;font-size:13px;border-radius:8px;text-decoration:none;text-align:center;">View Window Sticker</a>` : '<div style="color:var(--text-secondary);font-size:12px;">No VIN available</div>'}
+                            ${detailUrl !== '#' ? `<a href="${detailUrl}" target="_blank" style="display:block;padding:8px;background:var(--dark-bg);border:1px solid var(--border-color);color:var(--text-primary);font-size:12px;border-radius:8px;text-decoration:none;text-align:center;">View on Dealer Site</a>` : ''}
+                        </div>
                     </div>
-                    ${v.vin ? `<iframe src="${stickerUrl}" style="width:100%;height:70vh;border:none;background:#fff;"></iframe>` : '<div style="height:150px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);">No VIN</div>'}
                 </div>`;
             });
             html += '</div>';

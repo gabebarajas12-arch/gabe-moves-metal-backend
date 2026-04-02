@@ -4717,6 +4717,13 @@ async function scrapeDealerInspire(name, indexName, dealerLabel, dealerShort, si
         const img = hit.photo || hit.thumbnail || '';
 
         if (vin) {
+          // Try to get real image from DealerInspire CDN pattern
+          let realImg = img;
+          if (!img || img.includes('notfound') || img.includes('no-image') || img.includes('placeholder')) {
+            // DealerInspire CDN image pattern
+            realImg = `https://pictures.dealer.com/f/${name === 'fairway' ? 'fairwaychevroletbuickgmc' : 'hendersonchevroletbuickgmc'}/0/img/${vin}_1.jpg`;
+          }
+
           allVehicles.push({
             dealer: dealerLabel,
             dealerShort,
@@ -4730,8 +4737,19 @@ async function scrapeDealerInspire(name, indexName, dealerLabel, dealerShort, si
             msrp: msrp ? parseFloat(msrp) : null,
             priceFormatted: price ? `$${parseFloat(price).toLocaleString()}` : 'Call for price',
             stockNumber: stockNum,
-            image: img,
-            url: siteUrl,
+            image: realImg,
+            url: hit.link || siteUrl,
+            // Extra fields for comparison
+            drivetrain: hit.drivetrain || '',
+            engine: hit.engine_description || '',
+            fuelType: hit.fueltype || '',
+            cityMpg: hit.city_mpg || '',
+            hwyMpg: hit.hw_mpg || '',
+            exteriorColor: hit.ext_color || '',
+            interiorColor: hit.int_color || '',
+            mileage: hit.miles || 0,
+            daysOnLot: hit.days_in_stock || 0,
+            condition: hit.type || 'New',
           });
         }
       });
