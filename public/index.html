@@ -1607,10 +1607,7 @@
                     <div class="icon">▬</div>
                     <span>Battlecard</span>
                 </div>
-                <div class="nav-item" data-page="sms">
-                    <div class="icon">▬</div>
-                    <span>SMS Inbox</span>
-                </div>
+                <!-- SMS Inbox moved into Leads panel -->
                 <!-- Deal Calculator moved into Leads panel -->
                 <div class="nav-item" data-page="analytics">
                     <div class="icon">▬</div>
@@ -2199,49 +2196,7 @@
                     </div>
                 </div>
 
-                <!-- SMS Inbox Page -->
-                <div class="page" id="sms">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="font-size: 20px; font-weight: 700;">SMS Inbox</h2>
-                        <div style="display: flex; gap: 10px;">
-                            <button class="btn btn-secondary" onclick="openNewSMSModal()">New Message</button>
-                            <button class="btn btn-secondary" onclick="refreshSMSConversations()">Refresh</button>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 10px; margin-bottom: 20px; font-size: 14px;">
-                        <div style="background: var(--card-bg); padding: 12px 16px; border-radius: 8px;">
-                            <span style="color: var(--text-secondary);">Total Messages:</span>
-                            <span style="color: var(--accent-color); font-weight: 700; margin-left: 8px;" id="totalSMSCount">0</span>
-                        </div>
-                        <div style="background: var(--card-bg); padding: 12px 16px; border-radius: 8px;">
-                            <span style="color: var(--text-secondary);">Auto-Replies:</span>
-                            <span style="color: var(--accent-color); font-weight: 700; margin-left: 8px;" id="autoReplyCount">0</span>
-                        </div>
-                    </div>
-
-                    <div class="sms-container">
-                        <div class="sms-conversations-list" id="smsConversationsList">
-                            <div style="padding: 20px; text-align: center; color: var(--text-secondary);">Loading conversations...</div>
-                        </div>
-                        <div class="sms-thread-panel">
-                            <div class="sms-thread-header">
-                                <div>
-                                    <div id="smsSelectedName" style="font-size: 16px; font-weight: 700;">Select a conversation</div>
-                                    <div id="smsSelectedPhone" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;"></div>
-                                </div>
-                                <button class="btn btn-secondary" onclick="viewSMSLeadProfile()" style="padding: 8px 12px; font-size: 12px;">View Lead Profile</button>
-                            </div>
-                            <div class="sms-thread" id="smsThread">
-                                <div style="padding: 20px; text-align: center; color: var(--text-secondary);">Select a conversation to view messages</div>
-                            </div>
-                            <div class="sms-input-bar">
-                                <input type="text" id="smsMessageInput" placeholder="Type a message..." />
-                                <button class="btn btn-primary" onclick="sendSMS()">Send</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- SMS Inbox removed — now lives inside Lead panel tabs -->
 
                 <!-- Deal Calculator removed — now lives inside Lead panel tabs -->
 
@@ -2986,7 +2941,6 @@
                 notifications: 'Notifications',
                 calendar: 'Calendar',
                 intel: 'Competitive Intel',
-                sms: 'SMS Inbox',
                 analytics: 'Analytics'
             };
             document.getElementById('pageTitle').textContent = titles[page] || page;
@@ -3010,8 +2964,6 @@
                 loadAppointments();
             } else if (page === 'intel') {
                 loadCompetitorStatus();
-            } else if (page === 'sms') {
-                loadSMSConversations();
             } else if (page === 'analytics') {
                 loadAnalytics();
             }
