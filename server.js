@@ -5321,7 +5321,8 @@ app.post('/api/calculator/payment', (req, res) => {
 
     // Calculate taxable amount
     const netPrice = vehiclePrice - (tradeValue || 0);
-    const taxAmount = netPrice * (taxRate || 0.08);
+    const taxPct = (taxRate || 8.375) / 100; // taxRate comes in as 8.375, not 0.08375
+    const taxAmount = netPrice * taxPct;
     const totalCost = netPrice + taxAmount;
     const amountFinanced = totalCost - (downPayment || 0);
 
