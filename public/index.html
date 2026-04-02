@@ -764,6 +764,83 @@
             font-size: 10px;
             font-weight: 700;
             color: var(--gold);
+        }
+
+        .lead-panel-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--dark-bg);
+            gap: 0;
+        }
+
+        .lead-panel-tab {
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .lead-panel-tab.active {
+            color: var(--gold);
+            border-bottom-color: var(--gold);
+        }
+
+        .lead-panel-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .lead-panel-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .lead-msg-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .lead-msg-bubble {
+            max-width: 75%;
+            padding: 10px 14px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .lead-msg-in {
+            background: var(--card-bg);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .lead-msg-out {
+            background: var(--gold);
+            color: #000;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .lead-msg-time {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .lead-msg-auto {
+            font-size: 10px;
+            color: var(--gold);
+            margin-top: 2px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 4px;
@@ -1534,10 +1611,7 @@
                     <div class="icon">▬</div>
                     <span>SMS Inbox</span>
                 </div>
-                <div class="nav-item" data-page="calculator">
-                    <div class="icon">▬</div>
-                    <span>Deal Calculator</span>
-                </div>
+                <!-- Deal Calculator moved into Leads panel -->
                 <div class="nav-item" data-page="analytics">
                     <div class="icon">▬</div>
                     <span>Analytics</span>
@@ -2169,123 +2243,7 @@
                     </div>
                 </div>
 
-                <!-- Deal Calculator Page -->
-                <div class="page" id="calculator">
-                    <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 20px;">Deal Calculator</h2>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
-                        <!-- Input Card -->
-                        <div style="background: var(--card-bg); border-radius: 12px; padding: 24px; border: 1px solid var(--border-color);">
-                            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 20px;">Deal Details</h3>
-                            <div class="calc-grid">
-                                <div class="form-group">
-                                    <label>Selling Price <span style="font-size:11px;color:var(--text-secondary);">(after dealer discount)</span></label>
-                                    <input type="number" id="vehiclePrice" placeholder="0" value="35000" />
-                                </div>
-                                <div class="form-group">
-                                    <label>Rebates / Incentives <span style="font-size:11px;color:var(--text-secondary);">(not taxed)</span></label>
-                                    <input type="number" id="rebates" placeholder="0" value="0" />
-                                </div>
-                                <div class="form-group">
-                                    <label>Down Payment</label>
-                                    <input type="number" id="downPayment" placeholder="0" value="0" />
-                                </div>
-                                <div class="form-group">
-                                    <label>Trade-In Value (ACV)</label>
-                                    <input type="number" id="tradeInValue" placeholder="0" value="0" />
-                                </div>
-                                <div class="form-group">
-                                    <label>Trade Payoff <span style="font-size:11px;color:var(--text-secondary);">(amount still owed)</span></label>
-                                    <input type="number" id="tradePayoff" placeholder="0" value="0" />
-                                </div>
-                                <div class="form-group">
-                                    <label>APR %</label>
-                                    <input type="number" id="apr" placeholder="6.9" value="6.9" step="0.1" />
-                                </div>
-                                <div class="form-group">
-                                    <label>Loan Term</label>
-                                    <select id="loanTerm">
-                                        <option value="24">24 months</option>
-                                        <option value="36">36 months</option>
-                                        <option value="48">48 months</option>
-                                        <option value="60" selected>60 months</option>
-                                        <option value="72">72 months</option>
-                                        <option value="84">84 months</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>Tax Rate %</label>
-                                    <input type="number" id="taxRate" placeholder="8.375" value="8.375" step="0.01" />
-                                </div>
-                                <div class="form-group">
-                                    <label>Doc Fee <span style="font-size:11px;color:var(--text-secondary);">(taxed)</span></label>
-                                    <input type="number" id="docFee" placeholder="499" value="499" />
-                                </div>
-                            </div>
-                            <button class="btn btn-primary" onclick="calculateDeal()" style="width: 100%; margin-top: 20px; padding: 12px;">Calculate</button>
-                        </div>
-
-                        <!-- Results Card -->
-                        <div style="background: var(--card-bg); border-radius: 12px; padding: 24px; border: 1px solid var(--border-color);">
-                            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 20px;">Results</h3>
-                            <div style="text-align: center; margin-bottom: 30px;">
-                                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Monthly Payment</div>
-                                <div class="calc-monthly" id="monthlyPayment">$0.00</div>
-                            </div>
-                            <div class="calc-result">
-                                <div class="calc-result-row">
-                                    <span>Selling Price</span>
-                                    <span id="sellingPrice">$0.00</span>
-                                </div>
-                                <div class="calc-result-row">
-                                    <span>Doc Fee</span>
-                                    <span id="docFeeDisplay">$499.00</span>
-                                </div>
-                                <div class="calc-result-row">
-                                    <span>Tax (<span id="taxRateDisplay">8.375</span>%) <span style="font-size:10px;color:var(--text-secondary);">on price + doc − trade</span></span>
-                                    <span id="taxAmount">$0.00</span>
-                                </div>
-                                <div class="calc-result-row" style="border-top: 1px solid var(--border-color); padding-top: 8px; margin-top: 5px;">
-                                    <span>Rebates / Incentives</span>
-                                    <span id="rebatesDisplay" style="color: #4CAF50;">−$0.00</span>
-                                </div>
-                                <div class="calc-result-row">
-                                    <span>Down Payment</span>
-                                    <span id="downDisplay" style="color: #4CAF50;">−$0.00</span>
-                                </div>
-                                <div class="calc-result-row">
-                                    <span>Trade Equity <span id="equityLabel" style="font-size:11px;color:var(--text-secondary);"></span></span>
-                                    <span id="tradeEquity">$0.00</span>
-                                </div>
-                                <div class="calc-result-row" style="border-top: 2px solid var(--accent-color); padding-top: 10px; margin-top: 8px;">
-                                    <span style="font-weight:700;">Amount Financed</span>
-                                    <span id="amountFinanced" style="font-weight:700;">$0.00</span>
-                                </div>
-                                <div class="calc-result-row">
-                                    <span>Total Interest</span>
-                                    <span id="totalInterest">$0.00</span>
-                                </div>
-                                <div class="calc-result-row" style="border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 5px;">
-                                    <span style="font-weight:700;">Total of Payments</span>
-                                    <span id="totalCost" style="font-weight:700;">$0.00</span>
-                                </div>
-                            </div>
-                            <button class="btn btn-secondary" onclick="openCompareScenarios()" style="width: 100%; margin-top: 20px;">Compare Scenarios</button>
-                        </div>
-                    </div>
-
-                    <!-- Compare Scenarios Modal -->
-                    <div id="compareModal" class="modal-overlay" style="display: none;">
-                        <div class="modal" style="max-width: 900px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                                <h3 style="font-size: 18px; font-weight: 700;">Compare Scenarios</h3>
-                                <button onclick="closeCompareScenarios()" style="background: none; border: none; font-size: 20px; cursor: pointer;">×</button>
-                            </div>
-                            <div id="compareResults" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-height: 400px; overflow-y: auto;">
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Deal Calculator removed — now lives inside Lead panel tabs -->
 
                 <!-- Analytics Page -->
                 <div class="page" id="analytics">
@@ -3029,7 +2987,6 @@
                 calendar: 'Calendar',
                 intel: 'Competitive Intel',
                 sms: 'SMS Inbox',
-                calculator: 'Deal Calculator',
                 analytics: 'Analytics'
             };
             document.getElementById('pageTitle').textContent = titles[page] || page;
@@ -3055,8 +3012,6 @@
                 loadCompetitorStatus();
             } else if (page === 'sms') {
                 loadSMSConversations();
-            } else if (page === 'calculator') {
-                // Deal Calculator - client-side only, no load needed
             } else if (page === 'analytics') {
                 loadAnalytics();
             }
@@ -3634,7 +3589,10 @@
             const el = document.querySelector(`[data-lead-id="${leadId}"]`);
             if (el) el.style.borderLeft = '3px solid var(--gold)';
 
-            if (lead.conversationId) {
+            // If lead has phone, show tabbed view with messages
+            if (lead.phone) {
+                showLeadTabbedPanel(lead);
+            } else if (lead.conversationId) {
                 viewConversationInline(lead.conversationId, lead);
             } else {
                 // Show lead info panel with no conversation
@@ -3706,6 +3664,300 @@
                 console.error('Error loading conversation:', error);
                 panel.innerHTML = '<div style="padding:20px;text-align:center;color:var(--danger);">Error loading conversation.</div>';
             }
+        }
+
+        async function showLeadTabbedPanel(lead) {
+            const panel = document.getElementById('inlineConversationPanel');
+
+            // Determine which tabs to show
+            const hasMail = lead.phone;
+            const hasMessenger = lead.conversationId;
+
+            // Build tab HTML
+            let tabsHTML = '<div class="lead-panel-tabs">';
+            if (hasMail) {
+                tabsHTML += `<div class="lead-panel-tab active" onclick="switchLeadTab(event, '${lead.id}', 'messages')">Messages</div>`;
+            }
+            if (hasMessenger) {
+                tabsHTML += `<div class="lead-panel-tab" onclick="switchLeadTab(event, '${lead.id}', 'messenger')">Messenger/IG</div>`;
+            }
+            tabsHTML += `<div class="lead-panel-tab" onclick="switchLeadTab(event, '${lead.id}', 'calculator')">Deal Calc</div>`;
+            tabsHTML += `<div class="lead-panel-tab" onclick="switchLeadTab(event, '${lead.id}', 'info')">Lead Info</div>`;
+            tabsHTML += '</div>';
+
+            // Build content structure (Messages tab shown by default)
+            panel.innerHTML = tabsHTML + `
+                <div class="lead-panel-content">
+                    ${hasMail ? `<div id="lead-tab-messages-${lead.id}" style="display:flex;flex-direction:column;flex:1;overflow:hidden;"></div>` : ''}
+                    ${hasMessenger ? `<div id="lead-tab-messenger-${lead.id}" style="display:none;flex:1;overflow:hidden;"></div>` : ''}
+                    <div id="lead-tab-calculator-${lead.id}" style="display:none;flex-direction:column;flex:1;overflow-y:auto;padding:16px;"></div>
+                    <div id="lead-tab-info-${lead.id}" style="display:none;flex-direction:column;flex:1;overflow-y:auto;padding:20px;"></div>
+                </div>
+            `;
+
+            // Load initial content
+            if (hasMail) {
+                await loadLeadMessages(lead.id, lead.phone);
+            }
+        }
+
+        async function switchLeadTab(event, leadId, tabName) {
+            const lead = allLeads.find(l => l.id === leadId);
+            if (!lead) return;
+
+            // Update active tab styling
+            document.querySelectorAll('.lead-panel-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Hide all tabs
+            document.querySelectorAll('.lead-panel-content > div').forEach(div => {
+                div.style.display = 'none';
+            });
+
+            // Show selected tab
+            if (tabName === 'messages') {
+                const msgDiv = document.getElementById(`lead-tab-messages-${leadId}`);
+                if (msgDiv) {
+                    msgDiv.style.display = 'flex';
+                    if (!msgDiv.innerHTML.trim()) {
+                        loadLeadMessages(leadId, lead.phone);
+                    }
+                }
+            } else if (tabName === 'messenger') {
+                const messengerDiv = document.getElementById(`lead-tab-messenger-${leadId}`);
+                if (messengerDiv) {
+                    messengerDiv.style.display = 'flex';
+                    if (!messengerDiv.innerHTML.trim()) {
+                        loadLeadMessenger(leadId, lead);
+                    }
+                }
+            } else if (tabName === 'calculator') {
+                const calcDiv = document.getElementById(`lead-tab-calculator-${leadId}`);
+                if (calcDiv) {
+                    calcDiv.style.display = 'flex';
+                    if (!calcDiv.innerHTML.trim()) {
+                        loadLeadCalculator(leadId, lead, calcDiv);
+                    }
+                }
+            } else if (tabName === 'info') {
+                const infoDiv = document.getElementById(`lead-tab-info-${leadId}`);
+                if (infoDiv) {
+                    infoDiv.style.display = 'flex';
+                    if (!infoDiv.innerHTML.trim()) {
+                        loadLeadInfo(lead, infoDiv);
+                    }
+                }
+            }
+        }
+
+        async function loadLeadMessages(leadId, phone) {
+            const lead = allLeads.find(l => l.id === leadId);
+            const msgDiv = document.getElementById(`lead-tab-messages-${leadId}`);
+            if (!msgDiv) return;
+
+            msgDiv.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">Loading messages...</div>';
+
+            try {
+                // Normalize phone: strip non-digits, prepend +1 if 10 digits
+                let normalizedPhone = phone.replace(/\D/g, '');
+                if (normalizedPhone.length === 10) {
+                    normalizedPhone = '+1' + normalizedPhone;
+                } else if (!normalizedPhone.startsWith('+')) {
+                    normalizedPhone = '+' + normalizedPhone;
+                }
+
+                const response = await authFetch(`${API_BASE}/api/sms/messages/${encodeURIComponent(normalizedPhone)}`);
+                if (!response.ok) {
+                    msgDiv.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">Error loading messages</div>';
+                    return;
+                }
+
+                const messages = await response.json();
+                renderLeadMessages(leadId, phone, messages, msgDiv);
+            } catch (error) {
+                console.error('Error loading lead messages:', error);
+                msgDiv.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">Error loading messages</div>';
+            }
+        }
+
+        function renderLeadMessages(leadId, phone, messages, container) {
+            let html = '';
+
+            if (!messages || messages.length === 0) {
+                html = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);">No messages yet — send the first one below</div>';
+            } else {
+                html = '<div class="lead-msg-container">';
+                messages.forEach(msg => {
+                    const isOutbound = msg.direction === 'outbound';
+                    const bubbleClass = isOutbound ? 'lead-msg-out' : 'lead-msg-in';
+                    const msgTime = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    const autoTag = msg.isAutoReply ? '<div class="lead-msg-auto">⚡ Auto</div>' : '';
+                    html += `
+                        <div style="display:flex;flex-direction:column;${isOutbound ? 'align-items:flex-end;' : 'align-items:flex-start;'}">
+                            <div class="lead-msg-bubble ${bubbleClass}">${msg.body}</div>
+                            <div class="lead-msg-time">${msgTime}</div>
+                            ${autoTag}
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            // Add input area
+            html += `
+                <div style="padding:12px;border-top:1px solid var(--border-color);display:flex;gap:8px;">
+                    <input type="text" class="form-input lead-msg-input" data-lead-id="${leadId}" data-phone="${phone}" placeholder="Type a message..." style="flex:1;">
+                    <button class="btn btn-primary" onclick="sendLeadMessage('${leadId}', '${phone}')">Send</button>
+                </div>
+            `;
+
+            container.innerHTML = html;
+
+            // Auto-scroll to bottom
+            const msgContainer = container.querySelector('.lead-msg-container');
+            if (msgContainer) msgContainer.scrollTop = msgContainer.scrollHeight;
+        }
+
+        async function sendLeadMessage(leadId, phone) {
+            const input = document.querySelector(`[data-lead-id="${leadId}"][data-phone="${phone}"]`);
+            const body = input?.value.trim();
+            if (!body) return;
+
+            try {
+                const response = await authFetch(`${API_BASE}/api/sms/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, body })
+                });
+
+                if (!response.ok) throw new Error('Failed to send message');
+
+                input.value = '';
+
+                // Reload messages
+                await loadLeadMessages(leadId, phone);
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert('Failed to send message');
+            }
+        }
+
+        async function loadLeadMessenger(leadId, lead) {
+            const messengerDiv = document.getElementById(`lead-tab-messenger-${leadId}`);
+            if (!messengerDiv || !lead.conversationId) return;
+
+            messengerDiv.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">Loading conversation...</div>';
+            messengerDiv.style.flexDirection = 'column';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/conversations/${lead.conversationId}`);
+                const conv = await response.json();
+                currentConversation = conv;
+
+                const platformClass = conv.platform === 'FB Messenger' ? 'badge-messenger' : 'badge-instagram';
+
+                let messagesHTML = '';
+                (conv.messages || []).forEach(msg => {
+                    const isFromBot = msg.senderType === 'bot';
+                    const isFromSalesman = msg.senderId === currentUser?.id;
+                    const messageClass = isFromSalesman ? 'message-salesman' : (isFromBot ? 'message-bot' : 'message-customer');
+                    messagesHTML += `
+                        <div class="message ${messageClass}">
+                            ${isFromBot ? '<div class="message-bot-tag">Bot</div>' : ''}
+                            <div class="message-bubble">${msg.text}</div>
+                            <div class="message-time">${new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                        </div>
+                    `;
+                });
+
+                messengerDiv.innerHTML = `
+                    <div style="padding:12px 16px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="font-size:16px;font-weight:700;">${conv.name}</div>
+                            <span class="badge ${platformClass}" style="font-size:11px;">${conv.platform}</span>
+                        </div>
+                        <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px;" onclick="viewLeadDetail('${lead.id}')">Edit Lead</button>
+                    </div>
+                    <div class="message-thread" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">${messagesHTML}</div>
+                    <div style="padding:12px;border-top:1px solid var(--border-color);display:flex;gap:8px;">
+                        <input type="text" id="inlineReplyInput-${lead.id}" class="form-input" placeholder="Type your reply..." style="flex:1;" onkeypress="if(event.key==='Enter')sendLeadMessengerReply('${lead.conversationId}', '${lead.id}')">
+                        <button class="btn btn-primary" onclick="sendLeadMessengerReply('${lead.conversationId}', '${lead.id}')">Send</button>
+                    </div>
+                `;
+
+                // Auto-scroll to bottom
+                const thread = messengerDiv.querySelector('.message-thread');
+                if (thread) thread.scrollTop = thread.scrollHeight;
+            } catch (error) {
+                console.error('Error loading messenger conversation:', error);
+                messengerDiv.innerHTML = '<div style="padding:20px;text-align:center;color:var(--danger);">Error loading conversation.</div>';
+            }
+        }
+
+        async function sendLeadMessengerReply(convId, leadId) {
+            const input = document.getElementById(`inlineReplyInput-${leadId}`);
+            const text = input?.value.trim();
+            if (!text) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/conversations/${convId}/reply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+
+                if (!response.ok) throw new Error('Failed to send reply');
+
+                input.value = '';
+
+                // Reload messenger tab
+                const lead = allLeads.find(l => l.id === leadId);
+                if (lead) {
+                    await loadLeadMessenger(leadId, lead);
+                }
+            } catch (error) {
+                console.error('Error sending reply:', error);
+                alert('Error sending reply');
+            }
+        }
+
+        function loadLeadInfo(lead, container) {
+            const badgeClass = `badge-${lead.stage.toLowerCase().replace(/ /g, '')}`;
+            container.innerHTML = `
+                <div style="padding:0;display:grid;grid-template-columns:1fr 1fr;gap:15px;">
+                    <div>
+                        <div style="color:var(--text-secondary);font-size:12px;margin-bottom:4px;">Name</div>
+                        <div style="color:var(--text-primary);font-weight:600;">${lead.name}</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--text-secondary);font-size:12px;margin-bottom:4px;">Email</div>
+                        <div style="color:var(--text-primary);">${lead.email ? `<a href="mailto:${lead.email}" style="color:var(--gold)">${lead.email}</a>` : 'Not provided'}</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--text-secondary);font-size:12px;margin-bottom:4px;">Phone</div>
+                        <div style="color:var(--text-primary);">${lead.phone ? `<a href="tel:${lead.phone}" style="color:var(--gold)">${lead.phone}</a>` : 'Not provided'}</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--text-secondary);font-size:12px;margin-bottom:4px;">Stage</div>
+                        <div><span class="badge ${badgeClass}">${lead.stage}</span></div>
+                    </div>
+                    <div>
+                        <div style="color:var(--text-secondary);font-size:12px;margin-bottom:4px;">Interest</div>
+                        <div style="color:var(--text-primary);">${lead.interest || 'None'}</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--text-secondary);font-size:12px;margin-bottom:4px;">Source</div>
+                        <div style="color:var(--text-primary);">${lead.source || 'Unknown'}</div>
+                    </div>
+                </div>
+                ${lead.notes ? `<div style="background:var(--card-bg);padding:12px;border-radius:8px;margin-top:15px;"><span style="color:var(--text-secondary);font-size:12px;">Notes</span><br><span style="color:var(--text-primary);font-size:14px;">${lead.notes}</span></div>` : ''}
+                <div style="display:flex;gap:8px;margin-top:15px;">
+                    <button class="btn btn-primary" onclick="openLeadModal('${lead.id}')">Edit Lead</button>
+                    <button class="btn" style="background:var(--dark-bg);" onclick="enrollLeadInSequence('${lead.id}')">Enroll in Follow-Up</button>
+                </div>
+            `;
         }
 
         async function sendInlineReply(convId) {
@@ -5954,67 +6206,141 @@
             }
         }
 
-        // ===== DEAL CALCULATOR FUNCTIONS =====
+        // ===== DEAL CALCULATOR (inside Lead panel) =====
         // Nevada deal structure:
-        //   Taxable amount = Selling Price + Doc Fee - Trade ACV (trade reduces taxable)
-        //   Tax = taxable amount × rate
+        //   Taxable amount = Selling Price + Doc Fee - Trade ACV
         //   Rebates come off AFTER tax (not taxed)
         //   Trade equity = ACV - Payoff (negative = rolled into loan)
-        //   Amount financed = Selling Price + Doc Fee + Tax - Rebates - Down Payment - Trade Equity
-        function calculateDeal() {
-            const price = parseFloat(document.getElementById('vehiclePrice').value) || 0;
-            const rebates = parseFloat(document.getElementById('rebates').value) || 0;
-            const down = parseFloat(document.getElementById('downPayment').value) || 0;
-            const tradeACV = parseFloat(document.getElementById('tradeInValue').value) || 0;
-            const tradePayoff = parseFloat(document.getElementById('tradePayoff').value) || 0;
-            const apr = parseFloat(document.getElementById('apr').value) || 6.9;
-            const months = parseInt(document.getElementById('loanTerm').value) || 60;
-            const taxRate = parseFloat(document.getElementById('taxRate').value) || 8.375;
-            const docFee = parseFloat(document.getElementById('docFee').value) || 499;
 
-            // Trade equity (positive = customer has equity, negative = negative equity/upside down)
-            const tradeEquity = tradeACV - tradePayoff;
+        function loadLeadCalculator(leadId, lead, container) {
+            const pfx = 'lc-' + leadId + '-';
+            // Pre-fill interest vehicle name if available
+            const interestLabel = lead.interest ? lead.interest : '';
 
-            // Taxable amount: selling price + doc fee - trade ACV (NV trade-in reduces taxable)
+            container.innerHTML = `
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:4px;">Deal Calc — ${lead.name}</div>
+                    ${interestLabel ? `<div style="font-size:12px;color:var(--text-secondary);">Interest: ${interestLabel}</div>` : ''}
+                </div>
+                <div class="calc-grid" style="margin-bottom:12px;">
+                    <div class="form-group">
+                        <label>Selling Price</label>
+                        <input type="number" id="${pfx}price" placeholder="0" value="35000" />
+                    </div>
+                    <div class="form-group">
+                        <label>Rebates <span style="font-size:10px;color:var(--text-secondary);">(not taxed)</span></label>
+                        <input type="number" id="${pfx}rebates" placeholder="0" value="0" />
+                    </div>
+                    <div class="form-group">
+                        <label>Down Payment</label>
+                        <input type="number" id="${pfx}down" placeholder="0" value="0" />
+                    </div>
+                    <div class="form-group">
+                        <label>Trade ACV</label>
+                        <input type="number" id="${pfx}tradeACV" placeholder="0" value="0" />
+                    </div>
+                    <div class="form-group">
+                        <label>Trade Payoff <span style="font-size:10px;color:var(--text-secondary);">(owed)</span></label>
+                        <input type="number" id="${pfx}payoff" placeholder="0" value="0" />
+                    </div>
+                    <div class="form-group">
+                        <label>APR %</label>
+                        <input type="number" id="${pfx}apr" placeholder="6.9" value="6.9" step="0.1" />
+                    </div>
+                    <div class="form-group">
+                        <label>Term</label>
+                        <select id="${pfx}term">
+                            <option value="24">24 mo</option>
+                            <option value="36">36 mo</option>
+                            <option value="48">48 mo</option>
+                            <option value="60" selected>60 mo</option>
+                            <option value="72">72 mo</option>
+                            <option value="84">84 mo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tax %</label>
+                        <input type="number" id="${pfx}tax" placeholder="8.375" value="8.375" step="0.01" />
+                    </div>
+                    <div class="form-group">
+                        <label>Doc Fee</label>
+                        <input type="number" id="${pfx}doc" placeholder="499" value="499" />
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="runLeadCalc('${leadId}')" style="width:100%;padding:10px;margin-bottom:14px;">Calculate</button>
+                <div id="${pfx}results" style="display:none;">
+                    <div style="text-align:center;margin-bottom:14px;">
+                        <div style="font-size:11px;color:var(--text-secondary);">Monthly Payment</div>
+                        <div id="${pfx}monthly" style="font-size:36px;font-weight:700;color:var(--gold);">$0.00</div>
+                    </div>
+                    <div class="calc-result">
+                        <div class="calc-result-row"><span>Selling Price</span><span id="${pfx}r-price">$0</span></div>
+                        <div class="calc-result-row"><span>Doc Fee</span><span id="${pfx}r-doc">$499</span></div>
+                        <div class="calc-result-row"><span>Tax (<span id="${pfx}r-taxrate">8.375</span>%)</span><span id="${pfx}r-tax">$0</span></div>
+                        <div class="calc-result-row" style="border-top:1px solid var(--border-color);padding-top:6px;margin-top:4px;"><span>Rebates</span><span id="${pfx}r-rebates" style="color:#4CAF50;">$0</span></div>
+                        <div class="calc-result-row"><span>Down Payment</span><span id="${pfx}r-down" style="color:#4CAF50;">$0</span></div>
+                        <div class="calc-result-row"><span>Trade Equity <span id="${pfx}r-eqlabel" style="font-size:10px;color:var(--text-secondary);"></span></span><span id="${pfx}r-equity">$0</span></div>
+                        <div class="calc-result-row" style="border-top:2px solid var(--gold);padding-top:8px;margin-top:6px;"><span style="font-weight:700;">Amount Financed</span><span id="${pfx}r-financed" style="font-weight:700;">$0</span></div>
+                        <div class="calc-result-row"><span>Total Interest</span><span id="${pfx}r-interest">$0</span></div>
+                        <div class="calc-result-row" style="border-top:1px solid var(--border-color);padding-top:8px;margin-top:4px;"><span style="font-weight:700;">Total of Payments</span><span id="${pfx}r-total" style="font-weight:700;">$0</span></div>
+                    </div>
+                    <button class="btn btn-secondary" onclick="runLeadCalcCompare('${leadId}')" style="width:100%;margin-top:12px;">Compare 48/60/72</button>
+                    <div id="${pfx}compare" style="display:none;margin-top:12px;"></div>
+                </div>
+            `;
+        }
+
+        function runLeadCalc(leadId) {
+            const pfx = 'lc-' + leadId + '-';
+            const g = id => document.getElementById(pfx + id);
+
+            const price = parseFloat(g('price').value) || 0;
+            const rebates = parseFloat(g('rebates').value) || 0;
+            const down = parseFloat(g('down').value) || 0;
+            const tradeACV = parseFloat(g('tradeACV').value) || 0;
+            const payoff = parseFloat(g('payoff').value) || 0;
+            const apr = parseFloat(g('apr').value) || 6.9;
+            const months = parseInt(g('term').value) || 60;
+            const taxRate = parseFloat(g('tax').value) || 8.375;
+            const docFee = parseFloat(g('doc').value) || 499;
+
+            const tradeEquity = tradeACV - payoff;
             const taxableAmount = Math.max(0, price + docFee - tradeACV);
             const taxAmount = taxableAmount * (taxRate / 100);
-
-            // Amount financed = price + doc + tax - rebates - down - trade equity
-            // If trade equity is negative, it adds to the loan (negative equity rolls in)
             const amountFinanced = price + docFee + taxAmount - rebates - down - tradeEquity;
 
-            // Update results display
-            document.getElementById('sellingPrice').textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            document.getElementById('docFeeDisplay').textContent = '$' + docFee.toFixed(2);
-            document.getElementById('taxRateDisplay').textContent = taxRate;
-            document.getElementById('taxAmount').textContent = '$' + taxAmount.toFixed(2);
-            document.getElementById('rebatesDisplay').textContent = rebates > 0 ? '−$' + rebates.toFixed(2) : '$0.00';
-            document.getElementById('rebatesDisplay').style.color = rebates > 0 ? '#4CAF50' : 'var(--text-primary)';
-            document.getElementById('downDisplay').textContent = down > 0 ? '−$' + down.toFixed(2) : '$0.00';
-            document.getElementById('downDisplay').style.color = down > 0 ? '#4CAF50' : 'var(--text-primary)';
+            // Show results section
+            g('results').style.display = 'block';
+            g('r-price').textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+            g('r-doc').textContent = '$' + docFee.toFixed(2);
+            g('r-taxrate').textContent = taxRate;
+            g('r-tax').textContent = '$' + taxAmount.toFixed(2);
+            g('r-rebates').textContent = rebates > 0 ? '−$' + rebates.toFixed(2) : '$0.00';
+            g('r-rebates').style.color = rebates > 0 ? '#4CAF50' : 'var(--text-primary)';
+            g('r-down').textContent = down > 0 ? '−$' + down.toFixed(2) : '$0.00';
+            g('r-down').style.color = down > 0 ? '#4CAF50' : 'var(--text-primary)';
 
-            // Trade equity display
-            if (tradeACV > 0 || tradePayoff > 0) {
+            if (tradeACV > 0 || payoff > 0) {
                 if (tradeEquity >= 0) {
-                    document.getElementById('tradeEquity').textContent = '−$' + tradeEquity.toFixed(2);
-                    document.getElementById('tradeEquity').style.color = '#4CAF50';
-                    document.getElementById('equityLabel').textContent = '(positive)';
+                    g('r-equity').textContent = '−$' + tradeEquity.toFixed(2);
+                    g('r-equity').style.color = '#4CAF50';
+                    g('r-eqlabel').textContent = '(positive)';
                 } else {
-                    document.getElementById('tradeEquity').textContent = '+$' + Math.abs(tradeEquity).toFixed(2);
-                    document.getElementById('tradeEquity').style.color = '#f44336';
-                    document.getElementById('equityLabel').textContent = '(negative — rolled in)';
+                    g('r-equity').textContent = '+$' + Math.abs(tradeEquity).toFixed(2);
+                    g('r-equity').style.color = '#f44336';
+                    g('r-eqlabel').textContent = '(neg equity)';
                 }
             } else {
-                document.getElementById('tradeEquity').textContent = '$0.00';
-                document.getElementById('tradeEquity').style.color = 'var(--text-primary)';
-                document.getElementById('equityLabel').textContent = '';
+                g('r-equity').textContent = '$0.00';
+                g('r-equity').style.color = 'var(--text-primary)';
+                g('r-eqlabel').textContent = '';
             }
 
             if (amountFinanced <= 0) {
-                document.getElementById('monthlyPayment').textContent = '$0.00';
-                document.getElementById('amountFinanced').textContent = '$0.00';
-                document.getElementById('totalInterest').textContent = '$0.00';
-                document.getElementById('totalCost').textContent = '$0.00';
+                g('monthly').textContent = '$0.00';
+                g('r-financed').textContent = '$0.00';
+                g('r-interest').textContent = '$0.00';
+                g('r-total').textContent = '$0.00';
                 return;
             }
 
@@ -6023,16 +6349,25 @@
             const totalPaid = monthlyPayment * months;
             const totalInterest = totalPaid - amountFinanced;
 
-            document.getElementById('monthlyPayment').textContent = '$' + monthlyPayment.toFixed(2);
-            document.getElementById('amountFinanced').textContent = '$' + amountFinanced.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            document.getElementById('totalInterest').textContent = '$' + totalInterest.toFixed(2);
-            document.getElementById('totalCost').textContent = '$' + totalPaid.toFixed(2);
+            g('monthly').textContent = '$' + monthlyPayment.toFixed(2);
+            g('r-financed').textContent = '$' + amountFinanced.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+            g('r-interest').textContent = '$' + totalInterest.toFixed(2);
+            g('r-total').textContent = '$' + totalPaid.toFixed(2);
         }
 
-        function openCompareScenarios() {
-            const compareModal = document.getElementById('compareModal');
-            const compareResults = document.getElementById('compareResults');
-            const currentCalcs = getCurrentCalculation();
+        function runLeadCalcCompare(leadId) {
+            const pfx = 'lc-' + leadId + '-';
+            const g = id => document.getElementById(pfx + id);
+
+            const c = {
+                price: parseFloat(g('price').value) || 0,
+                rebates: parseFloat(g('rebates').value) || 0,
+                down: parseFloat(g('down').value) || 0,
+                tradeACV: parseFloat(g('tradeACV').value) || 0,
+                tradePayoff: parseFloat(g('payoff').value) || 0,
+                taxRate: parseFloat(g('tax').value) || 8.375,
+                docFee: parseFloat(g('doc').value) || 499
+            };
 
             const scenarios = [
                 { term: 48, apr: 5.9 },
@@ -6040,49 +6375,25 @@
                 { term: 72, apr: 7.9 }
             ];
 
-            let html = '';
-            scenarios.forEach(scenario => {
-                const calc = calculateScenario(currentCalcs, scenario.term, scenario.apr);
+            let html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">';
+            scenarios.forEach(s => {
+                const calc = calcScenario(c, s.term, s.apr);
                 html += `
-                    <div style="background:var(--card-bg); padding:15px; border-radius:8px; border:1px solid var(--border-color);">
-                        <div style="font-weight:700; margin-bottom:12px; font-size:14px;">${scenario.term} months @ ${scenario.apr}% APR</div>
-                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-color); font-size:12px;">
-                            <span style="color:var(--text-secondary);">Monthly Payment</span>
-                            <span style="color:var(--accent-color); font-weight:600;">$${calc.monthlyPayment.toFixed(2)}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-color); font-size:12px;">
-                            <span style="color:var(--text-secondary);">Total Interest</span>
-                            <span>$${calc.totalInterest.toFixed(2)}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; padding:8px 0; font-size:12px;">
-                            <span style="color:var(--text-secondary);">Total Cost</span>
-                            <span style="font-weight:600;">$${calc.totalCost.toFixed(2)}</span>
-                        </div>
+                    <div style="background:var(--dark-bg);padding:10px;border-radius:8px;border:1px solid var(--border-color);font-size:12px;">
+                        <div style="font-weight:700;margin-bottom:8px;color:var(--gold);">${s.term}mo @ ${s.apr}%</div>
+                        <div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:var(--text-secondary);">Payment</span><span style="font-weight:600;color:var(--gold);">$${calc.monthlyPayment.toFixed(2)}</span></div>
+                        <div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:var(--text-secondary);">Interest</span><span>$${calc.totalInterest.toFixed(2)}</span></div>
+                        <div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:var(--text-secondary);">Total</span><span style="font-weight:600;">$${calc.totalCost.toFixed(2)}</span></div>
                     </div>
                 `;
             });
+            html += '</div>';
 
-            compareResults.innerHTML = html;
-            compareModal.style.display = 'flex';
+            g('compare').innerHTML = html;
+            g('compare').style.display = 'block';
         }
 
-        function closeCompareScenarios() {
-            document.getElementById('compareModal').style.display = 'none';
-        }
-
-        function getCurrentCalculation() {
-            return {
-                price: parseFloat(document.getElementById('vehiclePrice').value) || 0,
-                rebates: parseFloat(document.getElementById('rebates').value) || 0,
-                down: parseFloat(document.getElementById('downPayment').value) || 0,
-                tradeACV: parseFloat(document.getElementById('tradeInValue').value) || 0,
-                tradePayoff: parseFloat(document.getElementById('tradePayoff').value) || 0,
-                taxRate: parseFloat(document.getElementById('taxRate').value) || 8.375,
-                docFee: parseFloat(document.getElementById('docFee').value) || 499
-            };
-        }
-
-        function calculateScenario(c, months, apr) {
+        function calcScenario(c, months, apr) {
             const tradeEquity = c.tradeACV - c.tradePayoff;
             const taxableAmount = Math.max(0, c.price + c.docFee - c.tradeACV);
             const taxAmount = taxableAmount * (c.taxRate / 100);
@@ -6091,13 +6402,7 @@
             const monthlyRate = apr / 100 / 12;
             const monthlyPayment = amountFinanced * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
             const totalPaid = monthlyPayment * months;
-            const totalInterest = totalPaid - amountFinanced;
-
-            return {
-                monthlyPayment,
-                totalInterest,
-                totalCost: totalPaid
-            };
+            return { monthlyPayment, totalInterest: totalPaid - amountFinanced, totalCost: totalPaid };
         }
 
         // ===== ANALYTICS FUNCTIONS =====
