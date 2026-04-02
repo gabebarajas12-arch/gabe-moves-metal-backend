@@ -6322,24 +6322,92 @@
             };
 
             const scenarios = [
-                { term: 48, apr: 5.9 },
-                { term: 60, apr: 6.9 },
-                { term: 72, apr: 7.9 }
+                { term: 48, apr: 5.9, label: 'Shortest' },
+                { term: 60, apr: 6.9, label: 'Middle' },
+                { term: 72, apr: 7.9, label: 'Longest' }
             ];
 
-            let html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">';
-            scenarios.forEach(s => {
-                const calc = calcScenario(c, s.term, s.apr);
+            // Calculate all scenarios
+            const results = scenarios.map(s => ({
+                ...s,
+                calc: calcScenario(c, s.term, s.apr)
+            }));
+
+            // Find lowest payment and lowest total cost
+            const lowestPayment = Math.min(...results.map(r => r.calc.monthlyPayment));
+            const lowestTotal = Math.min(...results.map(r => r.calc.totalCost));
+            const lowestInterest = Math.min(...results.map(r => r.calc.totalInterest));
+
+            // Build comparison cards
+            let html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">';
+            results.forEach(r => {
+                const isLowestPayment = r.calc.monthlyPayment === lowestPayment;
+                const isCheapest = r.calc.totalCost === lowestTotal;
+                const paymentDiff = r.calc.monthlyPayment - lowestPayment;
+                const interestDiff = r.calc.totalInterest - lowestInterest;
+                const totalDiff = r.calc.totalCost - lowestTotal;
+
+                // Highlight border: green for cheapest overall, blue for lowest payment
+                let borderColor = 'var(--border-color)';
+                let tag = '';
+                if (isCheapest) {
+                    borderColor = '#4CAF50';
+                    tag = '<div style="background:#4CAF50;color:#000;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;text-align:center;margin-bottom:6px;">LEAST TOTAL COST</div>';
+                } else if (isLowestPayment) {
+                    borderColor = 'var(--gold)';
+                    tag = '<div style="background:var(--gold);color:#000;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;text-align:center;margin-bottom:6px;">LOWEST PAYMENT</div>';
+                }
+
                 html += `
-                    <div style="background:var(--dark-bg);padding:10px;border-radius:8px;border:1px solid var(--border-color);font-size:12px;">
-                        <div style="font-weight:700;margin-bottom:8px;color:var(--gold);">${s.term}mo @ ${s.apr}%</div>
-                        <div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:var(--text-secondary);">Payment</span><span style="font-weight:600;color:var(--gold);">$${calc.monthlyPayment.toFixed(2)}</span></div>
-                        <div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:var(--text-secondary);">Interest</span><span>$${calc.totalInterest.toFixed(2)}</span></div>
-                        <div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:var(--text-secondary);">Total</span><span style="font-weight:600;">$${calc.totalCost.toFixed(2)}</span></div>
+                    <div style="background:var(--dark-bg);padding:10px;border-radius:8px;border:2px solid ${borderColor};font-size:12px;">
+                        ${tag}
+                        <div style="font-weight:700;margin-bottom:8px;color:var(--gold);font-size:13px;">${r.term}mo @ ${r.apr}%</div>
+                        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+                            <span style="color:var(--text-secondary);">Payment</span>
+                            <span style="font-weight:700;color:var(--gold);font-size:14px;">$${r.calc.monthlyPayment.toFixed(2)}</span>
+                        </div>
+                        ${paymentDiff > 0 ? `<div style="text-align:right;font-size:10px;color:var(--text-secondary);">+$${paymentDiff.toFixed(2)}/mo vs lowest</div>` : ''}
+                        <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;">
+                            <span style="color:var(--text-secondary);">Interest</span>
+                            <span style="color:${interestDiff > 0 ? '#f44336' : '#4CAF50'};font-weight:600;">$${r.calc.totalInterest.toFixed(2)}</span>
+                        </div>
+                        ${interestDiff > 0 ? `<div style="text-align:right;font-size:10px;color:#f44336;">+$${interestDiff.toFixed(2)} more interest</div>` : ''}
+                        <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid var(--border-color);margin-top:6px;padding-top:6px;">
+                            <span style="color:var(--text-secondary);">Total</span>
+                            <span style="font-weight:700;">$${r.calc.totalCost.toFixed(2)}</span>
+                        </div>
+                        ${totalDiff > 0 ? `<div style="text-align:right;font-size:10px;color:#f44336;">+$${totalDiff.toFixed(2)} vs cheapest</div>` : ''}
                     </div>
                 `;
             });
             html += '</div>';
+
+            // Bottom line breakdown — plain English reasoning
+            const short = results[0].calc;
+            const mid = results[1].calc;
+            const long = results[2].calc;
+            const paymentSavingsLong = short.monthlyPayment - long.monthlyPayment;
+            const interestCostLong = long.totalInterest - short.totalInterest;
+            const totalDiff72vs48 = long.totalCost - short.totalCost;
+
+            html += `<div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:12px;font-size:12px;line-height:1.6;">`;
+            html += `<div style="font-weight:700;color:var(--gold);margin-bottom:6px;">The Breakdown</div>`;
+            html += `<div style="color:var(--text-primary);margin-bottom:6px;">`;
+            html += `<span style="color:var(--gold);">48mo</span> has the highest payment at <strong>$${short.monthlyPayment.toFixed(2)}/mo</strong> but you pay the least interest — only <strong>$${short.totalInterest.toFixed(2)}</strong> total. Best option if the customer can handle a higher payment.`;
+            html += `</div>`;
+            html += `<div style="color:var(--text-primary);margin-bottom:6px;">`;
+            html += `<span style="color:var(--gold);">72mo</span> drops the payment to <strong>$${long.monthlyPayment.toFixed(2)}/mo</strong> (saves <strong>$${paymentSavingsLong.toFixed(2)}/mo</strong> vs 48) — but the longer term + higher rate means <strong>$${interestCostLong.toFixed(2)} more in interest</strong>. Total cost is <strong>$${totalDiff72vs48.toFixed(2)} more</strong> over the life of the loan.`;
+            html += `</div>`;
+            html += `<div style="color:var(--text-primary);">`;
+            html += `<span style="color:var(--gold);">60mo</span> is the sweet spot — <strong>$${mid.monthlyPayment.toFixed(2)}/mo</strong> with <strong>$${mid.totalInterest.toFixed(2)}</strong> in interest. Balanced payment and cost.`;
+            html += `</div>`;
+
+            // Rate impact callout
+            const rateDiff = results[2].apr - results[0].apr;
+            html += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color);color:var(--text-secondary);font-size:11px;">`;
+            html += `Rate difference: ${results[0].apr}% → ${results[2].apr}% (${rateDiff.toFixed(1)}% higher on the longer term). The higher rate + extra months is why interest jumps even though the payment drops.`;
+            html += `</div>`;
+            html += `</div>`;
 
             g('compare').innerHTML = html;
             g('compare').style.display = 'block';
