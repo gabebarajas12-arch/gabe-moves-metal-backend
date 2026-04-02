@@ -22,6 +22,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const Database = require('better-sqlite3');
 
 // ==================== CONFIG ====================
 const CONFIG = {
@@ -98,49 +99,22 @@ function logError(msg, err) {
 }
 
 /**
- * Run a sqlite3 query against the Messages database via Terminal
- * (Terminal has Full Disk Access, osascript's do shell script does not)
+ * Open a read-only connection to the Messages database.
+ * Node must have Full Disk Access in System Settings.
  */
-function queryMessagesDB(sql) {
-  const tmpFile = `/tmp/imsg_query_${Date.now()}.txt`;
-  try {
-    // Write query to temp file to avoid escaping issues
-    const queryFile = `/tmp/imsg_sql_${Date.now()}.sql`;
-    fs.writeFileSync(queryFile, sql);
+let messagesDb = null;
 
-    // Run via osascript → Terminal for Full Disk Access
-    const script = `
-      tell application "Terminal"
-        do script "sqlite3 '${CONFIG.MESSAGES_DB}' < '${queryFile}' > '${tmpFile}' 2>&1 && echo '__DONE__' >> '${tmpFile}'"
-      end tell
-    `;
-    execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
-
-    // Wait for Terminal to finish (poll for __DONE__ marker)
-    let attempts = 0;
-    while (attempts < 30) { // 15 seconds max
-      try {
-        const content = fs.readFileSync(tmpFile, 'utf-8');
-        if (content.includes('__DONE__')) {
-          // Clean up
-          try { fs.unlinkSync(queryFile); } catch(e) {}
-          try { fs.unlinkSync(tmpFile); } catch(e) {}
-          return content.replace('__DONE__', '').trim();
-        }
-      } catch(e) { /* file not ready yet */ }
-      execSync('sleep 0.5');
-      attempts++;
+function getMessagesDb() {
+  if (!messagesDb) {
+    try {
+      messagesDb = new Database(CONFIG.MESSAGES_DB, { readonly: true, fileMustExist: true });
+      log('📱 Connected to Messages database');
+    } catch (err) {
+      logError('Cannot open Messages database — make sure /usr/local/bin/node has Full Disk Access', err);
+      return null;
     }
-
-    // Cleanup on timeout
-    try { fs.unlinkSync(queryFile); } catch(e) {}
-    try { fs.unlinkSync(tmpFile); } catch(e) {}
-    return '';
-  } catch (err) {
-    logError('DB query failed', err);
-    try { fs.unlinkSync(tmpFile); } catch(e) {}
-    return '';
   }
+  return messagesDb;
 }
 
 /**
@@ -296,39 +270,36 @@ function generateAutoReply(messageText, customerName, lang) {
  * Poll for new incoming messages from CRM leads
  */
 function pollNewMessages() {
-  // Query for messages newer than our last seen rowid
-  // is_from_me = 0 means inbound (customer sent it)
-  const sql = `
-    SELECT m.rowid, m.text, m.is_from_me, h.id as phone,
-           datetime(m.date/1000000000 + 978307200, 'unixepoch', 'localtime') as msg_date
-    FROM message m
-    LEFT JOIN handle h ON m.handle_id = h.rowid
-    WHERE m.rowid > ${lastMessageRowId}
-      AND m.text IS NOT NULL
-      AND m.text != ''
-      AND m.is_from_me = 0
-    ORDER BY m.rowid ASC
-    LIMIT 50;
-  `;
+  const db = getMessagesDb();
+  if (!db) return [];
 
-  const result = queryMessagesDB(sql);
-  if (!result) return [];
+  try {
+    const rows = db.prepare(`
+      SELECT m.rowid, m.text, m.is_from_me, h.id as phone,
+             datetime(m.date/1000000000 + 978307200, 'unixepoch', 'localtime') as msg_date
+      FROM message m
+      LEFT JOIN handle h ON m.handle_id = h.rowid
+      WHERE m.rowid > ?
+        AND m.text IS NOT NULL
+        AND m.text != ''
+        AND m.is_from_me = 0
+      ORDER BY m.rowid ASC
+      LIMIT 50
+    `).all(lastMessageRowId);
 
-  const messages = [];
-  for (const line of result.split('\n')) {
-    if (!line.trim()) continue;
-    const parts = line.split('|');
-    if (parts.length >= 5) {
-      messages.push({
-        rowid: parseInt(parts[0]),
-        text: parts[1],
-        isFromMe: parts[2] === '1',
-        phone: parts[3],
-        date: parts[4],
-      });
-    }
+    return rows.map(r => ({
+      rowid: r.rowid,
+      text: r.text,
+      isFromMe: r.is_from_me === 1,
+      phone: r.phone,
+      date: r.msg_date,
+    }));
+  } catch (err) {
+    logError('Poll query failed', err);
+    // Reconnect on next poll in case DB was locked
+    messagesDb = null;
+    return [];
   }
-  return messages;
 }
 
 /**
@@ -451,9 +422,10 @@ async function main() {
 
   // If no saved state, start from current latest message (don't replay history)
   if (lastMessageRowId === 0) {
-    const result = queryMessagesDB('SELECT MAX(rowid) FROM message;');
-    if (result) {
-      lastMessageRowId = parseInt(result) || 0;
+    const db = getMessagesDb();
+    if (db) {
+      const row = db.prepare('SELECT MAX(rowid) as maxId FROM message').get();
+      lastMessageRowId = row?.maxId || 0;
       log(`⏩ Starting from current position (rowid ${lastMessageRowId})`);
       saveState();
     }
@@ -501,11 +473,13 @@ async function main() {
 process.on('SIGINT', () => {
   log('👋 Shutting down bridge...');
   saveState();
+  if (messagesDb) try { messagesDb.close(); } catch(e) {}
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   saveState();
+  if (messagesDb) try { messagesDb.close(); } catch(e) {}
   process.exit(0);
 });
 
