@@ -12,6 +12,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'gabe_moves_metal.db');
 
@@ -142,6 +143,34 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(date);
     CREATE INDEX IF NOT EXISTS idx_followup_queue_status ON followup_queue(status);
     CREATE INDEX IF NOT EXISTS idx_followup_queue_scheduled ON followup_queue(scheduledAt);
+
+    CREATE TABLE IF NOT EXISTS sms_messages (
+      id TEXT PRIMARY KEY,
+      leadId TEXT DEFAULT '',
+      phone TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      body TEXT DEFAULT '',
+      status TEXT DEFAULT 'sent',
+      twilioSid TEXT DEFAULT '',
+      autoReply INTEGER DEFAULT 0,
+      createdAt TEXT DEFAULT '',
+      FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS lead_response_times (
+      id TEXT PRIMARY KEY,
+      leadId TEXT NOT NULL,
+      source TEXT DEFAULT '',
+      receivedAt TEXT NOT NULL,
+      respondedAt TEXT DEFAULT '',
+      responseTimeMs INTEGER DEFAULT 0,
+      autoResponded INTEGER DEFAULT 0,
+      FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sms_phone ON sms_messages(phone);
+    CREATE INDEX IF NOT EXISTS idx_sms_lead ON sms_messages(leadId);
+    CREATE INDEX IF NOT EXISTS idx_response_lead ON lead_response_times(leadId);
   `);
 
   console.log('🗄️  SQLite database initialized at', DB_PATH);
@@ -688,6 +717,107 @@ function seedDefaultTemplates(defaultTemplates) {
 }
 
 
+// ==================== SMS MESSAGES ====================
+const smsDb = {
+  getAll(filters = {}) {
+    let query = 'SELECT * FROM sms_messages WHERE 1=1';
+    const params = [];
+    if (filters.phone) {
+      query += ' AND phone = ?';
+      params.push(filters.phone);
+    }
+    if (filters.leadId) {
+      query += ' AND leadId = ?';
+      params.push(filters.leadId);
+    }
+    if (filters.direction) {
+      query += ' AND direction = ?';
+      params.push(filters.direction);
+    }
+    query += ' ORDER BY createdAt DESC';
+    const stmt = db.prepare(query);
+    return params.length > 0 ? stmt.all(...params) : stmt.all();
+  },
+
+  getByPhone(phone) {
+    return db.prepare('SELECT * FROM sms_messages WHERE phone = ? ORDER BY createdAt ASC').all(phone);
+  },
+
+  getByLead(leadId) {
+    return db.prepare('SELECT * FROM sms_messages WHERE leadId = ? ORDER BY createdAt ASC').all(leadId);
+  },
+
+  create(msg) {
+    db.prepare(`
+      INSERT INTO sms_messages (id, leadId, phone, direction, body, status, twilioSid, autoReply, createdAt)
+      VALUES (@id, @leadId, @phone, @direction, @body, @status, @twilioSid, @autoReply, @createdAt)
+    `).run({
+      id: msg.id || crypto.randomUUID(),
+      leadId: msg.leadId || '',
+      phone: msg.phone,
+      direction: msg.direction,
+      body: msg.body || '',
+      status: msg.status || 'sent',
+      twilioSid: msg.twilioSid || '',
+      autoReply: msg.autoReply ? 1 : 0,
+      createdAt: msg.createdAt || new Date().toISOString(),
+    });
+    return msg;
+  },
+
+  updateStatus(id, status) {
+    db.prepare('UPDATE sms_messages SET status = ? WHERE id = ?').run(status, id);
+  },
+};
+
+// ==================== LEAD RESPONSE TIMES ====================
+const responseTimeDb = {
+  getAll() {
+    return db.prepare('SELECT * FROM lead_response_times ORDER BY receivedAt DESC').all();
+  },
+
+  create(entry) {
+    db.prepare(`
+      INSERT INTO lead_response_times (id, leadId, source, receivedAt, respondedAt, responseTimeMs, autoResponded)
+      VALUES (@id, @leadId, @source, @receivedAt, @respondedAt, @responseTimeMs, @autoResponded)
+    `).run({
+      id: entry.id || crypto.randomUUID(),
+      leadId: entry.leadId,
+      source: entry.source || '',
+      receivedAt: entry.receivedAt,
+      respondedAt: entry.respondedAt || '',
+      responseTimeMs: entry.responseTimeMs || 0,
+      autoResponded: entry.autoResponded ? 1 : 0,
+    });
+    return entry;
+  },
+
+  markResponded(leadId, respondedAt) {
+    const entry = db.prepare('SELECT receivedAt FROM lead_response_times WHERE leadId = ? ORDER BY receivedAt DESC LIMIT 1').get(leadId);
+    if (entry) {
+      const responseTimeMs = new Date(respondedAt) - new Date(entry.receivedAt);
+      db.prepare('UPDATE lead_response_times SET respondedAt = ?, responseTimeMs = ? WHERE leadId = ?')
+        .run(respondedAt, Math.max(0, responseTimeMs), leadId);
+    }
+  },
+
+  getStats() {
+    const allTimes = db.prepare('SELECT responseTimeMs, autoResponded FROM lead_response_times WHERE responseTimeMs > 0').all();
+    if (allTimes.length === 0) {
+      return { count: 0, avgMs: 0, minMs: 0, maxMs: 0, autoRespondedCount: 0 };
+    }
+    const responseTimes = allTimes.map(t => t.responseTimeMs);
+    const autoRespondedCount = allTimes.filter(t => t.autoResponded === 1).length;
+    return {
+      count: allTimes.length,
+      avgMs: Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length),
+      minMs: Math.min(...responseTimes),
+      maxMs: Math.max(...responseTimes),
+      autoRespondedCount,
+    };
+  },
+};
+
 // ==================== STATS ====================
 function getStats() {
   const totalLeads = db.prepare('SELECT COUNT(*) as count FROM leads').get().count;
@@ -726,4 +856,6 @@ module.exports = {
   appointments: appointmentsDb,
   followupSequences: followupSequencesDb,
   followupQueue: followupQueueDb,
+  sms: smsDb,
+  responseTime: responseTimeDb,
 };

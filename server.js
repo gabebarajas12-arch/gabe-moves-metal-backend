@@ -62,6 +62,10 @@ const CONFIG = {
   TIKTOK_ACCESS_TOKEN: process.env.TIKTOK_ACCESS_TOKEN || '',
   TIKTOK_CLIENT_KEY: process.env.TIKTOK_CLIENT_KEY || '',
   TIKTOK_CLIENT_SECRET: process.env.TIKTOK_CLIENT_SECRET || '',
+  // Twilio SMS API
+  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
+  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
+  TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER || '', // Twilio number in E.164
   // Personal brand info
   SALESMAN_NAME: 'Gabe',
   PAGE_NAME: 'Gabe Moves Metal',
@@ -5005,6 +5009,398 @@ app.get('/api/tiktok/status', (req, res) => {
     openId: CONFIG.TIKTOK_OPEN_ID || null,
   });
 });
+
+// ==================== SMS / TWILIO ====================
+
+// Generate AI auto-reply using template system
+function generateAIAutoReply(messageBody, customerName) {
+  const body = messageBody.toLowerCase();
+  const templates = database.templates.getAll();
+
+  // Detect language
+  const spanishKeywords = ['hola', 'qué', 'cuanto', 'precio', 'troca', 'camioneta', 'suv', 'tahoe', 'ayuda', 'quiero'];
+  const isSpanish = spanishKeywords.some(kw => body.includes(kw));
+  const lang = isSpanish ? 'es' : 'en';
+
+  // Find keyword-matching templates
+  const keywordTemplates = templates.filter(t =>
+    t.trigger === 'keyword' && t.lang === lang && t.active && t.keywords
+  );
+
+  let matchedTemplate = null;
+  for (const tmpl of keywordTemplates) {
+    if (tmpl.keywords.some(kw => body.includes(kw.toLowerCase()))) {
+      matchedTemplate = tmpl;
+      break;
+    }
+  }
+
+  // Fallback to instant greeting
+  if (!matchedTemplate) {
+    matchedTemplate = templates.find(t =>
+      t.trigger === 'new_message' && t.lang === lang && t.active
+    ) || templates.find(t => t.trigger === 'new_message' && t.active);
+  }
+
+  if (!matchedTemplate) return '';
+
+  // Replace {first_name} placeholder
+  const firstName = (customerName || 'there').split(' ')[0];
+  return matchedTemplate.message.replace('{first_name}', firstName);
+}
+
+// Send SMS via Twilio REST API
+async function sendSMSViaTwilio(toPhone, body) {
+  if (!CONFIG.TWILIO_ACCOUNT_SID || !CONFIG.TWILIO_AUTH_TOKEN || !CONFIG.TWILIO_PHONE_NUMBER) {
+    throw new Error('Twilio not configured');
+  }
+
+  try {
+    const auth = Buffer.from(`${CONFIG.TWILIO_ACCOUNT_SID}:${CONFIG.TWILIO_AUTH_TOKEN}`).toString('base64');
+    const response = await axios.post(
+      `https://api.twilio.com/2010-04-01/Accounts/${CONFIG.TWILIO_ACCOUNT_SID}/Messages.json`,
+      new URLSearchParams({
+        From: CONFIG.TWILIO_PHONE_NUMBER,
+        To: toPhone,
+        Body: body,
+      }),
+      {
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('[Twilio] Send SMS error:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+// Twilio incoming SMS webhook (PUBLIC — no auth required)
+app.post('/sms/incoming', express.urlencoded({ extended: false }), async (req, res) => {
+  try {
+    const fromPhone = req.body.From;
+    const messageBody = req.body.Body || '';
+    const twilioSid = req.body.MessageSid;
+
+    if (!fromPhone) {
+      return res.status(400).send('<Response></Response>');
+    }
+
+    // Store inbound message
+    const inboundMsg = {
+      id: crypto.randomUUID(),
+      phone: fromPhone,
+      direction: 'inbound',
+      body: messageBody,
+      status: 'received',
+      twilioSid,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Try to find matching lead
+    const leads = database.leads.getAll();
+    let matchedLead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === fromPhone.replace(/\D/g, ''));
+
+    if (matchedLead) {
+      inboundMsg.leadId = matchedLead.id;
+    }
+
+    database.sms.create(inboundMsg);
+
+    // Track response time
+    if (matchedLead) {
+      database.responseTime.create({
+        id: crypto.randomUUID(),
+        leadId: matchedLead.id,
+        source: 'sms',
+        receivedAt: new Date().toISOString(),
+        autoResponded: 0,
+      });
+    }
+
+    // Generate auto-reply
+    const customerName = matchedLead?.name || 'there';
+    const replyText = generateAIAutoReply(messageBody, customerName);
+
+    if (replyText) {
+      try {
+        const twilioReply = await sendSMSViaTwilio(fromPhone, replyText);
+
+        // Store outbound auto-reply
+        database.sms.create({
+          id: crypto.randomUUID(),
+          leadId: matchedLead?.id || '',
+          phone: fromPhone,
+          direction: 'outbound',
+          body: replyText,
+          status: 'sent',
+          twilioSid: twilioReply.sid,
+          autoReply: 1,
+          createdAt: new Date().toISOString(),
+        });
+
+        // Mark response time as auto-responded
+        if (matchedLead) {
+          const entries = database.responseTime.getAll().filter(rt => rt.leadId === matchedLead.id);
+          if (entries.length > 0) {
+            const latest = entries[0];
+            if (!latest.respondedAt) {
+              database.responseTime.markResponded(matchedLead.id, new Date().toISOString());
+              // Update autoResponded flag (note: responseTime doesn't have this in the query, manually update)
+              database.getDb().prepare('UPDATE lead_response_times SET autoResponded = 1 WHERE leadId = ? AND autoResponded = 0')
+                .run(matchedLead.id);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[SMS] Failed to send auto-reply:', error.message);
+      }
+    }
+
+    // Create notification for Gabe
+    database.notifications.create({
+      id: crypto.randomUUID(),
+      type: 'sms',
+      title: `New SMS from ${customerName}`,
+      message: messageBody,
+      leadId: matchedLead?.id || '',
+      createdAt: new Date().toISOString(),
+    });
+
+    // Return TwiML (empty response — we send via REST API)
+    res.type('text/xml').send('<Response></Response>');
+  } catch (error) {
+    console.error('[SMS Webhook] Error:', error.message);
+    res.type('text/xml').send('<Response></Response>');
+  }
+});
+
+// Get SMS conversations grouped by phone
+app.get('/api/sms/conversations', requireAuth, (req, res) => {
+  try {
+    const allSms = database.sms.getAll();
+    const conversationMap = new Map();
+
+    for (const sms of allSms) {
+      if (!conversationMap.has(sms.phone)) {
+        conversationMap.set(sms.phone, {
+          phone: sms.phone,
+          leadId: sms.leadId || null,
+          leadName: '',
+          messageCount: 0,
+          lastMessage: '',
+          lastMessageTime: '',
+          inboundCount: 0,
+          outboundCount: 0,
+          autoReplyCount: 0,
+        });
+      }
+
+      const convo = conversationMap.get(sms.phone);
+      convo.messageCount += 1;
+      convo.lastMessage = sms.body;
+      convo.lastMessageTime = sms.createdAt;
+      if (sms.direction === 'inbound') convo.inboundCount += 1;
+      if (sms.direction === 'outbound') convo.outboundCount += 1;
+      if (sms.autoReply) convo.autoReplyCount += 1;
+
+      if (sms.leadId) {
+        const lead = database.leads.getById(sms.leadId);
+        if (lead) convo.leadName = lead.name;
+      }
+    }
+
+    const conversations = Array.from(conversationMap.values())
+      .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+
+    res.json({ conversations, total: conversations.length });
+  } catch (error) {
+    console.error('[SMS Conversations] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all messages for a phone number
+app.get('/api/sms/messages/:phone', requireAuth, (req, res) => {
+  try {
+    const phone = req.params.phone;
+    const messages = database.sms.getByPhone(phone);
+    res.json({ messages, count: messages.length });
+  } catch (error) {
+    console.error('[SMS Messages] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Send SMS manually
+app.post('/api/sms/send', requireAuth, async (req, res) => {
+  try {
+    const { to, body, leadId } = req.body;
+
+    if (!to || !body) {
+      return res.status(400).json({ error: 'Missing phone number or message body' });
+    }
+
+    const twilioReply = await sendSMSViaTwilio(to, body);
+
+    database.sms.create({
+      id: crypto.randomUUID(),
+      leadId: leadId || '',
+      phone: to,
+      direction: 'outbound',
+      body,
+      status: 'sent',
+      twilioSid: twilioReply.sid,
+      autoReply: 0,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.json({ success: true, sid: twilioReply.sid });
+  } catch (error) {
+    console.error('[SMS Send] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get SMS stats
+app.get('/api/sms/stats', requireAuth, (req, res) => {
+  try {
+    const allSms = database.sms.getAll();
+    const stats = {
+      totalMessages: allSms.length,
+      inbound: allSms.filter(m => m.direction === 'inbound').length,
+      outbound: allSms.filter(m => m.direction === 'outbound').length,
+      autoReplies: allSms.filter(m => m.autoReply).length,
+      uniquePhones: new Set(allSms.map(m => m.phone)).size,
+    };
+    res.json(stats);
+  } catch (error) {
+    console.error('[SMS Stats] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Response time analytics
+app.get('/api/analytics/response-times', requireAuth, (req, res) => {
+  try {
+    const stats = database.responseTime.getStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('[Response Times] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Response time log
+app.get('/api/analytics/response-log', requireAuth, (req, res) => {
+  try {
+    const log = database.responseTime.getAll();
+    const enriched = log.map(entry => {
+      const lead = database.leads.getById(entry.leadId);
+      return {
+        ...entry,
+        leadName: lead?.name || '',
+        leadPhone: lead?.phone || '',
+      };
+    });
+    res.json({ log: enriched, count: enriched.length });
+  } catch (error) {
+    console.error('[Response Log] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== PAYMENT CALCULATOR ====================
+app.post('/api/calculator/payment', (req, res) => {
+  try {
+    const { vehiclePrice, downPayment, tradeValue, apr, termMonths, taxRate } = req.body;
+
+    if (!vehiclePrice || !apr || !termMonths) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Calculate taxable amount
+    const netPrice = vehiclePrice - (tradeValue || 0);
+    const taxAmount = netPrice * (taxRate || 0.08);
+    const totalCost = netPrice + taxAmount;
+    const amountFinanced = totalCost - (downPayment || 0);
+
+    if (amountFinanced <= 0) {
+      return res.json({
+        monthlyPayment: 0,
+        totalInterest: 0,
+        totalCost,
+        amountFinanced: 0,
+        taxAmount,
+      });
+    }
+
+    // Standard amortization formula: M = P * [r(1+r)^n] / [(1+r)^n - 1]
+    // where P = principal, r = monthly rate, n = number of months
+    const monthlyRate = apr / 100 / 12;
+    const numerator = monthlyRate * Math.pow(1 + monthlyRate, termMonths);
+    const denominator = Math.pow(1 + monthlyRate, termMonths) - 1;
+    const monthlyPayment = amountFinanced * (numerator / denominator);
+    const totalInterest = (monthlyPayment * termMonths) - amountFinanced;
+
+    res.json({
+      monthlyPayment: Math.round(monthlyPayment * 100) / 100,
+      totalInterest: Math.round(totalInterest * 100) / 100,
+      totalCost: Math.round(totalCost * 100) / 100,
+      amountFinanced: Math.round(amountFinanced * 100) / 100,
+      taxAmount: Math.round(taxAmount * 100) / 100,
+    });
+  } catch (error) {
+    console.error('[Payment Calculator] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== APPOINTMENT REMINDER SYSTEM ====================
+function checkAndSendReminders() {
+  try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    const appointments = database.appointments.getAll({ date: tomorrowStr });
+    const scheduledAppointments = appointments.filter(a => a.status === 'scheduled' && a.phone);
+
+    for (const appt of scheduledAppointments) {
+      if (!CONFIG.TWILIO_ACCOUNT_SID || !CONFIG.TWILIO_AUTH_TOKEN || !CONFIG.TWILIO_PHONE_NUMBER) {
+        continue; // Skip if Twilio not configured
+      }
+
+      const reminderText = `Hey ${appt.customerName}! Just a reminder about your ${appt.type} appointment tomorrow at ${appt.time} with Gabe at Findlay Chevrolet. See you then! 🚗`;
+
+      sendSMSViaTwilio(appt.phone, reminderText)
+        .then(twilioReply => {
+          // Store reminder SMS
+          database.sms.create({
+            id: crypto.randomUUID(),
+            leadId: '',
+            phone: appt.phone,
+            direction: 'outbound',
+            body: reminderText,
+            status: 'sent',
+            twilioSid: twilioReply.sid,
+            autoReply: 0,
+            createdAt: new Date().toISOString(),
+          });
+          console.log(`[Reminder] Sent appointment reminder to ${appt.phone}`);
+        })
+        .catch(error => {
+          console.error(`[Reminder] Failed to send reminder to ${appt.phone}:`, error.message);
+        });
+    }
+  } catch (error) {
+    console.error('[Appointment Reminders] Error:', error.message);
+  }
+}
+
+// Start reminder check every hour
+setInterval(checkAndSendReminders, 60 * 60 * 1000);
+
 app.listen(PORT, () => {
   // Start inventory auto-refresh
   inventoryModule.startAutoRefresh();
