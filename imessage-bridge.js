@@ -233,9 +233,11 @@ async function authenticate() {
 async function loadLeads() {
   try {
     const result = await crmRequest('GET', '/api/leads');
-    if (result.leads) {
+    // API returns raw array or { leads: [...] }
+    const leads = Array.isArray(result) ? result : (result.leads || []);
+    if (leads.length >= 0) {
       crmLeads.clear();
-      for (const lead of result.leads) {
+      for (const lead of leads) {
         if (lead.phone) {
           // Normalize phone number: strip everything except digits, ensure +1 prefix
           const normalized = normalizePhone(lead.phone);
