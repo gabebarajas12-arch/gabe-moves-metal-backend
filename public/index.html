@@ -4520,229 +4520,285 @@
             }
         }
 
+        // Feature categories for organized comparison
+        const FEATURE_CATEGORIES = {
+            'Safety Tech': ['Forward Collision Warning','Lane Departure Warning','Blind Spot Monitor','Adaptive Cruise Control','Parking Sensors / Assist','Side-Impact Air Bags','Automatic Emergency Braking'],
+            'Technology': ['Navigation System','Apple CarPlay','Android Auto','WiFi Hotspot','Wireless Phone Charging','Satellite Radio Ready','Bluetooth'],
+            'Comfort & Convenience': ['Leather Seats','Heated Seats','Ventilated Seats','Heated Steering Wheel','Power Seats','Sunroof / Moonroof','Remote Start','Push Start','Keyless Entry','Rear A/C','Rain Sensing Wipers','Hands-Free Liftgate','Power Liftgate','Interior Accents','Memory Seats'],
+            'Performance & Capability': ['AWD','4WD','Tow Package','Off-Road Package','Technology Package','Sport Package','Fog Lights'],
+            'Appearance': ['Chrome Wheels','Alloy Wheels','Running Boards','Roof Rack','LED Headlights','Tinted Windows'],
+            'Camera & Visibility': ['Backup Camera','360-Degree Camera','Head-Up Display','Auto-Dimming Mirror'],
+        };
+
+        function categorizeFeature(feature) {
+            for (const [cat, list] of Object.entries(FEATURE_CATEGORIES)) {
+                if (list.some(f => feature.toLowerCase().includes(f.toLowerCase()) || f.toLowerCase().includes(feature.toLowerCase()))) return cat;
+            }
+            return 'Other';
+        }
+
         async function showComparePanel() {
             if (compareList.length < 2) { alert('Select at least 2 vehicles to compare'); return; }
             const overlay = document.getElementById('comparePanelOverlay');
             overlay.style.display = 'block';
             const content = document.getElementById('compareContent');
-            content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Decoding VINs and comparing specs... this takes a few seconds</p>';
+            content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Decoding VINs and building comparison... takes a few seconds</p>';
 
-            // Gather vehicle data from all caches (use detailed Algolia data when available)
+            // Gather vehicle data from all caches
             const allVehicles = [...(window._inventoryCache || []), ...(window._compInventoryCache || [])];
-            // Also check the raw Algolia cache for richer data (features, mileage, etc.)
             const algoliaCache = window._algoliaInventoryCache || [];
             const selected = compareList.map(vin => {
-                // Prefer Algolia detail if available
                 const algolia = algoliaCache.find(v => v.vin === vin);
                 const basic = allVehicles.find(v => v.vin === vin);
-                if (algolia) return { ...basic, ...algolia, _hasAlgolia: true };
+                if (algolia) return { ...basic, ...algolia };
                 return basic;
             }).filter(Boolean);
 
             if (selected.length < 2) {
-                content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;">Could not find all selected vehicles. Try searching on the "All Dealers" tab first.</p>';
+                content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;">Could not find all selected vehicles. Try "All Dealers" tab first.</p>';
                 return;
             }
 
-            // Decode all VINs in parallel
+            // Decode VINs
             const decoded = await Promise.all(selected.map(v => decodeVIN(v.vin)));
-
             const cols = selected.length;
 
-            // ============ 1. VEHICLE HEADER CARDS ============
-            let html = `<div style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:12px;margin-bottom:16px;">`;
+            // Identify Findlay vehicles
+            const findlayIdx = selected.findIndex(v => v.dealer === 'Findlay' || v.dealerShort === 'Findlay');
+            const hasFindlay = findlayIdx >= 0;
+            const isVsCompetitor = hasFindlay && selected.some(v => v.dealer !== 'Findlay' && v.dealerShort !== 'Findlay');
+
+            // Parse numbers
+            const prices = selected.map(v => parseFloat(String(v.price || '0').replace(/[^0-9.]/g,'')) || 0);
+            const msrps = selected.map(v => parseFloat(String(v.msrp || '0').replace(/[^0-9.]/g,'')) || 0);
+            const mileages = selected.map(v => parseInt(v.mileage) || 0);
+            const daysArr = selected.map(v => parseInt(v.daysOnLot) || 0);
+
+            // Build features per vehicle
+            const vehicleFeatures = selected.map(v => new Set(v.features || []));
+            const allFeatureSet = new Set();
+            vehicleFeatures.forEach(s => s.forEach(f => allFeatureSet.add(f)));
+            const allFeatureList = [...allFeatureSet].sort();
+
+            // Categorize differences
+            const featureDiffs = []; // {feature, category, hasIt: [bool, bool...]}
+            const featureShared = [];
+            allFeatureList.forEach(f => {
+                const hasIt = vehicleFeatures.map(s => s.has(f));
+                if (hasIt.every(Boolean)) {
+                    featureShared.push(f);
+                } else {
+                    featureDiffs.push({ feature: f, category: categorizeFeature(f), hasIt });
+                }
+            });
+
+            // Count advantages per vehicle
+            const featureWins = selected.map((_, i) => featureDiffs.filter(d => d.hasIt[i]).length);
+
+            // ============ SALES SCORECARD (TOP) ============
+            let html = '';
+
+            // Build scorecard
+            const scoreItems = [];
+            // Price
+            if (prices.filter(p => p > 0).length >= 2) {
+                const best = prices.indexOf(Math.min(...prices.filter(p => p > 0)));
+                scoreItems.push({ label: 'Price', winners: [best], detail: '$' + prices[best].toLocaleString() });
+            }
+            // More features
+            if (featureDiffs.length > 0) {
+                const maxFeats = Math.max(...featureWins);
+                const winners = featureWins.map((w, i) => w === maxFeats ? i : -1).filter(i => i >= 0);
+                scoreItems.push({ label: 'More Features', winners, detail: maxFeats + ' exclusive features' });
+            }
+            // Lower mileage
+            if (mileages.filter(m => m > 0).length >= 2) {
+                const best = mileages.indexOf(Math.min(...mileages.filter(m => m > 0)));
+                scoreItems.push({ label: 'Lower Miles', winners: [best], detail: mileages[best].toLocaleString() + ' mi' });
+            }
+            // Fewer days on lot (fresher)
+            if (daysArr.filter(d => d > 0).length >= 2) {
+                const best = daysArr.indexOf(Math.min(...daysArr.filter(d => d > 0)));
+                scoreItems.push({ label: 'Fresher Stock', winners: [best], detail: daysArr[best] + ' days' });
+            }
+
+            // Findlay advantage banner
+            if (hasFindlay) {
+                const findlayWinCount = scoreItems.filter(s => s.winners.includes(findlayIdx)).length;
+                const otherWins = scoreItems.length - findlayWinCount;
+
+                if (isVsCompetitor) {
+                    const bannerColor = findlayWinCount > otherWins ? '#4CAF50' : findlayWinCount === otherWins ? 'var(--gold)' : '#ef4444';
+                    html += `<div style="background:${findlayWinCount > otherWins ? 'rgba(76,175,80,0.1)' : findlayWinCount === otherWins ? 'rgba(212,160,23,0.1)' : 'rgba(239,68,68,0.1)'};border:2px solid ${bannerColor};border-radius:12px;padding:16px;margin-bottom:16px;">`;
+                    html += `<div style="font-size:18px;font-weight:800;color:${bannerColor};margin-bottom:8px;">`;
+                    if (findlayWinCount > otherWins) {
+                        html += `FINDLAY WINS ${findlayWinCount} OF ${scoreItems.length}`;
+                    } else if (findlayWinCount === otherWins) {
+                        html += `EVEN MATCHUP — ${findlayWinCount} WINS EACH`;
+                    } else {
+                        html += `FINDLAY WINS ${findlayWinCount} OF ${scoreItems.length} — SEE BELOW`;
+                    }
+                    html += `</div>`;
+
+                    // Scorecard chips
+                    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;">`;
+                    scoreItems.forEach(s => {
+                        const findlayWon = s.winners.includes(findlayIdx);
+                        html += `<div style="padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;background:${findlayWon ? 'rgba(76,175,80,0.2);color:#4CAF50;border:1px solid rgba(76,175,80,0.4)' : 'rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3)'};">
+                            ${findlayWon ? '✓' : '✗'} ${s.label}: ${s.detail}
+                        </div>`;
+                    });
+                    html += `</div>`;
+
+                    // Talking points
+                    const findlayV = selected[findlayIdx];
+                    const otherIdx = selected.findIndex((v, i) => i !== findlayIdx);
+                    const otherV = selected[otherIdx];
+                    const findlayExclusiveFeatures = featureDiffs.filter(d => d.hasIt[findlayIdx] && !d.hasIt[otherIdx]).map(d => d.feature);
+                    const otherExclusiveFeatures = featureDiffs.filter(d => !d.hasIt[findlayIdx] && d.hasIt[otherIdx]).map(d => d.feature);
+
+                    html += `<div style="margin-top:12px;padding-top:12px;border-top:1px solid ${bannerColor};">`;
+                    html += `<div style="font-weight:700;font-size:13px;color:var(--gold);margin-bottom:6px;">Talking Points for the Customer:</div>`;
+                    html += `<ul style="margin:0;padding-left:18px;font-size:13px;color:var(--text-primary);line-height:1.8;">`;
+
+                    if (prices[findlayIdx] < prices[otherIdx] && prices[findlayIdx] > 0) {
+                        html += `<li><strong>$${(prices[otherIdx] - prices[findlayIdx]).toLocaleString()} less</strong> than ${otherV.dealerShort || otherV.dealer}'s ${otherV.model || 'vehicle'}</li>`;
+                    } else if (prices[findlayIdx] > prices[otherIdx] && prices[otherIdx] > 0) {
+                        html += `<li>Ours is $${(prices[findlayIdx] - prices[otherIdx]).toLocaleString()} more — but here's why it's worth it:</li>`;
+                    }
+
+                    if (findlayExclusiveFeatures.length > 0) {
+                        html += `<li><strong>Ours has ${findlayExclusiveFeatures.length} features theirs doesn't:</strong> ${findlayExclusiveFeatures.slice(0, 6).join(', ')}${findlayExclusiveFeatures.length > 6 ? ` +${findlayExclusiveFeatures.length - 6} more` : ''}</li>`;
+                    }
+                    if (otherExclusiveFeatures.length > 0) {
+                        html += `<li style="color:var(--text-secondary);">They have ${otherExclusiveFeatures.length} we don't: ${otherExclusiveFeatures.slice(0, 4).join(', ')}${otherExclusiveFeatures.length > 4 ? ` +${otherExclusiveFeatures.length - 4} more` : ''}</li>`;
+                    }
+
+                    if (mileages[findlayIdx] > 0 && mileages[otherIdx] > 0 && mileages[findlayIdx] < mileages[otherIdx]) {
+                        html += `<li><strong>${(mileages[otherIdx] - mileages[findlayIdx]).toLocaleString()} fewer miles</strong> — more life left in the vehicle</li>`;
+                    }
+
+                    if (daysArr[otherIdx] > 60) {
+                        html += `<li>Their unit has been sitting <strong>${daysArr[otherIdx]} days</strong> — they're more motivated to move it (use as leverage if cross-shopping)</li>`;
+                    }
+                    if (daysArr[findlayIdx] > 60) {
+                        html += `<li style="color:var(--warning);">Ours has been here <strong>${daysArr[findlayIdx]} days</strong> — management wants this one gone, room to work the deal</li>`;
+                    }
+
+                    html += `<li>We're Findlay Chevrolet — <strong>#1 volume dealer west of Texas</strong>. Volume = better pricing and service after the sale.</li>`;
+                    html += `</ul></div></div>`;
+
+                } else {
+                    // Comparing two Findlay vehicles (helping customer choose)
+                    html += `<div style="background:rgba(212,160,23,0.08);border:2px solid var(--gold);border-radius:12px;padding:16px;margin-bottom:16px;">`;
+                    html += `<div style="font-size:16px;font-weight:800;color:var(--gold);margin-bottom:8px;">HELPING YOUR CUSTOMER CHOOSE</div>`;
+                    html += `<div style="font-size:13px;color:var(--text-primary);line-height:1.6;">`;
+
+                    const priceDiff = Math.abs(prices[0] - prices[1]);
+                    const moreExpensiveIdx = prices[0] > prices[1] ? 0 : 1;
+                    const cheaperIdx = moreExpensiveIdx === 0 ? 1 : 0;
+                    const moreExpensive = selected[moreExpensiveIdx];
+                    const cheaper = selected[cheaperIdx];
+                    const extraFeatures = featureDiffs.filter(d => d.hasIt[moreExpensiveIdx] && !d.hasIt[cheaperIdx]).map(d => d.feature);
+
+                    if (priceDiff > 0 && extraFeatures.length > 0) {
+                        html += `For <strong>$${priceDiff.toLocaleString()} more</strong>, the <strong>${moreExpensive.year} ${moreExpensive.model}</strong> gets them: <strong>${extraFeatures.slice(0, 5).join(', ')}</strong>${extraFeatures.length > 5 ? ` and ${extraFeatures.length - 5} more` : ''}.`;
+                        html += ` If they don't need those features, the <strong>${cheaper.year} ${cheaper.model}</strong> is the smarter buy at <strong>$${prices[cheaperIdx].toLocaleString()}</strong>.`;
+                    } else if (priceDiff > 0) {
+                        html += `The <strong>${moreExpensive.year} ${moreExpensive.model}</strong> is <strong>$${priceDiff.toLocaleString()} more</strong>. Check the specs and stickers below for what accounts for the difference.`;
+                    }
+                    html += `</div></div>`;
+                }
+            }
+
+            // ============ VEHICLE HEADER CARDS ============
+            html += `<div style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:12px;margin-bottom:16px;">`;
             selected.forEach((v, i) => {
                 const isFindlay = v.dealer === 'Findlay' || v.dealerShort === 'Findlay';
-                const price = parseFloat(String(v.price || '0').replace(/[^0-9.]/g,'')) || 0;
-                const msrp = parseFloat(String(v.msrp || '0').replace(/[^0-9.]/g,'')) || 0;
-                const priceStr = price ? '$' + price.toLocaleString() : 'Call for price';
-                const msrpStr = msrp ? '$' + msrp.toLocaleString() : '';
+                const price = prices[i];
+                const msrp = msrps[i];
+                const priceStr = price ? '$' + price.toLocaleString() : 'Call';
                 const trim = decoded[i]['Trim'] || v.trim || '';
-                const mileage = v.mileage ? Number(v.mileage).toLocaleString() + ' mi' : '';
-                const condition = v.condition || '';
+                const mileage = mileages[i] ? mileages[i].toLocaleString() + ' mi' : '';
                 const imgSrc = v.image || v.imageUrl || '';
 
                 html += `<div style="background:var(--card-bg);border-radius:12px;overflow:hidden;border:2px solid ${isFindlay ? 'var(--gold)' : 'var(--border-color)'};">
-                    ${imgSrc ? `<img src="${imgSrc}" style="width:100%;height:140px;object-fit:cover;" onerror="this.style.display='none'">` : ''}
-                    <div style="padding:14px;">
-                        <div style="font-weight:700;font-size:15px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}</div>
-                        ${trim ? `<div style="font-size:13px;color:var(--text-secondary);font-weight:600;">${trim}</div>` : ''}
-                        <div style="font-size:18px;font-weight:700;color:${isFindlay ? 'var(--gold)' : 'var(--text-primary)'};margin:6px 0;">${priceStr}</div>
-                        ${msrp && msrp !== price ? `<div style="font-size:12px;color:var(--text-secondary);">MSRP: ${msrpStr} ${msrp > price ? `<span style="color:#4CAF50;font-weight:600;">Save $${(msrp - price).toLocaleString()}</span>` : ''}</div>` : ''}
+                    ${isFindlay ? '<div style="background:var(--gold);color:#000;text-align:center;font-size:11px;font-weight:700;padding:3px;">OUR VEHICLE</div>' : `<div style="background:var(--border-color);text-align:center;font-size:11px;font-weight:700;padding:3px;color:var(--text-secondary);">${v.dealerShort || v.dealer || 'Competitor'}</div>`}
+                    ${imgSrc ? `<img src="${imgSrc}" style="width:100%;height:130px;object-fit:cover;" onerror="this.style.display='none'">` : ''}
+                    <div style="padding:12px;">
+                        <div style="font-weight:700;font-size:14px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}</div>
+                        ${trim ? `<div style="font-size:12px;color:var(--text-secondary);font-weight:600;">${trim}</div>` : ''}
+                        <div style="font-size:18px;font-weight:700;color:${isFindlay ? 'var(--gold)' : 'var(--text-primary)'};margin:4px 0;">${priceStr}</div>
+                        ${msrp && msrp !== price ? `<div style="font-size:11px;color:var(--text-secondary);">MSRP: $${msrp.toLocaleString()} ${msrp > price ? `<span style="color:#4CAF50;font-weight:600;">Save $${(msrp - price).toLocaleString()}</span>` : ''}</div>` : ''}
                         <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">
-                            ${condition ? condition + ' · ' : ''}${mileage ? mileage + ' · ' : ''}${v.dealer || 'Findlay'}
+                            ${v.condition || ''} ${mileage ? '· ' + mileage : ''} · ${featureWins[i]} exclusive features
                             <br>Stock: ${v.stockNumber || v.stock || 'N/A'} · VIN: ...${(v.vin||'').slice(-6)}
-                            ${v.daysOnLot ? `<br><span style="color:${v.daysOnLot > 60 ? '#f44336' : v.daysOnLot > 30 ? 'var(--warning)' : '#4CAF50'};">${v.daysOnLot} days on lot</span>` : ''}
+                            ${daysArr[i] ? `<br><span style="color:${daysArr[i] > 60 ? '#f44336' : daysArr[i] > 30 ? 'var(--warning)' : '#4CAF50'};">${daysArr[i]} days on lot</span>` : ''}
                         </div>
                     </div>
                 </div>`;
             });
             html += '</div>';
 
-            // ============ 2. PRICING COMPARISON ============
-            const prices = selected.map(v => parseFloat(String(v.price || '0').replace(/[^0-9.]/g,'')) || 0);
-            const msrps = selected.map(v => parseFloat(String(v.msrp || '0').replace(/[^0-9.]/g,'')) || 0);
-            const mileages = selected.map(v => parseInt(v.mileage) || 0);
-            const lowestPrice = Math.min(...prices.filter(p => p > 0));
-            const priceDiff = Math.max(...prices) - lowestPrice;
+            // ============ FEATURES Y/N GRID BY CATEGORY ============
+            if (featureDiffs.length > 0) {
+                // Group by category
+                const catGroups = {};
+                featureDiffs.forEach(d => {
+                    if (!catGroups[d.category]) catGroups[d.category] = [];
+                    catGroups[d.category].push(d);
+                });
 
-            if (prices.some(p => p > 0)) {
                 html += `<div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);margin-bottom:16px;">`;
-                html += `<h3 style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px;">Pricing Breakdown</h3>`;
-                html += `<div style="display:grid;grid-template-columns:140px repeat(${cols}, 1fr);gap:0;font-size:13px;">`;
+                html += `<h3 style="font-size:15px;font-weight:700;color:#ef4444;margin-bottom:4px;">Feature Differences</h3>`;
+                html += `<p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">Grouped by category — this is what the price difference buys you.</p>`;
 
-                // Selling Price row
-                html += `<div style="padding:8px 10px;font-weight:600;color:var(--text-secondary);">Selling Price</div>`;
-                selected.forEach((v, i) => {
-                    const p = prices[i];
-                    const isLowest = p === lowestPrice && p > 0;
-                    const diff = p - lowestPrice;
-                    html += `<div style="padding:8px;text-align:center;border-left:1px solid var(--border-color);">
-                        <div style="font-weight:700;${isLowest ? 'color:#4CAF50;' : ''}">${p ? '$' + p.toLocaleString() : '—'}</div>
-                        ${diff > 0 ? `<div style="font-size:11px;color:#f44336;">+$${diff.toLocaleString()} more</div>` : ''}
-                        ${isLowest && priceDiff > 0 ? `<div style="font-size:11px;color:#4CAF50;font-weight:600;">BEST PRICE</div>` : ''}
-                    </div>`;
-                });
+                Object.entries(catGroups).forEach(([category, features]) => {
+                    html += `<div style="margin-bottom:12px;">`;
+                    html += `<div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">${category}</div>`;
+                    html += `<div style="display:grid;grid-template-columns:1fr repeat(${cols}, 50px);gap:0;font-size:12px;">`;
 
-                // MSRP row (if any have MSRP)
-                if (msrps.some(m => m > 0)) {
-                    html += `<div style="padding:8px 10px;font-weight:600;color:var(--text-secondary);border-top:1px solid var(--border-color);">MSRP</div>`;
-                    selected.forEach((v, i) => {
-                        const m = msrps[i];
-                        const savings = m && prices[i] ? m - prices[i] : 0;
-                        html += `<div style="padding:8px;text-align:center;border-left:1px solid var(--border-color);border-top:1px solid var(--border-color);">
-                            <div>${m ? '$' + m.toLocaleString() : '—'}</div>
-                            ${savings > 0 ? `<div style="font-size:11px;color:#4CAF50;">You save $${savings.toLocaleString()}</div>` : ''}
-                        </div>`;
-                    });
-                }
-
-                // Mileage row (if used vehicles)
-                if (mileages.some(m => m > 0)) {
-                    const lowestMiles = Math.min(...mileages.filter(m => m > 0));
-                    html += `<div style="padding:8px 10px;font-weight:600;color:var(--text-secondary);border-top:1px solid var(--border-color);">Mileage</div>`;
-                    selected.forEach((v, i) => {
-                        const m = mileages[i];
-                        const isLowest = m === lowestMiles && m > 0;
-                        html += `<div style="padding:8px;text-align:center;border-left:1px solid var(--border-color);border-top:1px solid var(--border-color);">
-                            <div style="${isLowest ? 'color:#4CAF50;font-weight:600;' : ''}">${m ? m.toLocaleString() + ' mi' : '—'}</div>
-                            ${m > lowestMiles ? `<div style="font-size:11px;color:var(--text-secondary);">+${(m - lowestMiles).toLocaleString()} mi more</div>` : ''}
-                        </div>`;
-                    });
-                }
-
-                // Days on lot row
-                const daysOnLot = selected.map(v => parseInt(v.daysOnLot) || 0);
-                if (daysOnLot.some(d => d > 0)) {
-                    html += `<div style="padding:8px 10px;font-weight:600;color:var(--text-secondary);border-top:1px solid var(--border-color);">Days on Lot</div>`;
-                    selected.forEach((v, i) => {
-                        const d = daysOnLot[i];
-                        html += `<div style="padding:8px;text-align:center;border-left:1px solid var(--border-color);border-top:1px solid var(--border-color);">
-                            <div style="color:${d > 60 ? '#f44336' : d > 30 ? 'var(--warning)' : '#4CAF50'};">${d || '—'} days</div>
-                            ${d > 60 ? `<div style="font-size:11px;color:var(--text-secondary);">Negotiate harder</div>` : ''}
-                        </div>`;
-                    });
-                }
-
-                html += `</div></div>`;
-
-                // ============ PRICING REASONING ============
-                if (priceDiff > 0) {
-                    html += `<div style="background:rgba(212,160,23,0.08);border:1px solid rgba(212,160,23,0.3);border-radius:12px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.6;">`;
-                    html += `<div style="font-weight:700;color:var(--gold);margin-bottom:6px;">Why the price difference?</div>`;
-                    html += `<div style="color:var(--text-primary);">The <strong>$${priceDiff.toLocaleString()}</strong> gap is likely due to: `;
-
-                    const reasons = [];
-                    // Check trim differences
-                    const trims = decoded.map(d => d['Trim'] || '');
-                    if (trims.some((t, i) => t && trims.some((t2, j) => j !== i && t2 && t !== t2))) {
-                        reasons.push('different trim levels (higher trim = more standard features and content)');
-                    }
-                    // Check mileage
-                    if (mileages.some(m => m > 0)) {
-                        const mileDiff = Math.max(...mileages) - Math.min(...mileages.filter(m => m > 0));
-                        if (mileDiff > 5000) reasons.push(`${mileDiff.toLocaleString()} mile difference (lower miles holds more value)`);
-                    }
-                    // Check condition (new vs used)
-                    const conditions = selected.map(v => (v.condition || '').toLowerCase());
-                    if (conditions.includes('new') && (conditions.includes('used') || conditions.includes('carbravo'))) {
-                        reasons.push('new vs pre-owned (depreciation)');
-                    }
-                    // Check drivetrain
-                    const drives = decoded.map(d => d['Drive Type'] || '');
-                    if (drives.some((d, i) => d && drives.some((d2, j) => j !== i && d2 && d !== d2))) {
-                        reasons.push('different drivetrain (4WD/AWD commands a premium over 2WD)');
-                    }
-                    // Check engine
-                    const engines = decoded.map(d => d['Displacement (L)'] || '');
-                    if (engines.some((e, i) => e && engines.some((e2, j) => j !== i && e2 && e !== e2))) {
-                        reasons.push('different engine size');
-                    }
-                    // Days on lot
-                    const maxDays = Math.max(...daysOnLot);
-                    if (maxDays > 60) reasons.push(`the ${maxDays}-day unit has been sitting — more room to deal`);
-
-                    if (reasons.length > 0) {
-                        html += reasons.join(', ') + '.';
-                    } else {
-                        html += 'different packages and options — check the features below and window stickers for the full breakdown.';
-                    }
-                    html += `</div></div>`;
-                }
-            }
-
-            // ============ 3. FEATURES / PACKAGES DIFF ============
-            const allFeatures = new Set();
-            selected.forEach(v => {
-                (v.features || []).forEach(f => allFeatures.add(f));
-            });
-
-            if (allFeatures.size > 0) {
-                const featureList = [...allFeatures].sort();
-                const onlyOnOne = []; // features unique to one vehicle
-                const shared = [];   // features on all vehicles
-
-                featureList.forEach(f => {
-                    const hasIt = selected.map(v => (v.features || []).includes(f));
-                    if (hasIt.every(Boolean)) {
-                        shared.push(f);
-                    } else {
-                        onlyOnOne.push({ feature: f, hasIt });
-                    }
-                });
-
-                if (onlyOnOne.length > 0) {
-                    html += `<div style="background:var(--card-bg);border:2px solid #ef4444;border-radius:12px;padding:16px;margin-bottom:16px;">`;
-                    html += `<h3 style="font-size:15px;font-weight:700;color:#ef4444;margin-bottom:4px;">Features One Has That the Other Doesn't</h3>`;
-                    html += `<p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">These features/packages differ — this is what justifies the price gap.</p>`;
-                    html += `<div style="display:grid;grid-template-columns:1fr repeat(${cols}, 60px);gap:0;font-size:13px;">`;
-                    // Header
-                    html += `<div style="padding:6px 10px;font-weight:700;color:#ef4444;font-size:11px;">FEATURE</div>`;
-                    selected.forEach(v => {
-                        html += `<div style="padding:6px 4px;text-align:center;font-weight:700;font-size:11px;color:#ef4444;border-left:1px solid var(--border-color);">${(v.year + '').slice(-2)} ${(v.model || '').split(' ')[0]}</div>`;
-                    });
-
-                    onlyOnOne.forEach((item, i) => {
-                        const bg = i % 2 === 0 ? 'rgba(239,68,68,0.06)' : 'transparent';
-                        html += `<div style="padding:5px 10px;background:${bg};border-top:1px solid var(--border-color);font-size:12px;">${item.feature}</div>`;
+                    features.forEach((item, fi) => {
+                        const bg = fi % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+                        html += `<div style="padding:5px 8px;background:${bg};border-top:1px solid var(--border-color);">${item.feature}</div>`;
                         item.hasIt.forEach((has, vi) => {
-                            html += `<div style="padding:5px 4px;background:${bg};text-align:center;border-top:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:14px;">${has ? '<span style="color:#4CAF50;">Y</span>' : '<span style="color:#f44336;">N</span>'}</div>`;
+                            const isFindlay = selected[vi].dealer === 'Findlay' || selected[vi].dealerShort === 'Findlay';
+                            html += `<div style="padding:5px 4px;background:${bg};text-align:center;border-top:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:16px;">`;
+                            if (has) {
+                                html += isFindlay ? '<span style="color:var(--gold);font-weight:700;">✓</span>' : '<span style="color:#4CAF50;">✓</span>';
+                            } else {
+                                html += '<span style="color:#555;">—</span>';
+                            }
+                            html += `</div>`;
                         });
                     });
                     html += `</div></div>`;
-                }
+                });
 
-                if (shared.length > 0) {
-                    html += `<details style="margin-bottom:16px;">
-                        <summary style="cursor:pointer;font-size:13px;font-weight:600;color:#4CAF50;padding:8px 0;">Both have ${shared.length} features in common (click to see)</summary>
-                        <div style="background:var(--card-bg);border-radius:8px;padding:12px;margin-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.8;">
-                            ${shared.join(' &nbsp;·&nbsp; ')}
-                        </div>
-                    </details>`;
-                }
+                // Feature count summary
+                html += `<div style="display:flex;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--border-color);">`;
+                selected.forEach((v, i) => {
+                    const isFindlay = v.dealer === 'Findlay' || v.dealerShort === 'Findlay';
+                    html += `<div style="flex:1;text-align:center;padding:8px;background:${isFindlay ? 'rgba(212,160,23,0.1)' : 'var(--dark-bg)'};border-radius:8px;">
+                        <div style="font-size:24px;font-weight:800;color:${isFindlay ? 'var(--gold)' : 'var(--text-primary)'};">${featureWins[i]}</div>
+                        <div style="font-size:11px;color:var(--text-secondary);">exclusive features</div>
+                    </div>`;
+                });
+                html += `</div>`;
+                html += `</div>`;
             }
 
-            // ============ 4. SPEC COMPARISON (VIN DECODE) ============
+            // Shared features (collapsed)
+            if (featureShared.length > 0) {
+                html += `<details style="margin-bottom:16px;">
+                    <summary style="cursor:pointer;font-size:13px;font-weight:600;color:#4CAF50;padding:8px 0;">✓ Both have ${featureShared.length} features in common</summary>
+                    <div style="background:var(--card-bg);border-radius:8px;padding:12px;margin-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.8;">
+                        ${featureShared.join(' · ')}
+                    </div>
+                </details>`;
+            }
+
+            // ============ SPEC DIFFERENCES (VIN) ============
             const specKeys = [
                 { label: 'Trim Level', key: 'Trim' },
                 { label: 'Drive Type', key: 'Drive Type' },
@@ -4752,72 +4808,52 @@
                 { label: 'Turbo', key: 'Turbo' },
                 { label: 'Horsepower', key: 'Engine Brake (hp) From' },
                 { label: 'Transmission', key: 'Transmission Style' },
-                { label: 'Transmission Speeds', key: 'Transmission Speeds' },
                 { label: 'Fuel Type', key: 'Fuel Type - Primary' },
                 { label: 'Body Style', key: 'Body Class' },
                 { label: 'Doors', key: 'Doors' },
-                { label: 'Seat Rows', key: 'Number of Seat Rows' },
-                { label: 'Weight Class', key: 'Gross Vehicle Weight Rating From' },
-                { label: 'Backup Camera', key: 'Backup Camera' },
-                { label: 'Blind Spot Warning', key: 'Blind Spot Warning' },
-                { label: 'Lane Departure Warning', key: 'Lane Departure Warning' },
-                { label: 'Forward Collision Warning', key: 'Forward Collision Warning' },
-                { label: 'Auto Emergency Braking', key: 'Automatic Emergency Braking (AEB)' },
-                { label: 'Adaptive Cruise', key: 'Adaptive Cruise Control (ACC)' },
-                { label: 'Plant', key: 'Plant City' },
             ];
 
-            const hasDifference = (key) => {
+            const hasDiff = (key) => {
                 const vals = decoded.map(d => (d[key] || '').toLowerCase());
                 return vals.some(v => v !== vals[0]);
             };
 
-            const diffSpecs = specKeys.filter(s => {
-                const vals = decoded.map(d => d[s.key] || '');
-                return vals.some(v => v) && hasDifference(s.key);
-            });
-            const sameSpecs = specKeys.filter(s => {
-                const vals = decoded.map(d => d[s.key] || '');
-                return vals.some(v => v) && !hasDifference(s.key);
-            });
+            const diffSpecs = specKeys.filter(s => decoded.some(d => d[s.key]) && hasDiff(s.key));
+            const sameSpecs = specKeys.filter(s => decoded.some(d => d[s.key]) && !hasDiff(s.key));
 
-            // Spec differences
             if (diffSpecs.length > 0) {
                 html += `<div style="border:2px solid #ef4444;border-radius:12px;overflow:hidden;margin-bottom:16px;">`;
-                html += `<div style="padding:10px 14px;background:#ef4444;font-weight:700;font-size:13px;color:#fff;">Spec Differences (from VIN decode)</div>`;
-                html += `<div style="display:grid;grid-template-columns:160px repeat(${cols}, 1fr);gap:0;">`;
+                html += `<div style="padding:10px 14px;background:#ef4444;font-weight:700;font-size:13px;color:#fff;">Spec Differences</div>`;
+                html += `<div style="display:grid;grid-template-columns:140px repeat(${cols}, 1fr);gap:0;">`;
                 diffSpecs.forEach((spec, i) => {
                     const bg = i % 2 === 0 ? 'rgba(239,68,68,0.06)' : 'transparent';
                     html += `<div style="padding:8px 12px;background:${bg};border-top:1px solid var(--border-color);font-weight:600;font-size:12px;color:#ef4444;">${spec.label}</div>`;
                     decoded.forEach((d, vi) => {
                         const val = d[spec.key] || '—';
                         const isFindlay = selected[vi].dealer === 'Findlay' || selected[vi].dealerShort === 'Findlay';
-                        html += `<div style="padding:8px;background:${bg};border-top:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:12px;text-align:center;font-weight:${isFindlay ? '700' : '400'};${isFindlay ? 'color:var(--gold);' : ''}">${val}</div>`;
+                        html += `<div style="padding:8px;background:${bg};border-top:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:12px;text-align:center;${isFindlay ? 'color:var(--gold);font-weight:700;' : ''}">${val}</div>`;
                     });
                 });
                 html += '</div></div>';
             }
 
-            // Matching specs (collapsed)
             if (sameSpecs.length > 0) {
                 html += `<details style="margin-bottom:16px;">
-                    <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);padding:8px 0;">${sameSpecs.length} Matching Specs (click to expand)</summary>
+                    <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);padding:8px 0;">${sameSpecs.length} matching specs</summary>
                     <div style="border:1px solid var(--border-color);border-radius:12px;overflow:hidden;margin-top:8px;">
-                    <div style="display:grid;grid-template-columns:160px repeat(${cols}, 1fr);gap:0;">`;
+                    <div style="display:grid;grid-template-columns:140px repeat(${cols}, 1fr);gap:0;">`;
                 sameSpecs.forEach((spec, i) => {
                     const bg = i % 2 === 0 ? 'var(--dark-bg)' : 'var(--card-bg)';
                     html += `<div style="padding:6px 12px;background:${bg};border-top:1px solid var(--border-color);font-size:12px;color:var(--text-secondary);">${spec.label}</div>`;
-                    decoded.forEach(d => {
-                        html += `<div style="padding:6px 8px;background:${bg};border-top:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:12px;text-align:center;">${d[spec.key] || '—'}</div>`;
-                    });
+                    decoded.forEach(d => html += `<div style="padding:6px 8px;background:${bg};border-top:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:12px;text-align:center;">${d[spec.key] || '—'}</div>`);
                 });
                 html += '</div></div></details>';
             }
 
-            // ============ 5. WINDOW STICKERS SIDE-BY-SIDE ============
+            // ============ WINDOW STICKERS ============
             html += `<div style="margin-bottom:12px;">
-                <h3 style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:4px;">Full Window Stickers</h3>
-                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">For the complete packages, options, and MSRP breakdown — scroll each sticker.</p>
+                <h3 style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:4px;">Window Stickers</h3>
+                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">Full MSRP breakdown, packages, and options from GM.</p>
             </div>`;
             html += `<div style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:12px;">`;
             selected.forEach(v => {
@@ -4825,18 +4861,13 @@
                 const isFindlay = v.dealer === 'Findlay' || v.dealerShort === 'Findlay';
                 html += `<div style="background:var(--card-bg);border-radius:12px;overflow:hidden;border:1px solid ${isFindlay ? 'var(--gold)' : 'var(--border-color)'};">
                     <div style="padding:8px 12px;background:${isFindlay ? 'rgba(212,175,55,0.15)' : 'var(--dark-bg)'};font-size:13px;font-weight:700;text-align:center;${isFindlay ? 'color:var(--gold);' : ''}">
-                        ${v.year} ${v.model || ''} — ${v.dealerShort || v.dealer || 'Findlay'}
-                        ${v.vin ? `<a href="${stickerUrl}" target="_blank" style="margin-left:8px;font-size:11px;color:var(--text-secondary);">Open full ↗</a>` : ''}
+                        ${v.year} ${v.model || ''} ${v.vin ? `<a href="${stickerUrl}" target="_blank" style="margin-left:6px;font-size:11px;color:var(--text-secondary);">Open ↗</a>` : ''}
                     </div>
-                    ${v.vin
-                        ? `<iframe src="${stickerUrl}" style="width:100%;height:70vh;border:none;background:#fff;" title="Window Sticker ${v.vin}"></iframe>`
-                        : `<div style="height:200px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);">No VIN — cannot load sticker</div>`
-                    }
+                    ${v.vin ? `<iframe src="${stickerUrl}" style="width:100%;height:70vh;border:none;background:#fff;"></iframe>` : '<div style="height:150px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);">No VIN</div>'}
                 </div>`;
             });
             html += '</div>';
 
-            // Clear button
             html += `<div style="text-align:center;margin-top:16px;">
                 <button class="btn" style="background:var(--card-bg);" onclick="compareList=[];updateCompareUI();closeComparePanel();">Clear Comparison</button>
             </div>`;
