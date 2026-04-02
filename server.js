@@ -4715,13 +4715,23 @@ async function scrapeDealerInspire(name, indexName, dealerLabel, dealerShort, si
         const msrp = hit.msrp || null;
         const stockNum = hit.stock || hit.stock_number || '';
         const img = hit.photo || hit.thumbnail || '';
+        // DealerInspire Algolia also sometimes has these:
+        const imgAlt = hit.images?.[0] || hit.image || hit.vehicle_image || '';
 
         if (vin) {
-          // Try to get real image from DealerInspire CDN pattern
-          let realImg = img;
-          if (!img || img.includes('notfound') || img.includes('no-image') || img.includes('placeholder')) {
-            // DealerInspire CDN image pattern
-            realImg = `https://pictures.dealer.com/f/${name === 'fairway' ? 'fairwaychevroletbuickgmc' : 'hendersonchevroletbuickgmc'}/0/img/${vin}_1.jpg`;
+          // Try multiple image sources
+          let realImg = '';
+          // 1. Direct Algolia image fields
+          if (img && !img.includes('notfound') && !img.includes('no-image') && !img.includes('placeholder')) {
+            realImg = img.startsWith('//') ? 'https:' + img : img;
+          } else if (imgAlt && !imgAlt.includes('notfound') && !imgAlt.includes('placeholder')) {
+            realImg = imgAlt.startsWith('//') ? 'https:' + imgAlt : imgAlt;
+          }
+          // 2. Build VDP-based image URL — DealerInspire sites serve images at /assets/stock/<vin>/ patterns
+          // or use our server proxy endpoint to fetch real images
+          if (!realImg) {
+            // Use server-side image proxy which will scrape the VDP for real image
+            realImg = `/api/competitors/vehicle-image?vin=${vin}&dealer=${name}`;
           }
 
           allVehicles.push({
@@ -4912,6 +4922,66 @@ function parseVehicleTitle(title) {
 
   return { year, make, model, trim };
 }
+
+// API: Get vehicle image by scraping VDP page
+app.get('/api/competitors/vehicle-image', async (req, res) => {
+  const { vin, dealer } = req.query;
+  if (!vin || !dealer) return res.status(400).json({ error: 'Missing vin or dealer' });
+
+  // Check in-memory cache first
+  if (!global._vehicleImageCache) global._vehicleImageCache = {};
+  if (global._vehicleImageCache[vin]) {
+    return res.redirect(global._vehicleImageCache[vin]);
+  }
+
+  // Find the vehicle URL from our inventory cache
+  const dealerInv = competitorInventory[dealer];
+  const vehicle = dealerInv?.vehicles?.find(v => v.vin === vin);
+  const vdpUrl = vehicle?.url;
+
+  if (!vdpUrl || vdpUrl === '#') {
+    return res.status(404).send('No vehicle URL');
+  }
+
+  try {
+    const response = await axios.get(vdpUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+      timeout: 10000,
+    });
+    const html = response.data;
+
+    // Try multiple patterns to find vehicle images
+    let imgUrl = '';
+
+    // Pattern 1: og:image meta tag (most reliable)
+    const ogMatch = html.match(/<meta\s+(?:property|name)="og:image"\s+content="([^"]+)"/i)
+                 || html.match(/content="([^"]+)"\s+(?:property|name)="og:image"/i);
+    if (ogMatch) imgUrl = ogMatch[1];
+
+    // Pattern 2: DealerInspire vehicle gallery image
+    if (!imgUrl) {
+      const galleryMatch = html.match(/class="[^"]*media-gallery[^"]*"[\s\S]*?<img[^>]+src="([^"]+(?:\.jpg|\.jpeg|\.png|\.webp)[^"]*)"/i);
+      if (galleryMatch) imgUrl = galleryMatch[1];
+    }
+
+    // Pattern 3: Any large vehicle image
+    if (!imgUrl) {
+      const imgMatch = html.match(/<img[^>]+src="(https?:\/\/[^"]+(?:vehicle|inventory|stock|auto)[^"]*(?:\.jpg|\.jpeg|\.png|\.webp)[^"]*)"/i);
+      if (imgMatch) imgUrl = imgMatch[1];
+    }
+
+    if (imgUrl) {
+      if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+      global._vehicleImageCache[vin] = imgUrl;
+      return res.redirect(imgUrl);
+    }
+
+    res.status(404).send('No image found');
+  } catch (err) {
+    console.error(`[VehicleImage] Error fetching ${vdpUrl}:`, err.message);
+    res.status(500).send('Error fetching image');
+  }
+});
 
 // API: Scrape all competitors
 app.post('/api/competitors/scrape', requireAuth, async (req, res) => {

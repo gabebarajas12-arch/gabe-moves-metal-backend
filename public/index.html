@@ -4379,9 +4379,10 @@
             let html = '';
             vehicles.forEach(vehicle => {
                 const imgSrc = vehicle.image || '';
+                const noImgDiv = `<div style="width:100%;height:160px;display:flex;align-items:center;justify-content:center;background:#1a1a2e;border-radius:8px 8px 0 0;font-size:13px;color:var(--text-secondary);flex-direction:column;gap:4px;"><span style="font-size:32px;">🚗</span><span>${vehicle.year || ''} ${vehicle.make || ''}</span></div>`;
                 const imgHtml = imgSrc
-                    ? `<img src="${imgSrc}" alt="${vehicle.year} ${vehicle.make} ${vehicle.model}" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div style="display:none;width:100%;height:160px;align-items:center;justify-content:center;background:#1a1a2e;border-radius:8px 8px 0 0;font-size:48px;color:var(--text-secondary);">No Img</div>`
-                    : `<div style="width:100%;height:160px;display:flex;align-items:center;justify-content:center;background:#1a1a2e;border-radius:8px 8px 0 0;font-size:14px;color:var(--text-secondary);">No Image</div>`;
+                    ? `<img src="${imgSrc}" alt="${vehicle.year} ${vehicle.make} ${vehicle.model}" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${noImgDiv.replace('display:flex','display:none')}`
+                    : noImgDiv;
                 const stockNum = vehicle.stockNumber || vehicle.stock || '';
                 const priceVal = vehicle.price || vehicle.msrp || '';
                 const priceDisplay = priceVal ? '$' + Number(String(priceVal).replace(/[^0-9]/g,'')).toLocaleString() : 'Call for price';
@@ -4396,7 +4397,7 @@
                         ${dealerBadge}
                         ${imgHtml}
                         <div class="inventory-details" style="padding:12px;">
-                            <div class="inventory-title" style="font-size:14px;font-weight:700;">${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}</div>
+                            <div class="inventory-title" style="font-size:14px;font-weight:700;">${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}${vehicle.trim && !(vehicle.model || '').includes(vehicle.trim) ? ' ' + vehicle.trim : ''}</div>
                             <div class="inventory-price" style="color:var(--gold);font-weight:700;font-size:16px;">${priceDisplay}</div>
                             <div class="inventory-info" style="font-size:12px;color:var(--text-secondary);margin:4px 0;">
                                 <div>Stock: ${stockNum || 'N/A'}</div>
@@ -4534,6 +4535,7 @@
             const content = document.getElementById('compareContent');
             content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Decoding VINs and building comparison... takes a few seconds</p>';
 
+          try {
             // Gather vehicle data from all caches
             const allVehicles = [...(window._inventoryCache || []), ...(window._compInventoryCache || [])];
             const algoliaCache = window._algoliaInventoryCache || [];
@@ -4549,8 +4551,11 @@
                 return;
             }
 
-            // Decode VINs
-            const decoded = await Promise.all(selected.map(v => decodeVIN(v.vin)));
+            // Decode VINs — with error handling per VIN
+            const decoded = await Promise.all(selected.map(v => decodeVIN(v.vin).catch(e => {
+                console.error('VIN decode error for', v.vin, e);
+                return {};
+            })));
             const cols = selected.length;
 
             // Identify Findlay vehicles
@@ -4771,8 +4776,7 @@
                     ${isFindlay ? '<div style="background:var(--gold);color:#000;text-align:center;font-size:11px;font-weight:700;padding:3px;">OUR VEHICLE</div>' : `<div style="background:var(--border-color);text-align:center;font-size:11px;font-weight:700;padding:3px;color:var(--text-secondary);">${v.dealerShort || v.dealer || 'Competitor'}</div>`}
                     ${imgSrc ? `<img src="${imgSrc}" style="width:100%;height:130px;object-fit:cover;" onerror="this.style.display='none'">` : ''}
                     <div style="padding:12px;">
-                        <div style="font-weight:700;font-size:14px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}</div>
-                        ${trim ? `<div style="font-size:12px;color:var(--text-secondary);font-weight:600;">${trim}</div>` : ''}
+                        <div style="font-weight:700;font-size:14px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}${trim && !(v.model || '').includes(trim) ? ' ' + trim : ''}</div>
                         <div style="font-size:18px;font-weight:700;color:${isFindlay ? 'var(--gold)' : 'var(--text-primary)'};margin:4px 0;">${priceStr}</div>
                         ${msrp && msrp !== price ? `<div style="font-size:11px;color:var(--text-secondary);">MSRP: $${msrp.toLocaleString()} ${msrp > price ? `<span style="color:#4CAF50;font-weight:600;">Save $${(msrp - price).toLocaleString()}</span>` : ''}</div>` : ''}
                         <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">
@@ -4907,7 +4911,7 @@
                 const detailUrl = v.url || v.detailUrl || '#';
                 html += `<div style="background:var(--card-bg);border-radius:12px;overflow:hidden;border:1px solid ${isFindlay ? 'var(--gold)' : 'var(--border-color)'};">
                     <div style="padding:14px;text-align:center;">
-                        <div style="font-size:14px;font-weight:700;margin-bottom:4px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}</div>
+                        <div style="font-size:14px;font-weight:700;margin-bottom:4px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}${v.trim && !(v.model || '').includes(v.trim) ? ' ' + v.trim : ''}</div>
                         <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;">VIN: ${v.vin || 'N/A'}</div>
                         <div style="display:flex;flex-direction:column;gap:8px;">
                             ${v.vin ? `<a href="${stickerUrl}" target="_blank" style="display:block;padding:10px;background:var(--gold);color:#000;font-weight:700;font-size:13px;border-radius:8px;text-decoration:none;text-align:center;">View Window Sticker</a>` : '<div style="color:var(--text-secondary);font-size:12px;">No VIN available</div>'}
@@ -4923,6 +4927,14 @@
             </div>`;
 
             content.innerHTML = html;
+          } catch (compareError) {
+            console.error('Comparison error:', compareError);
+            content.innerHTML = `<div style="text-align:center;padding:40px;">
+                <div style="color:#ef4444;font-size:16px;font-weight:700;margin-bottom:8px;">Comparison Error</div>
+                <div style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">${compareError.message || 'Something went wrong building the comparison.'}</div>
+                <button class="btn btn-primary" onclick="showComparePanel()">Try Again</button>
+            </div>`;
+          }
         }
 
         function closeComparePanel() {
