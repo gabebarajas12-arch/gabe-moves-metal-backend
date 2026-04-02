@@ -5310,6 +5310,69 @@ app.get('/api/analytics/response-log', requireAuth, (req, res) => {
   }
 });
 
+// ==================== iMESSAGE BRIDGE ENDPOINTS ====================
+// Log an SMS/iMessage from the bridge script (runs on Gabe's Mac)
+app.post('/api/sms/log', requireAuth, (req, res) => {
+  try {
+    const { phone, leadId, direction, body, autoReply, platform } = req.body;
+    if (!phone || !direction) {
+      return res.status(400).json({ error: 'phone and direction required' });
+    }
+    const msg = {
+      id: `sms_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      leadId: leadId || '',
+      phone,
+      direction,
+      body: body || '',
+      status: direction === 'outbound' ? 'sent' : 'received',
+      twilioSid: platform === 'imessage' ? `imsg_${Date.now()}` : '',
+      autoReply: autoReply ? 1 : 0,
+      createdAt: new Date().toISOString(),
+    };
+    database.sms.create(msg);
+
+    // Create notification for inbound messages
+    if (direction === 'inbound') {
+      const lead = leadId ? database.leads.getById(leadId) : null;
+      const senderName = lead ? lead.name : phone;
+      database.notifications.create({
+        id: `notif_${Date.now()}`,
+        type: 'imessage',
+        title: `iMessage from ${senderName}`,
+        message: (body || '').substring(0, 100),
+        leadId: leadId || '',
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    res.json({ success: true, message: msg });
+  } catch (error) {
+    console.error('[SMS Log] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Track response time from the bridge
+app.post('/api/analytics/track-response', requireAuth, (req, res) => {
+  try {
+    const { leadId, source, autoResponded } = req.body;
+    const entry = {
+      id: `rt_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      leadId: leadId || '',
+      source: source || 'imessage',
+      receivedAt: new Date().toISOString(),
+      respondedAt: new Date().toISOString(),
+      responseTimeMs: 5000, // bridge auto-reply delay
+      autoResponded: autoResponded ? 1 : 0,
+    };
+    database.responseTime.create(entry);
+    res.json({ success: true, entry });
+  } catch (error) {
+    console.error('[Track Response] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== PAYMENT CALCULATOR ====================
 app.post('/api/calculator/payment', (req, res) => {
   try {
