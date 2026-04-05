@@ -4379,10 +4379,11 @@
             let html = '';
             vehicles.forEach(vehicle => {
                 const imgSrc = vehicle.image || '';
-                const noImgDiv = `<div style="width:100%;height:160px;display:flex;align-items:center;justify-content:center;background:#1a1a2e;border-radius:8px 8px 0 0;font-size:13px;color:var(--text-secondary);flex-direction:column;gap:4px;"><span style="font-size:32px;">🚗</span><span>${vehicle.year || ''} ${vehicle.make || ''}</span></div>`;
+                const fallbackBg = `background:linear-gradient(135deg,#1a1a2e,#2a2a4e)`;
+                const fallbackText = `${(vehicle.make || 'CHEVY').toUpperCase()}`;
                 const imgHtml = imgSrc
-                    ? `<img src="${imgSrc}" alt="${vehicle.year} ${vehicle.make} ${vehicle.model}" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${noImgDiv.replace('display:flex','display:none')}`
-                    : noImgDiv;
+                    ? `<img src="${imgSrc}" alt="${vehicle.year} ${vehicle.make} ${vehicle.model}" style="width:100%;height:160px;object-fit:cover;border-radius:8px 8px 0 0;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="inv-no-img" style="display:none;width:100%;height:160px;align-items:center;justify-content:center;${fallbackBg};border-radius:8px 8px 0 0;flex-direction:column;gap:4px;"><div style="font-size:28px;font-weight:800;color:var(--gold);opacity:0.5;">${fallbackText}</div></div>`
+                    : `<div class="inv-no-img" style="display:flex;width:100%;height:160px;align-items:center;justify-content:center;${fallbackBg};border-radius:8px 8px 0 0;flex-direction:column;gap:4px;"><div style="font-size:28px;font-weight:800;color:var(--gold);opacity:0.5;">${fallbackText}</div></div>`;
                 const stockNum = vehicle.stockNumber || vehicle.stock || '';
                 const priceVal = vehicle.price || vehicle.msrp || '';
                 const priceDisplay = priceVal ? '$' + Number(String(priceVal).replace(/[^0-9]/g,'')).toLocaleString() : 'Call for price';
