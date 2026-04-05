@@ -2036,6 +2036,7 @@
                             <span id="compareCount" style="display:none;background:var(--gold);color:#000;padding:4px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;" onclick="showComparePanel()">Compare (0)</span>
                             <button class="btn" style="background:var(--card-bg);border:1px solid var(--border-color);font-size:13px;" onclick="showTrimCheatSheet()" title="See LT vs RS vs Premier at a glance">📋 Trim Sheet</button>
                             <button class="btn" style="background:var(--card-bg);border:1px solid var(--border-color);font-size:13px;" onclick="showObjectionHandler()" title="Search objections and get counter-points">🎯 Objections</button>
+                            <button class="btn" style="background:var(--card-bg);border:1px solid var(--border-color);font-size:13px;" onclick="showWalkaroundBuilder()" title="Build a customer-tailored walkaround script">🎤 Walkaround</button>
                             <button class="btn btn-primary" id="refreshInventoryBtn">Refresh</button>
                         </div>
                     </div>
@@ -4997,6 +4998,193 @@
 
         function closeObjectionHandler() {
             const modal = document.getElementById('objectionModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        // ============ WALKAROUND SCRIPT BUILDER ============
+        // Generates a customer-tailored walkaround script for a specific vehicle.
+        // Pulls the vehicle's sticker, filters features by customer archetype priorities,
+        // and orders them into a natural walkaround flow (exterior → interior → tech → safety → engine → close).
+        const CUSTOMER_ARCHETYPES = [
+            { id:'family', icon:'👨‍👩‍👧', label:'Family', hint:'Safety, space, kids, reliability',
+              priorities:['teen driver','rear seat','third row','safety','airbag','cargo','latch','child','rear camera','surround vision','blind spot','automatic emergency','lane keep','cross traffic','collision','liftgate','dvd','entertainment','climate','heated seat','seating','captain','bench','bluetooth','apple carplay','android auto','wifi','onstar'],
+              opener:'Alright, let me show you what\'s going to make your life easier with the kids.',
+              closer:'Bottom line — this one keeps your family safe, fits everything you need, and doesn\'t punish you to own. Want to take it around the block?' },
+            { id:'work', icon:'🔧', label:'Work / Contractor', hint:'Towing, payload, bed, durability',
+              priorities:['tow','trailer','max trailer','payload','bed','multipro','tailgate','hitch','v8','duramax','diesel','4wd','4x4','transfer case','skid','bed liner','power outlet','110v','inverter','trailer brake','hauling','cargo','heavy duty','work','upfitter'],
+              opener:'You\'re here to work — so let\'s start with what\'s actually going to make you money.',
+              closer:'This truck pays for itself — tow, haul, and outwork anything in its class. What are you hauling most?' },
+            { id:'commuter', icon:'🚙', label:'Daily Commuter', hint:'Efficiency, comfort, tech, cost',
+              priorities:['mpg','fuel','efficient','cruise','adaptive cruise','super cruise','comfort','heated seat','apple carplay','android auto','wireless','bluetooth','onstar','wifi','bose','stereo','audio','climate','dual zone','keyless','remote start','lane keep','blind spot','collision','camera','auto dim'],
+              opener:'You\'re on the road every day — so comfort and tech matter more than anything.',
+              closer:'When you\'re driving it every day, this is the stuff that makes you forget you\'re even commuting. Ready to try it?' },
+            { id:'enthusiast', icon:'🏁', label:'Enthusiast / Performance', hint:'Engine, handling, looks',
+              priorities:['v8','6.2','5.3','duramax','z71','zr2','rs','ss','trail boss','magneride','magnetic','suspension','exhaust','performance','sport','paddle','launch','track','red line','brembo','handling','19 inch','20 inch','22 inch','wheel','alloy','led headlight','sport appearance'],
+              opener:'Let\'s talk about what makes this one fun to drive — because I can tell you care about that.',
+              closer:'This isn\'t just transportation — it\'s a reason to take the long way home. Let\'s hear it run.' },
+            { id:'first-time', icon:'🔰', label:'First-Time Buyer', hint:'Simplicity, safety, warranty',
+              priorities:['warranty','powertrain','bumper','safety','airbag','automatic emergency','collision','lane keep','blind spot','rear camera','cross traffic','teen driver','onstar','automatic','cvt','easy','assist','reliability','apple carplay','android auto','bluetooth'],
+              opener:'This is a big first purchase — so let me walk you through the stuff that matters most for peace of mind.',
+              closer:'You\'re covered on warranty, safety tech, and roadside — all the stuff you don\'t want to worry about in year one. Let\'s make sure the size and feel are right for you.' },
+            { id:'luxury', icon:'💎', label:'Luxury / Executive', hint:'Comfort, quiet, prestige',
+              priorities:['leather','premium','bose','premier','high country','denali','rst','massage','ventilated','heated seat','heated steering','memory seat','panoramic','sunroof','moonroof','ambient','led','chrome','22 inch','20 inch','wood','suede','magneride','magnetic','dual zone','tri zone','head up','surround vision','quiet'],
+              opener:'Let\'s start with the stuff that makes this feel like a $80k vehicle should feel.',
+              closer:'Comfort, quiet, presence — this one has all three. Take a seat and tell me what you think of the leather.' },
+            { id:'offroad', icon:'🏔️', label:'Off-Road / Adventure', hint:'4WD, clearance, Z71/ZR2',
+              priorities:['z71','zr2','trail boss','4wd','4x4','transfer case','low range','locking differential','locker','skid plate','hill descent','all terrain','off road','ground clearance','recovery','tow hook','fox shock','multimatic','approach angle','off-road tire','snorkel','crawl','rubicon'],
+              opener:'Alright — let\'s talk about what this thing can actually do once the pavement ends.',
+              closer:'Real skid plates, real lockers, real tires — this isn\'t an off-road appearance package. Let\'s get you in the seat.' },
+        ];
+
+        function showWalkaroundBuilder() {
+            let modal = document.getElementById('walkaroundModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'walkaroundModal';
+                modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;display:none;overflow-y:auto;padding:16px;';
+                modal.onclick = function(e) { if (e.target === modal) closeWalkaroundBuilder(); };
+                modal.innerHTML = '<div style="background:var(--dark-bg);border:2px solid var(--gold);border-radius:16px;max-width:900px;margin:0 auto;padding:20px;position:relative;"><button onclick="closeWalkaroundBuilder()" style="position:absolute;top:12px;right:12px;background:transparent;border:none;color:var(--text-secondary);font-size:24px;cursor:pointer;">✕</button><h2 style="color:var(--gold);font-size:22px;font-weight:800;margin-bottom:4px;">🎤 Walkaround Script Builder</h2><p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;">Pick the customer type and the vehicle — I\'ll build you a tailored walkaround to follow.</p><div id="walkaroundBody"></div></div>';
+                document.body.appendChild(modal);
+            }
+            renderWalkaroundPicker();
+            modal.style.display = 'block';
+        }
+
+        let _walkaroundState = { archetype: null, vin: null };
+
+        function renderWalkaroundPicker() {
+            const body = document.getElementById('walkaroundBody');
+            if (!body) return;
+            const inventory = (window._inventoryCache || []).filter(v => (v.dealer === 'Findlay' || v.dealerShort === 'Findlay') && v.condition === 'New');
+            let html = '<div style="margin-bottom:16px;"><div style="font-size:11px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">1. Customer Type</div>';
+            html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;">';
+            CUSTOMER_ARCHETYPES.forEach(a => {
+                const active = _walkaroundState.archetype === a.id;
+                html += '<button onclick="pickWalkaroundArchetype(\'' + a.id + '\')" style="padding:10px;background:' + (active ? 'var(--gold)' : 'var(--card-bg)') + ';color:' + (active ? '#000' : 'var(--text-primary)') + ';border:1px solid ' + (active ? 'var(--gold)' : 'var(--border-color)') + ';border-radius:8px;font-size:12px;cursor:pointer;text-align:left;"><div style="font-size:20px;margin-bottom:2px;">' + a.icon + '</div><div style="font-weight:700;">' + a.label + '</div><div style="font-size:10px;opacity:0.7;margin-top:2px;">' + a.hint + '</div></button>';
+            });
+            html += '</div></div>';
+
+            html += '<div style="margin-bottom:16px;"><div style="font-size:11px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">2. Vehicle (search stock, model, VIN)</div>';
+            html += '<input type="text" id="walkaroundVehSearch" placeholder="Silverado LT, stock 25T4231, VIN last 6..." oninput="renderWalkaroundVehicleList(this.value)" style="width:100%;padding:10px 14px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;margin-bottom:8px;">';
+            html += '<div id="walkaroundVehList" style="max-height:260px;overflow-y:auto;border:1px solid var(--border-color);border-radius:8px;"></div></div>';
+            html += '<div id="walkaroundScript"></div>';
+            body.innerHTML = html;
+            renderWalkaroundVehicleList('');
+        }
+
+        function pickWalkaroundArchetype(id) {
+            _walkaroundState.archetype = id;
+            renderWalkaroundPicker();
+            if (_walkaroundState.vin) generateWalkaroundScript();
+        }
+
+        function renderWalkaroundVehicleList(query) {
+            const list = document.getElementById('walkaroundVehList');
+            if (!list) return;
+            const q = (query || '').toLowerCase().trim();
+            const inventory = (window._inventoryCache || []).filter(v => (v.dealer === 'Findlay' || v.dealerShort === 'Findlay') && v.condition === 'New');
+            const matches = inventory.filter(v => {
+                if (!q) return true;
+                const blob = (v.year + ' ' + (v.make||'') + ' ' + (v.model||'') + ' ' + (v.trim||'') + ' ' + (v.stockNumber||v.stock||'') + ' ' + (v.vin||'')).toLowerCase();
+                return blob.includes(q);
+            }).slice(0, 30);
+            if (!matches.length) { list.innerHTML = '<p style="color:var(--text-secondary);padding:12px;font-size:13px;">No matches</p>'; return; }
+            let html = '';
+            matches.forEach(v => {
+                const active = _walkaroundState.vin === v.vin;
+                const price = parseFloat(String(v.price || '0').replace(/[^0-9.]/g, '')) || 0;
+                html += '<div onclick="pickWalkaroundVehicle(\'' + v.vin + '\')" style="padding:10px 12px;border-bottom:1px solid var(--border-color);cursor:pointer;background:' + (active ? 'rgba(212,160,23,0.15)' : 'transparent') + ';"><div style="font-size:13px;font-weight:600;color:' + (active ? 'var(--gold)' : 'var(--text-primary)') + ';">' + v.year + ' ' + (v.model||'') + ' ' + (v.trim||'') + '</div><div style="font-size:11px;color:var(--text-secondary);">Stock ' + (v.stockNumber||v.stock||'N/A') + ' · $' + price.toLocaleString() + ' · VIN ...' + (v.vin||'').slice(-6) + '</div></div>';
+            });
+            list.innerHTML = html;
+        }
+
+        function pickWalkaroundVehicle(vin) {
+            _walkaroundState.vin = vin;
+            renderWalkaroundVehicleList(document.getElementById('walkaroundVehSearch')?.value || '');
+            if (_walkaroundState.archetype) generateWalkaroundScript();
+        }
+
+        async function generateWalkaroundScript() {
+            const out = document.getElementById('walkaroundScript');
+            if (!out) return;
+            const archetype = CUSTOMER_ARCHETYPES.find(a => a.id === _walkaroundState.archetype);
+            const vehicle = (window._inventoryCache || []).find(v => v.vin === _walkaroundState.vin);
+            if (!archetype || !vehicle) return;
+            out.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">Loading sticker for ' + vehicle.year + ' ' + vehicle.model + '...</div>';
+            let sticker = {};
+            try {
+                const res = await fetch(API_BASE + '/api/sticker/parse?vins=' + vehicle.vin, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                const data = await res.json();
+                sticker = (data.stickers || [])[0] || {};
+            } catch (e) {}
+            const allFeatures = new Set();
+            (sticker.standardFeatures || []).forEach(f => allFeatures.add(f));
+            (sticker.allFeatures || []).forEach(f => allFeatures.add(f));
+            (sticker.packages || []).forEach(p => (p.features || []).forEach(f => allFeatures.add(f)));
+            // Match features against archetype priorities
+            const matched = [];
+            [...allFeatures].forEach(f => {
+                const fl = f.toLowerCase();
+                for (let i = 0; i < archetype.priorities.length; i++) {
+                    if (fl.includes(archetype.priorities[i])) {
+                        matched.push({ feature: f, rank: i });
+                        break;
+                    }
+                }
+            });
+            matched.sort((a, b) => a.rank - b.rank);
+            // Bucket into walkaround sections
+            const sections = {
+                exterior: [],
+                interior: [],
+                tech: [],
+                safety: [],
+                powertrain: [],
+            };
+            matched.forEach(m => {
+                const cat = categorizeFeature(m.feature);
+                if (cat === 'Safety') sections.safety.push(m.feature);
+                else if (cat === 'Tech' || cat === 'Infotainment' || cat === 'Convenience') sections.tech.push(m.feature);
+                else if (cat === 'Interior' || cat === 'Comfort' || cat === 'Seating') sections.interior.push(m.feature);
+                else if (cat === 'Exterior' || cat === 'Wheels' || cat === 'Lighting') sections.exterior.push(m.feature);
+                else if (cat === 'Powertrain' || cat === 'Performance' || cat === 'Towing') sections.powertrain.push(m.feature);
+                else sections.tech.push(m.feature);
+            });
+            const order = archetype.id === 'work' ? ['powertrain','exterior','interior','tech','safety']
+                         : archetype.id === 'enthusiast' ? ['powertrain','exterior','interior','tech','safety']
+                         : archetype.id === 'offroad' ? ['powertrain','exterior','interior','safety','tech']
+                         : archetype.id === 'luxury' ? ['interior','tech','exterior','safety','powertrain']
+                         : ['safety','interior','tech','exterior','powertrain'];
+            const sectionTitles = { exterior:'🚗 Exterior Walk', interior:'💺 Step Inside', tech:'📱 Tech & Connectivity', safety:'🛡️ Safety Net', powertrain:'⚙️ Under The Hood' };
+            const stickerPrice = sticker?.pricing?.standardPrice || parseFloat(String(vehicle.msrp || vehicle.price || '0').replace(/[^0-9.]/g,'')) || 0;
+
+            let html = '<div style="background:var(--card-bg);border:2px solid var(--gold);border-radius:12px;padding:16px;">';
+            html += '<div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;">Walkaround Script</div>';
+            html += '<div style="font-size:18px;font-weight:800;color:var(--text-primary);margin:4px 0;">' + vehicle.year + ' ' + (vehicle.model||'') + ' ' + (vehicle.trim||'') + '</div>';
+            html += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">For a ' + archetype.icon + ' ' + archetype.label + ' buyer · Stock ' + (vehicle.stockNumber||vehicle.stock||'N/A') + (stickerPrice ? ' · $' + stickerPrice.toLocaleString() + ' MSRP' : '') + '</div>';
+            html += '<div style="background:rgba(212,160,23,0.1);border-left:3px solid var(--gold);padding:10px 14px;margin-bottom:14px;border-radius:4px;"><div style="font-size:10px;color:var(--gold);font-weight:700;text-transform:uppercase;margin-bottom:3px;">Opener</div><div style="font-size:14px;font-style:italic;color:var(--text-primary);">"' + archetype.opener + '"</div></div>';
+
+            order.forEach((sec, idx) => {
+                const feats = sections[sec];
+                if (!feats || !feats.length) return;
+                html += '<div style="margin-bottom:12px;"><div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px;">' + (idx + 1) + '. ' + sectionTitles[sec] + '</div>';
+                html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+                feats.slice(0, 8).forEach(f => {
+                    const safe = f.replace(/'/g, "\\'");
+                    html += '<div onclick="showFeatureSpotlight(\'' + safe + '\')" style="padding:4px 10px;background:rgba(212,160,23,0.08);border:1px solid rgba(212,160,23,0.25);border-radius:4px;font-size:11px;color:var(--gold);cursor:pointer;">' + f + '</div>';
+                });
+                if (feats.length > 8) html += '<div style="padding:4px 10px;font-size:11px;color:var(--text-secondary);">+' + (feats.length - 8) + ' more</div>';
+                html += '</div></div>';
+            });
+
+            html += '<div style="background:rgba(212,160,23,0.15);border:1px solid var(--gold);border-radius:6px;padding:12px;margin-top:14px;"><div style="font-size:10px;color:var(--gold);font-weight:700;text-transform:uppercase;margin-bottom:3px;">Close</div><div style="font-size:14px;color:var(--text-primary);font-style:italic;">"' + archetype.closer + '"</div></div>';
+            html += '<p style="font-size:10px;color:var(--text-secondary);margin-top:10px;font-style:italic;">Tap any feature for a plain-English card you can show the customer.</p>';
+            html += '</div>';
+            out.innerHTML = html;
+        }
+
+        function closeWalkaroundBuilder() {
+            const modal = document.getElementById('walkaroundModal');
             if (modal) modal.style.display = 'none';
         }
 
