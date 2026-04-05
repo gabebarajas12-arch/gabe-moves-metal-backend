@@ -421,26 +421,40 @@ async function handleMessage(event, platform) {
     const botHasNotRepliedYet = database.conversations.getNonCustomerMessageCount(convo.id) === 0;
 
     if (isFirstCustomerMessage && botHasNotRepliedYet) {
+      // Primary: AI-generated clarifying question that actually reads the
+      // customer's message and replies to what they said. Falls back to the
+      // short greeting template if the API key is missing or the call fails.
       const allTemplates = database.templates.getAll();
       const greeting = allTemplates.find(t =>
         t.trigger === 'new_message' && t.active && t.lang === detectedLang
       ) || allTemplates.find(t => t.trigger === 'new_message' && t.active);
+      const fallback = greeting
+        ? greeting.message.replace(/\{first_name\}/g, firstName)
+        : `Hey ${firstName}, this is Gabe at Findlay Chevy. What are you looking at?`;
 
-      if (greeting) {
-        const reply = greeting.message.replace(/\{first_name\}/g, firstName);
-        setTimeout(() => {
-          sendMessage(senderId, reply, platform);
-          database.conversations.addMessage(convo.id, {
-            id: generateId(),
-            from: 'bot',
-            text: reply,
-            timestamp: new Date().toISOString(),
-            templateUsed: greeting.name,
-          });
-        }, (greeting.delay || 0) * 1000);
-      }
+      (async () => {
+        let reply = fallback;
+        let templateUsed = greeting ? greeting.name : 'Fallback Greeting';
+        try {
+          const ai = await generateClarifierReply(messageText, firstName, detectedLang);
+          if (ai) {
+            reply = ai;
+            templateUsed = 'AI Clarifier';
+          }
+        } catch (err) {
+          console.log('[AI Clarifier] Error, using fallback:', err.message);
+        }
+        sendMessage(senderId, reply, platform);
+        database.conversations.addMessage(convo.id, {
+          id: generateId(),
+          from: 'bot',
+          text: reply,
+          timestamp: new Date().toISOString(),
+          templateUsed,
+        });
+      })();
 
-      // Still capture interest on the lead record (internal only — never sent to customer)
+      // Silently capture interest on the lead record (internal only — never sent)
       const detectedInterest = detectInterest(messageText);
       if (detectedInterest) {
         const leadForInterest = database.leads.getById(convo.leadId);
@@ -520,6 +534,74 @@ async function handleLeadAd(leadData) {
     }
   } catch (err) {
     console.error('Error fetching lead ad data:', err.message);
+  }
+}
+
+
+// ==================== AI CLARIFIER REPLY ====================
+// Reads the customer's first message and generates ONE short, on-topic
+// clarifying question in Gabe's voice. No brand drop, no pricing, no
+// inventory listings. Returns null on failure so the caller can fall back
+// to the static greeting template.
+async function generateClarifierReply(customerMessage, firstName, lang) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  if (!customerMessage || !customerMessage.trim()) return null;
+
+  const systemPrompt = lang === 'es'
+    ? `Eres Gabe, vendedor de autos en Findlay Chevrolet en Las Vegas. Un cliente te acaba de mandar su primer mensaje por Messenger/WhatsApp. Lee lo que dijo y responde con UN mensaje corto en español, como texto natural entre personas. Reglas estrictas:
+- Máximo 2 oraciones. Máximo 30 palabras en total.
+- Empieza con un saludo breve ("Qué tal ${firstName}" o similar).
+- Haz UNA pregunta aclaratoria específica sobre LO QUE DIJERON. Si mencionaron un modelo, pregunta por trim o uso. Si mencionaron un trim, pregunta por color o si tienen un link. Si no fueron específicos, pregunta qué tipo de vehículo buscan.
+- NO menciones precios, descuentos, pagos mensuales, financiamiento, inventario, ni cuánto vende el dealer.
+- NO digas "Gabe Moves Metal". NO digas "#1 en volumen". NO hagas una introducción larga.
+- NO uses signos de exclamación excesivos. NO uses emojis. Habla como una persona normal mandando un texto.
+- Devuelve SOLO el mensaje que voy a enviar, sin comillas, sin comentarios.`
+    : `You are Gabe, a car salesman at Findlay Chevrolet in Las Vegas. A customer just sent you their first message on Messenger/WhatsApp. Read what they said and write ONE short reply in Gabe's voice, like a normal human text. Strict rules:
+- Max 2 sentences. Max 30 words total.
+- Start with a quick "Hey ${firstName}" or similar.
+- Ask ONE specific clarifying question about WHAT THEY SAID. If they mentioned a model, ask about trim or use case. If they mentioned a trim, ask about color or if they have a link. If they were vague, ask what type of vehicle they're looking for.
+- DO NOT mention price, discounts, monthly payments, financing, inventory, or how much the dealer sells.
+- DO NOT say "Gabe Moves Metal". DO NOT say "#1 volume dealer". DO NOT do a long introduction.
+- DO NOT use excessive exclamation points. DO NOT use emojis. Talk like a regular person texting.
+- Return ONLY the message I will send, no quotes, no commentary.`;
+
+  try {
+    const resp = await axios.post('https://api.anthropic.com/v1/messages', {
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 150,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: `Customer's first message: "${customerMessage}"` },
+      ],
+    }, {
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      timeout: 10000,
+    });
+
+    const text = resp.data?.content?.[0]?.text?.trim();
+    if (!text) return null;
+
+    // Strip any wrapping quotes the model might add
+    const cleaned = text.replace(/^["'`]|["'`]$/g, '').trim();
+
+    // Hard safety net: if the model ignored instructions and leaked banned
+    // phrases, drop the AI reply and let the caller fall back to the
+    // template. Better to say something safe than something off-brand.
+    const banned = /gabe moves metal|#1 volume|volume dealer|\$\d|price|pricing|discount|rebate/i;
+    if (banned.test(cleaned)) {
+      console.log('[AI Clarifier] Output hit safety net, falling back');
+      return null;
+    }
+
+    return cleaned;
+  } catch (err) {
+    console.log('[AI Clarifier] API call failed:', err.message);
+    return null;
   }
 }
 
@@ -657,24 +739,37 @@ async function handleWhatsAppMessage(msg, value) {
   const botHasNotRepliedYet = database.conversations.getNonCustomerMessageCount(convo.id) === 0;
 
   if (isFirstCustomerMessage && botHasNotRepliedYet) {
+    // Primary: AI clarifier that reads the message and replies to it.
+    // Fallback: short greeting template.
     const waTemplates = database.templates.getAll();
     const greeting = waTemplates.find(t =>
       t.trigger === 'new_message' && t.active && t.lang === detectedLang
     ) || waTemplates.find(t => t.trigger === 'new_message' && t.active);
+    const fallback = greeting
+      ? greeting.message.replace(/\{first_name\}/g, firstName)
+      : `Hey ${firstName}, this is Gabe at Findlay Chevy. What are you looking at?`;
 
-    if (greeting) {
-      const reply = greeting.message.replace(/\{first_name\}/g, firstName);
-      setTimeout(() => {
-        sendWhatsAppMessage(from, reply);
-        database.conversations.addMessage(convo.id, {
-          id: generateId(),
-          from: 'bot',
-          text: reply,
-          timestamp: new Date().toISOString(),
-          templateUsed: greeting.name,
-        });
-      }, (greeting.delay || 0) * 1000);
-    }
+    (async () => {
+      let reply = fallback;
+      let templateUsed = greeting ? greeting.name : 'Fallback Greeting';
+      try {
+        const ai = await generateClarifierReply(messageText, firstName, detectedLang);
+        if (ai) {
+          reply = ai;
+          templateUsed = 'AI Clarifier';
+        }
+      } catch (err) {
+        console.log('[AI Clarifier] Error, using fallback:', err.message);
+      }
+      sendWhatsAppMessage(from, reply);
+      database.conversations.addMessage(convo.id, {
+        id: generateId(),
+        from: 'bot',
+        text: reply,
+        timestamp: new Date().toISOString(),
+        templateUsed,
+      });
+    })();
 
     // Silently capture interest on the lead record (internal only — never sent)
     const detectedInterest = detectInterest(messageText);
