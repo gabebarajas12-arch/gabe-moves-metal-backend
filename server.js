@@ -1074,6 +1074,10 @@ app.get('/api/inventory/match', (req, res) => {
 
 app.post('/api/inventory/refresh', async (req, res) => {
   const vehicles = await inventoryModule.scrapeInventory();
+  // Fire and forget — prewarm stickers for any new VINs in the background
+  if (typeof prewarmStickers === 'function' && vehicles && vehicles.length) {
+    prewarmStickers(vehicles, { label: 'refresh' });
+  }
   res.json({ success: true, count: vehicles.length, lastScraped: inventoryModule.getLastScraped() });
 });
 
@@ -5032,6 +5036,88 @@ app.get('/api/sticker/parse', requireAuth, async (req, res) => {
   res.json({ stickers: results });
 });
 
+// ==================== STICKER PRE-WARM ====================
+// Parse window stickers in the background so first compare click is instant.
+// GM stickers only (non-GM VINs will 404 or error and get skipped).
+let prewarmState = {
+  running: false,
+  started: null,
+  finished: null,
+  total: 0,
+  done: 0,
+  ok: 0,
+  failed: 0,
+};
+
+const GM_MAKES = new Set(['chevrolet', 'chevy', 'gmc', 'buick', 'cadillac']);
+
+async function prewarmStickers(vehicles, { concurrency = 3, label = 'prewarm' } = {}) {
+  if (prewarmState.running) {
+    console.log(`[Sticker ${label}] Skipped — prewarm already running`);
+    return;
+  }
+  const targets = (vehicles || [])
+    .filter(v => v && v.vin && v.vin.length === 17)
+    .filter(v => {
+      const make = (v.make || '').toLowerCase();
+      // If make is unknown, still try — GM stickers URL will 404 quickly for non-GM
+      return !make || GM_MAKES.has(make);
+    })
+    .filter(v => !stickerCache[v.vin]);
+
+  prewarmState = {
+    running: true,
+    started: new Date().toISOString(),
+    finished: null,
+    total: targets.length,
+    done: 0,
+    ok: 0,
+    failed: 0,
+  };
+
+  console.log(`[Sticker ${label}] Starting prewarm for ${targets.length} VINs (concurrency=${concurrency})`);
+
+  let idx = 0;
+  async function worker() {
+    while (idx < targets.length) {
+      const my = idx++;
+      const v = targets[my];
+      try {
+        const r = await parseWindowSticker(v.vin);
+        if (r && !r.error) prewarmState.ok++;
+        else prewarmState.failed++;
+      } catch (err) {
+        prewarmState.failed++;
+      }
+      prewarmState.done++;
+      // Small breather to avoid hammering GM's CDN
+      await new Promise(r => setTimeout(r, 150));
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, targets.length || 1) }, () => worker());
+  await Promise.all(workers);
+
+  prewarmState.running = false;
+  prewarmState.finished = new Date().toISOString();
+  console.log(`[Sticker ${label}] Prewarm complete — ${prewarmState.ok} ok, ${prewarmState.failed} failed out of ${prewarmState.total}`);
+}
+
+// API: Sticker cache status (for UI progress indicator)
+app.get('/api/sticker/status', requireAuth, (req, res) => {
+  res.json({
+    cached: Object.keys(stickerCache).length,
+    prewarm: prewarmState,
+  });
+});
+
+// API: Manually kick off a prewarm pass
+app.post('/api/sticker/prewarm', requireAuth, async (req, res) => {
+  const vehicles = inventoryModule.getInventory();
+  prewarmStickers(vehicles, { label: 'manual' }); // fire and forget
+  res.json({ success: true, queued: vehicles.length });
+});
+
 // API: Scrape all competitors
 app.post('/api/competitors/scrape', requireAuth, async (req, res) => {
   const results = await Promise.allSettled([
@@ -5616,6 +5702,21 @@ setInterval(checkAndSendReminders, 60 * 60 * 1000);
 app.listen(PORT, () => {
   // Start inventory auto-refresh
   inventoryModule.startAutoRefresh();
+
+  // Prewarm window sticker cache 60s after boot, then every 6 hours.
+  // This makes the first "Compare" click feel instant instead of a 5-10s wait.
+  setTimeout(() => {
+    const vehicles = inventoryModule.getInventory();
+    if (vehicles && vehicles.length) {
+      prewarmStickers(vehicles, { label: 'startup' });
+    } else {
+      console.log('[Sticker startup] No inventory yet — will retry on next cycle');
+    }
+  }, 60000);
+  setInterval(() => {
+    const vehicles = inventoryModule.getInventory();
+    if (vehicles && vehicles.length) prewarmStickers(vehicles, { label: 'interval' });
+  }, 6 * 60 * 60 * 1000);
 
   // Initial competitor scrape (30 seconds after boot so we don't slow startup)
   setTimeout(() => {
