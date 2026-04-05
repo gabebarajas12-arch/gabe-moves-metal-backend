@@ -4933,6 +4933,28 @@ async function parseWindowSticker(vin) {
     const content = await page.getTextContent();
     const text = content.items.map(i => i.str).join(' ');
 
+    // Group text items by y-coordinate into lines (tolerant of slight drift).
+    // pdfjs transform: [scaleX, skewX, skewY, scaleY, tx, ty]; ty = item.transform[5] (y), tx = [4] (x).
+    const rawItems = content.items.map(it => ({
+      str: (it.str || '').replace(/\s+/g, ' '),
+      x: it.transform ? it.transform[4] : 0,
+      y: it.transform ? Math.round(it.transform[5]) : 0,
+    })).filter(it => it.str && it.str.trim().length);
+    // Bucket by y (rounded to nearest 2pt)
+    const byY = new Map();
+    rawItems.forEach(it => {
+      const key = Math.round(it.y / 2) * 2;
+      if (!byY.has(key)) byY.set(key, []);
+      byY.get(key).push(it);
+    });
+    const lines = [...byY.entries()]
+      .sort((a, b) => b[0] - a[0]) // top-to-bottom in PDF coords (high y = top)
+      .map(([y, items]) => {
+        items.sort((a, b) => a.x - b.x);
+        return { y, items, text: items.map(i => i.str).join(' ').replace(/\s+/g, ' ').trim() };
+      })
+      .filter(l => l.text.length);
+
     const result = { vin, standardFeatures: [], packages: [], standaloneOptions: [], pricing: {}, allFeatures: [] };
 
     // Vehicle header
@@ -4971,36 +4993,91 @@ async function parseWindowSticker(vin) {
       }
     });
 
-    // Parse OPTIONS section
-    if (optionsIdx > 0) {
-      const totalOptIdx = text.indexOf('TOTAL OPTIONS');
-      const optText = text.substring(optionsIdx, totalOptIdx > 0 ? totalOptIdx : text.length);
+    // Parse OPTIONS section using item-level x/y positions.
+    // GM stickers are multi-column, so y-only line grouping merges columns. Instead,
+    // for each price token we walk leftward on the same y (±3) collecting text items
+    // until an x-gap > 100 is found — that gives us the option name in its own column.
+    // Features are bulleted items below the price in the same x-column.
+    const priceOnlyRx = /^\s*\d{1,3}(?:,\d{3})*\.\d{2}\s*$/;
+    const bulletRx = /^[•·]\s*/;
+    const noiseNameRx = /^(STANDARD VEHICLE PRICE|TOTAL VEHICLE|TOTAL OPTIONS|DESTINATION|OPTIONS\s*&|SUBTOTAL|FUEL|CITY|HWY|COMBINED|YOU SAVE|ANNUAL FUEL|GASOLINE|ETHANOL|PARTS CONTENT|FINAL ASSEMBLY|COUNTRY OF|ENGINE:|TRANSMISSION:)/i;
 
-      // Find all priced line items
-      const itemRegex = /([A-Z][A-Z\s&/,'():-]+?)\s{2,}(\d{1,3}(?:,\d{3})*\.\d{2})/g;
-      const lineItems = [];
-      let im;
-      while ((im = itemRegex.exec(optText)) !== null) {
-        let name = im[1].trim().replace(/:$/, '').replace(/^.*SHOWN\)\s*/, '');
-        lineItems.push({ name, price: parseFloat(im[2].replace(/,/g, '')), startIdx: im.index, endIdx: im.index + im[0].length });
+    const pricedItems = rawItems.filter(it => priceOnlyRx.test(it.str));
+
+    // Helper: find items to the left of a price on the same visual line (y within ±3)
+    function nameForPrice(priceItem) {
+      const candidates = rawItems
+        .filter(it => it !== priceItem)
+        .filter(it => Math.abs(it.y - priceItem.y) <= 3)
+        .filter(it => it.x < priceItem.x && !priceOnlyRx.test(it.str))
+        .sort((a, b) => a.x - b.x);
+      if (!candidates.length) return null;
+      // Walk from rightmost backward, collecting items until x-gap > 100
+      const picked = [];
+      let prevX = priceItem.x;
+      for (let i = candidates.length - 1; i >= 0; i--) {
+        const c = candidates[i];
+        const itemRight = c.x + (c.str.length * 5); // rough width estimate
+        const gap = prevX - itemRight;
+        if (gap > 120) break;
+        picked.unshift(c);
+        prevX = c.x;
       }
-
-      lineItems.forEach((item, i) => {
-        const nextItemStart = i < lineItems.length - 1 ? lineItems[i + 1].startIdx : optText.length;
-        const between = optText.substring(item.endIdx, nextItemStart);
-        const features = (between.match(/•\s*([^•]+)/g) || []).map(b => {
-          let f = b.replace(/^•\s*/, '').replace(/\s+/g, ' ').trim();
-          f = f.replace(/\s+\d{1,3}(?:,\d{3})*\.\d{2}.*$/s, '').trim();
-          return f;
-        }).filter(f => f.length > 3);
-
-        if (item.name.includes('PACKAGE') || features.length > 1) {
-          result.packages.push({ name: item.name, price: item.price, features });
-        } else {
-          result.standaloneOptions.push({ name: item.name, price: item.price });
-        }
-      });
+      if (!picked.length) return null;
+      return picked.map(p => p.str).join(' ').replace(/\s+/g, ' ').replace(/:\s*$/, '').trim();
     }
+
+    // Helper: find bullet features beneath a price in the same column (x within ±30)
+    function featuresForPrice(priceItem, nextPriceInColumnY) {
+      const colLeft = priceItem.x - 200; // name column starts ~150-180 left of price
+      const colRight = priceItem.x + 20;
+      const minY = nextPriceInColumnY != null ? nextPriceInColumnY : 0;
+      const bullets = rawItems
+        .filter(it => bulletRx.test(it.str) || /^•/.test(it.str))
+        .filter(it => it.y < priceItem.y && it.y > minY)
+        .filter(it => it.x >= colLeft && it.x <= colRight)
+        .sort((a, b) => b.y - a.y);
+      return bullets.map(b => b.str.replace(bulletRx, '').replace(/^•\s*/, '').replace(/\s+/g, ' ').trim()).filter(f => f.length > 2);
+    }
+
+    // Classify each price: is it an option, or a total/noise line?
+    const optionEntries = [];
+    pricedItems.forEach(pi => {
+      const name = nameForPrice(pi);
+      if (!name) return;
+      if (noiseNameRx.test(name)) return;
+      // Skip anything that looks like "$XX,XXX.XX" totals column (price_x very high and name is a total label — already filtered by noiseNameRx)
+      const price = parseFloat(pi.str.replace(/,/g, ''));
+      if (!price || price <= 0) return;
+      optionEntries.push({ name, price, priceItem: pi });
+    });
+
+    // For each entry, compute features in its column bounded by the next higher y entry in same column
+    optionEntries.forEach((entry, i) => {
+      // Find next priced entry in same x-column (within ±40) with y between this y and 0
+      const sameCol = optionEntries.filter(e => e !== entry && Math.abs(e.priceItem.x - entry.priceItem.x) <= 40 && e.priceItem.y < entry.priceItem.y);
+      const nextY = sameCol.length ? Math.max(...sameCol.map(e => e.priceItem.y)) : null;
+      const features = featuresForPrice(entry.priceItem, nextY);
+      entry.features = features;
+    });
+
+    // Clean names and push into result buckets
+    optionEntries.forEach(entry => {
+      let name = entry.name
+        .replace(/^\(.*?\)\s*/, '')
+        .replace(/:\s*$/, '')
+        .replace(/\s*\(.*?SHOWN\)\s*/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (name.length < 3) return;
+      if (noiseNameRx.test(name)) return;
+      const isPackage = /PACKAGE/i.test(name) || entry.features.length > 1;
+      if (isPackage) {
+        result.packages.push({ name, price: entry.price, features: entry.features });
+      } else {
+        result.standaloneOptions.push({ name, price: entry.price });
+      }
+    });
 
     // Pricing
     const sp = {
