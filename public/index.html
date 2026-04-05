@@ -4877,49 +4877,95 @@
                     html += `<div style="padding:8px;text-align:center;border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);${isFindlay ? 'color:var(--gold);font-weight:700;' : ''}">$${(s?.pricing?.standardPrice || 0).toLocaleString()}</div>`;
                 });
 
-                // Package rows — show ALL packages from ALL vehicles
+                // Close the base price grid
+                html += `</div>`;
+
+                // Package rows — show ALL packages with full feature lists
                 const allPackageNames = new Set();
                 stickers.forEach(s => (s?.packages || []).forEach(p => allPackageNames.add(p.name)));
 
                 [...allPackageNames].forEach(pkgName => {
-                    html += `<div style="padding:6px 12px;font-weight:600;font-size:11px;color:var(--text-primary);border-bottom:1px solid var(--border-color);">${pkgName}</div>`;
+                    // Package header row with price per vehicle
+                    html += `<div style="display:grid;grid-template-columns:1fr repeat(${cols}, auto);gap:0;margin-top:12px;border:1px solid var(--border-color);border-radius:8px;overflow:hidden;">`;
+
+                    // Package name + price row
+                    html += `<div style="padding:10px 12px;font-weight:700;font-size:13px;color:var(--text-primary);background:rgba(255,255,255,0.04);">${pkgName}</div>`;
                     stickers.forEach((s, i) => {
                         const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
                         const pkg = (s?.packages || []).find(p => p.name === pkgName);
                         if (pkg) {
-                            html += `<div style="padding:6px 8px;text-align:center;border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:11px;${isFindlay ? 'color:var(--gold);' : 'color:#4CAF50;'}">$${pkg.price.toLocaleString()}<br><span style="font-size:10px;color:var(--text-secondary);">${pkg.features.length} features</span></div>`;
+                            html += `<div style="padding:10px 12px;text-align:center;background:rgba(255,255,255,0.04);border-left:1px solid var(--border-color);font-weight:700;font-size:13px;${isFindlay ? 'color:var(--gold);' : 'color:#4CAF50;'}">$${pkg.price.toLocaleString()}</div>`;
                         } else {
-                            html += `<div style="padding:6px 8px;text-align:center;border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:11px;color:#555;">Not included</div>`;
+                            html += `<div style="padding:10px 12px;text-align:center;background:rgba(255,255,255,0.04);border-left:1px solid var(--border-color);font-size:12px;color:#ef4444;font-weight:600;">NOT INCLUDED</div>`;
                         }
                     });
+
+                    // Feature rows inside this package
+                    const allPkgFeatures = new Set();
+                    stickers.forEach(s => {
+                        const pkg = (s?.packages || []).find(p => p.name === pkgName);
+                        if (pkg) pkg.features.forEach(f => allPkgFeatures.add(f));
+                    });
+
+                    [...allPkgFeatures].forEach((feat, fi) => {
+                        const bg = fi % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)';
+                        html += `<div style="padding:4px 12px 4px 24px;font-size:11px;color:var(--text-secondary);background:${bg};border-top:1px solid rgba(255,255,255,0.05);">• ${feat}</div>`;
+                        stickers.forEach((s, i) => {
+                            const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
+                            const pkg = (s?.packages || []).find(p => p.name === pkgName);
+                            const has = pkg ? pkg.features.some(f => f === feat) : false;
+                            html += `<div style="padding:4px 8px;text-align:center;background:${bg};border-left:1px solid var(--border-color);border-top:1px solid rgba(255,255,255,0.05);font-size:14px;">`;
+                            if (has) {
+                                html += isFindlay ? '<span style="color:var(--gold);">✓</span>' : '<span style="color:#4CAF50;">✓</span>';
+                            } else {
+                                html += '<span style="color:#555;">—</span>';
+                            }
+                            html += `</div>`;
+                        });
+                    });
+
+                    html += `</div>`;
                 });
 
-                // Standalone options
+                // Standalone options (dealer-installed, color, etc.)
                 const allStandaloneNames = new Set();
                 stickers.forEach(s => (s?.standaloneOptions || []).forEach(o => allStandaloneNames.add(o.name)));
-                [...allStandaloneNames].forEach(optName => {
-                    // Skip generic noise
-                    if (optName.length < 5) return;
-                    html += `<div style="padding:6px 12px;font-size:11px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);">${optName}</div>`;
-                    stickers.forEach((s, i) => {
-                        const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
-                        const opt = (s?.standaloneOptions || []).find(o => o.name === optName);
-                        html += `<div style="padding:6px 8px;text-align:center;border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:11px;">${opt ? '$' + opt.price.toLocaleString() : '<span style="color:#555;">—</span>'}</div>`;
-                    });
-                });
+                const standaloneItems = [...allStandaloneNames].filter(n => n.length >= 5);
 
-                // Total options + total price rows
-                html += `<div style="padding:8px 12px;font-weight:700;color:var(--text-primary);border-bottom:1px solid var(--border-color);background:rgba(255,255,255,0.03);">Total Options</div>`;
+                if (standaloneItems.length > 0) {
+                    html += `<div style="display:grid;grid-template-columns:1fr repeat(${cols}, auto);gap:0;margin-top:12px;border:1px solid var(--border-color);border-radius:8px;overflow:hidden;">`;
+                    html += `<div style="padding:8px 12px;font-weight:700;font-size:12px;color:var(--text-secondary);background:rgba(255,255,255,0.04);grid-column:1/-1;">Additional Options</div>`;
+
+                    standaloneItems.forEach((optName, oi) => {
+                        const bg = oi % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)';
+                        html += `<div style="padding:5px 12px;font-size:11px;color:var(--text-secondary);background:${bg};border-top:1px solid rgba(255,255,255,0.05);">${optName}</div>`;
+                        stickers.forEach((s, i) => {
+                            const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
+                            const opt = (s?.standaloneOptions || []).find(o => o.name === optName);
+                            html += `<div style="padding:5px 8px;text-align:center;background:${bg};border-left:1px solid var(--border-color);border-top:1px solid rgba(255,255,255,0.05);font-size:11px;${isFindlay && opt ? 'color:var(--gold);' : ''}">${opt ? '$' + opt.price.toLocaleString() : '<span style="color:#555;">—</span>'}</div>`;
+                        });
+                    });
+                    html += `</div>`;
+                }
+
+                // Totals summary
+                html += `<div style="display:grid;grid-template-columns:1fr repeat(${cols}, auto);gap:0;margin-top:16px;border:2px solid var(--gold);border-radius:8px;overflow:hidden;">`;
+                html += `<div style="padding:10px 12px;font-weight:700;color:var(--text-primary);background:rgba(255,255,255,0.04);border-bottom:1px solid var(--border-color);">Total Options</div>`;
                 stickers.forEach((s, i) => {
                     const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
-                    html += `<div style="padding:8px;text-align:center;font-weight:700;border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);background:rgba(255,255,255,0.03);${isFindlay ? 'color:var(--gold);' : ''}">$${(s?.pricing?.totalOptions || 0).toLocaleString()}</div>`;
+                    html += `<div style="padding:10px 12px;text-align:center;font-weight:700;background:rgba(255,255,255,0.04);border-left:1px solid var(--border-color);border-bottom:1px solid var(--border-color);${isFindlay ? 'color:var(--gold);' : ''}">$${(s?.pricing?.totalOptions || 0).toLocaleString()}</div>`;
                 });
-                html += `<div style="padding:8px 12px;font-weight:800;color:var(--gold);background:rgba(212,160,23,0.08);">Sticker Price</div>`;
+                html += `<div style="padding:10px 12px;font-weight:700;color:var(--text-secondary);background:rgba(255,255,255,0.04);border-bottom:1px solid var(--border-color);">+ Destination</div>`;
+                stickers.forEach((s, i) => {
+                    html += `<div style="padding:10px 12px;text-align:center;font-weight:600;background:rgba(255,255,255,0.04);border-left:1px solid var(--border-color);border-bottom:1px solid var(--border-color);color:var(--text-secondary);">$${(s?.pricing?.destination || 0).toLocaleString()}</div>`;
+                });
+                html += `<div style="padding:12px;font-weight:800;font-size:14px;color:var(--gold);background:rgba(212,160,23,0.1);">STICKER PRICE</div>`;
                 stickers.forEach((s, i) => {
                     const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
                     const tp = s?.pricing?.totalPrice || 0;
-                    html += `<div style="padding:8px;text-align:center;font-weight:800;font-size:14px;border-left:1px solid var(--border-color);background:rgba(212,160,23,0.08);${isFindlay ? 'color:var(--gold);' : 'color:var(--text-primary);'}">$${tp.toLocaleString()}</div>`;
+                    html += `<div style="padding:12px;text-align:center;font-weight:800;font-size:16px;border-left:1px solid var(--border-color);background:rgba(212,160,23,0.1);${isFindlay ? 'color:var(--gold);' : 'color:var(--text-primary);'}">$${tp.toLocaleString()}</div>`;
                 });
+                html += `</div>`;
 
                 // Price difference callout
                 if (cols === 2 && prices[0] > 0 && prices[1] > 0) {
