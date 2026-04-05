@@ -4513,6 +4513,13 @@
             }
         }
 
+        // Is this vehicle a Chevrolet? We're at a Chevy dealer — trade-ins from other
+        // makes are noise on the inventory page and should be excluded from dropdowns + grid.
+        function isChevy(v) {
+            const make = (v.make || '').toLowerCase().trim();
+            return make === 'chevrolet' || make === 'chevy' || make === '';
+        }
+
         function populateModelDropdown(vehicles) {
             const select = document.getElementById('filterModel');
             if (!select) return;
@@ -4524,19 +4531,30 @@
                 if (m) models.add(m);
             });
             const sorted = [...models].sort();
-            select.innerHTML = '<option value="">All Models</option>' + sorted.map(m => `<option value="${m}"${m === current ? ' selected' : ''}>${m}</option>`).join('');
+            // Preserve current selection if it still exists in the new filtered list
+            const currentStillValid = current && sorted.includes(current);
+            if (current && !currentStillValid) select.value = '';
+            select.innerHTML = '<option value="">All Models</option>' + sorted.map(m => `<option value="${m}"${m === current && currentStillValid ? ' selected' : ''}>${m}</option>`).join('');
         }
 
         function filterCurrentInventory() {
-            const vehicles = currentInvDealer === 'findlay' ? (window._inventoryCache || []) : (window._compInventoryCache || []);
+            let vehicles = currentInvDealer === 'findlay' ? (window._inventoryCache || []) : (window._compInventoryCache || []);
+            // On the Findlay tab, only show Chevys — trade-ins from other makes are noise
+            if (currentInvDealer === 'findlay') {
+                vehicles = vehicles.filter(isChevy);
+            }
             const condition = document.getElementById('filterCondition')?.value || '';
             const modelFilter = document.getElementById('filterModel')?.value || '';
             const minPrice = parseFloat(document.getElementById('filterMinPrice')?.value) || 0;
             const maxPrice = parseFloat(document.getElementById('filterMaxPrice')?.value) || Infinity;
             const search = (document.getElementById('matchInterest')?.value || '').toLowerCase();
 
-            // Populate model dropdown from current vehicle set
-            populateModelDropdown(vehicles);
+            // Cascade: model dropdown should only show models available in the current condition filter.
+            // If condition=New is picked, the model dropdown should only list models that have New units.
+            const dropdownSource = condition
+                ? vehicles.filter(v => (v.condition || '').toLowerCase() === condition.toLowerCase())
+                : vehicles;
+            populateModelDropdown(dropdownSource);
 
             const filtered = vehicles.filter(v => {
                 if (condition && v.condition && v.condition.toLowerCase() !== condition.toLowerCase()) return false;
