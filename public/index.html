@@ -4823,14 +4823,34 @@
                 modal.style.display = 'block';
                 return;
             }
-            // Build model list from inventory
-            const models = [...new Set(inventory.map(v => (v.model || '').trim()).filter(m => m))].sort();
+            // The inventory cache stores model as "Silverado 1500 LT" (model + trim concatenated).
+            // Strip the trim off the end so all trims of one model group under the same base name.
+            const baseModelOf = function(v) {
+                let m = (v.model || '').trim();
+                const t = (v.trim || '').trim();
+                if (t && m.toLowerCase().endsWith(' ' + t.toLowerCase())) {
+                    m = m.slice(0, m.length - t.length - 1).trim();
+                }
+                return m;
+            };
+            // Build base model list, filtering to models that actually have 2+ trims to compare
+            const modelCounts = {};
+            inventory.forEach(v => {
+                const bm = baseModelOf(v);
+                if (!bm) return;
+                if (!modelCounts[bm]) modelCounts[bm] = new Set();
+                modelCounts[bm].add((v.trim || 'Base').trim());
+            });
+            const models = Object.keys(modelCounts)
+                .map(m => ({ model: m, trimCount: modelCounts[m].size, total: inventory.filter(v => baseModelOf(v) === m).length }))
+                .filter(m => m.total > 0)
+                .sort((a, b) => b.total - a.total); // most in-stock first
             card.innerHTML =
                 '<button onclick="closeTrimCheatSheet()" style="position:absolute;top:12px;right:12px;background:transparent;border:none;color:var(--text-secondary);font-size:24px;cursor:pointer;">✕</button>' +
                 '<h2 style="color:var(--gold);font-size:22px;font-weight:800;margin-bottom:4px;">📋 Trim Cheat Sheet</h2>' +
                 '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;">Pulled live from window stickers of current Findlay inventory. Pick a model to see what each trim adds.</p>' +
                 '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">' +
-                models.map(m => '<button onclick="renderTrimCheatSheet(\'' + m.replace(/'/g, "\\'") + '\')" class="btn" style="background:var(--card-bg);border:1px solid var(--border-color);font-size:12px;padding:6px 12px;">' + m + '</button>').join('') +
+                models.map(m => '<button onclick="renderTrimCheatSheet(\'' + m.model.replace(/'/g, "\\'") + '\')" class="btn" style="background:var(--card-bg);border:1px solid var(--border-color);font-size:12px;padding:6px 12px;">' + m.model + ' <span style="opacity:0.6;font-size:10px;">(' + m.trimCount + ' trim' + (m.trimCount === 1 ? '' : 's') + ' · ' + m.total + ')</span></button>').join('') +
                 '</div>' +
                 '<div id="trimSheetBody"><p style="color:var(--text-secondary);font-size:13px;text-align:center;padding:20px;">Pick a model above.</p></div>';
             modal.style.display = 'block';
@@ -4847,10 +4867,18 @@
                 return;
             }
             body.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:20px;">Loading window stickers for ' + model + '...</p>';
+            const baseModelOf = function(v) {
+                let m = (v.model || '').trim();
+                const t = (v.trim || '').trim();
+                if (t && m.toLowerCase().endsWith(' ' + t.toLowerCase())) {
+                    m = m.slice(0, m.length - t.length - 1).trim();
+                }
+                return m;
+            };
             const inventory = (window._inventoryCache || []).filter(v =>
                 (v.dealer === 'Findlay' || v.dealerShort === 'Findlay') &&
                 v.condition === 'New' &&
-                (v.model || '').trim() === model
+                baseModelOf(v) === model
             );
             // Group by trim, keep one representative VIN per trim (cheapest)
             const trimMap = {};
