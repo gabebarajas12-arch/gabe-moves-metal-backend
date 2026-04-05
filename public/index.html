@@ -2035,6 +2035,7 @@
                         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                             <span id="compareCount" style="display:none;background:var(--gold);color:#000;padding:4px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;" onclick="showComparePanel()">Compare (0)</span>
                             <button class="btn" style="background:var(--card-bg);border:1px solid var(--border-color);font-size:13px;" onclick="showTrimCheatSheet()" title="See LT vs RS vs Premier at a glance">📋 Trim Sheet</button>
+                            <button class="btn" style="background:var(--card-bg);border:1px solid var(--border-color);font-size:13px;" onclick="showObjectionHandler()" title="Search objections and get counter-points">🎯 Objections</button>
                             <button class="btn btn-primary" id="refreshInventoryBtn">Refresh</button>
                         </div>
                     </div>
@@ -4921,6 +4922,81 @@
 
         function closeTrimCheatSheet() {
             const modal = document.getElementById('trimSheetModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        // ============ OBJECTION HANDLER LIBRARY ============
+        // Searchable library of common customer objections with reframes.
+        // Content is factual / Findlay-specific - no rebate/OTD claims, no margin assumptions.
+        const OBJECTION_LIBRARY = [
+            { tags:['think','thinking','sleep on it','time','later','tomorrow'], objection:'I need to think about it', real:'They don\'t feel confident yet — usually unresolved fit, comfort, or trust issues, not actually price.', facts:['Most customers who leave to "think" don\'t come back — not because they found a better deal, but because they lose momentum.','Findlay has the largest Chevy inventory west of Texas — what they\'re looking at today may not be here next week.'], say:'I totally get it, this is a big decision. Can I ask — is it the vehicle, the numbers, or something else? Sometimes just talking through the one thing on your mind is all it takes.' },
+            { tags:['shop','shopping','other dealers','compare','pricing','other places','look around'], objection:'I want to shop around', real:'They don\'t want to feel pressured or ripped off. Usually not actually price-driven.', facts:['We sell more Chevys than any dealer west of Texas — that volume is the reason we can move faster than anyone else on the Strip.','Using the compare tool, we can pull any competitor unit right now and see exactly what they have vs what we have — feature-by-feature.'], say:'That\'s smart — and I\'ll actually help you shop. Send me the link to anything you find at another store, I\'ll compare it side-by-side with what we have on my phone right now. If theirs is better, I\'ll be the first to tell you.' },
+            { tags:['toyota','honda','resale','depreciation','hold value','holds value'], objection:'Toyota/Honda holds value better', real:'They\'ve heard this for 30 years and assume it\'s still true across the board.', facts:['Silverado, Tahoe, Suburban, and Corvette all have retained value scores competitive with or beating their closest Toyota/Honda rivals in their segments.','Full-size truck and SUV resale is dominated by domestics, not imports — Tacoma resale is strong but Silverado 1500 holds up right there with it.'], say:'That used to be the rule, but it\'s really only true in compact cars at this point. On trucks and SUVs the gap closed years ago — and if you\'re looking at a Tahoe or Silverado, resale is actually one of our strongest arguments.' },
+            { tags:['chevy break','unreliable','reliability','breaks down','quality'], objection:'I heard Chevys break down / aren\'t reliable', real:'Old stereotype from the 80s-90s GM era.', facts:['J.D. Power dependability has ranked Chevrolet competitively with Toyota and Honda for several years running.','Powertrain warranty is 5 years / 60,000 miles — longer than Toyota\'s standard powertrain warranty.','The LT1 V8 in Silverado is one of the most-produced and most-proven truck engines on the road.'], say:'That reputation is stuck in the 80s. Go look at the last 5 years of J.D. Power scores — Chevy is right there with Toyota. And we cover the powertrain for 5 years, which is longer than most imports.' },
+            { tags:['ford','ram','f-150','f150','1500'], objection:'Ford/Ram is better', real:'Brand loyalty — often inherited from family.', facts:['Silverado is the only full-size truck to offer MultiPro Tailgate, Super Cruise hands-free driving, and the Duramax diesel in the same package.','Silverado HD and GMC Sierra HD hold the highest conventional tow ratings in the segment.','Ram 1500 discontinued the V8 HEMI in most trims for 2025 — Silverado still offers the 5.3L and 6.2L V8s.'], say:'Ford and Ram make good trucks — no argument. But on features, Silverado is the only one with Super Cruise, MultiPro Tailgate, and a real V8 lineup still on the table. Let me show you.' },
+            { tags:['payment','too high','too expensive','afford','budget','cost','price'], objection:'The payment / price is too high', real:'Could be real budget, or just anchor-setting. Don\'t assume.', facts:['Findlay has the largest new Chevy inventory in the region — there are almost always multiple options within any given budget if we widen the model/trim search.','Stepping down one trim level or considering a different body style often gets the same features at a different price point.'], say:'Let\'s not stop on this one then — tell me what payment you\'re trying to land and what\'s non-negotiable on features. I\'ve got 500+ new units in stock, let me find the right one instead of forcing this one.' },
+            { tags:['spouse','wife','husband','partner','talk to'], objection:'I need to talk to my spouse', real:'Legitimate most of the time — but sometimes a polite exit.', facts:['The compare tool + customer-facing view lets the customer send their spouse a screenshot of exactly what they\'re looking at — images, features, price, everything.'], say:'Of course — can we FaceTime them right now? Or I\'ll text you the full comparison page on my phone so you can send it over. Way better than trying to describe it from memory.' },
+            { tags:['just looking','browsing','not ready','not buying today'], objection:'I\'m just looking', real:'They don\'t want a high-pressure pitch. Respect it, stay useful.', facts:[], say:'Cool — I\'m not gonna chase you around the lot. My name\'s Gabe, I work here, and if you have a question while you\'re walking around I\'m right over there. No pressure at all.' },
+            { tags:['interest','rate','financing','apr','finance','loan'], objection:'Interest rates are too high', real:'Rates are real concern right now, but this is often a stall.', facts:['GM Financial offers promotional rates on specific models and terms that move monthly — always check current offers at the point of sale.','A lower-rate/longer-term combo can land the same payment as a higher-rate/shorter-term, depending on the unit.'], say:'Rates are where they are — and yeah they\'re higher than 2021. But we work with GM Financial plus 12+ outside banks, so the actual rate you qualify for might be very different from what you\'re seeing online. Let\'s not guess — let\'s look.' },
+            { tags:['electric','ev','gas','future','hybrid'], objection:'Gas is over, I should wait for an EV / Why buy gas?', real:'Tech anxiety or eco-concern — often both.', facts:['Chevy now sells Equinox EV, Blazer EV, Silverado EV, and Bolt — more EVs than most dealers in the region have on the ground.','Findlay has EV chargers on site and EV-certified techs — we sell and service them.','If they\'re not ready for EV, Silverado and Tahoe both offer a Duramax diesel for high-mileage efficiency.'], say:'You don\'t have to pick. We sell more Chevy EVs than almost anyone in Nevada — Equinox EV, Blazer EV, Silverado EV, Bolt. Want me to show you one right now? And if you\'re not ready for EV, we\'ve got diesels too.' },
+            { tags:['dealership','pressure','sales tactics','hate','pushy'], objection:'I hate dealerships / the process', real:'Previous bad experience with another store.', facts:['The whole reason I built this tool is to make the process transparent — every number, every feature, every comparison is right on my phone.','Findlay is family-owned — not a corporate chain — so decisions happen in-house.'], say:'I get it, a lot of stores earned that reputation. I\'m trying to do it differently — that\'s why I built this app. Every feature, every comparison, every sticker — I\'ll show you everything on my phone. No back-room games.' },
+            { tags:['warranty','coverage','bumper','powertrain'], objection:'Warranty isn\'t long enough', real:'Comparing to Hyundai/Kia\'s 10-year powertrain.', facts:['Chevy new vehicle warranty: 3 years / 36,000 miles bumper-to-bumper, 5 years / 60,000 miles powertrain.','Hyundai/Kia\'s 10-year powertrain warranty does NOT transfer to the second owner — it drops to 5/60 just like Chevy.','Extended protection packages are available at the point of sale if extra coverage matters.'], say:'The 10-year warranty on Hyundai and Kia is first-owner only — the second it changes hands, it drops to 5 years, same as us. For most people that 10-year number is a headline, not reality.' },
+            { tags:['wait','new model','next year','2027','2026'], objection:'I want to wait for the new model', real:'Perceived fear of buying obsolete tech.', facts:['Mid-cycle refreshes rarely change the mechanicals — usually trim, lighting, infotainment.','Current-year units typically see price increases on the next model year launch.','Waiting for a new model usually means missing current promotional pricing windows.'], say:'Fair point — what specifically are you hoping changes? If it\'s a feature, I might be able to show you that same thing in a current-year unit right now. And new-model launches almost always come with price bumps, not cuts.' },
+            { tags:['trade','trade-in','trade value','kbb','carmax'], objection:'Your trade offer is low', real:'They saw KBB/Carmax and expected that number.', facts:['KBB and Edmunds retail values assume best-condition, dealer-retail pricing — wholesale trade value is always lower, at every dealer.','Carmax offers are the only true competing cash offer — we can match them case-by-case.'], say:'Those online numbers are retail, not trade. Every dealer in town is going to come in lower than KBB retail — that\'s just the math of wholesale. Do you have an actual Carmax offer in hand? If so, that\'s the number we\'ll work against.' },
+            { tags:['gm bailout','don\'t trust','government motors'], objection:'I don\'t trust GM after the bailout', real:'Lingering political/emotional grudge from 2009.', facts:['GM repaid all bailout funds years ago and has been profitable every year since.','The bailout-era leadership is long gone — current GM invests billions in US manufacturing and EV production.'], say:'That was 15 years ago — different leadership, different company, and they paid it all back. Today GM has more US workers than Ford or Toyota North America.' },
+        ];
+
+        function showObjectionHandler() {
+            let modal = document.getElementById('objectionModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'objectionModal';
+                modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;display:none;overflow-y:auto;padding:16px;';
+                modal.onclick = function(e) { if (e.target === modal) closeObjectionHandler(); };
+                modal.innerHTML = '<div style="background:var(--dark-bg);border:2px solid var(--gold);border-radius:16px;max-width:900px;margin:0 auto;padding:20px;position:relative;"><button onclick="closeObjectionHandler()" style="position:absolute;top:12px;right:12px;background:transparent;border:none;color:var(--text-secondary);font-size:24px;cursor:pointer;">✕</button><h2 style="color:var(--gold);font-size:22px;font-weight:800;margin-bottom:4px;">🎯 Objection Handler</h2><p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">Search what they just said, or browse the list. Tap any card to expand.</p><input type="text" id="objectionSearch" placeholder="Type what they said (e.g. &quot;shop around&quot;)" style="width:100%;padding:10px 14px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;margin-bottom:14px;" oninput="renderObjections(this.value)"><div id="objectionList"></div></div>';
+                document.body.appendChild(modal);
+            }
+            modal.style.display = 'block';
+            renderObjections('');
+            setTimeout(function() { const s = document.getElementById('objectionSearch'); if (s) s.focus(); }, 100);
+        }
+
+        function renderObjections(query) {
+            const list = document.getElementById('objectionList');
+            if (!list) return;
+            const q = (query || '').toLowerCase().trim();
+            let items = OBJECTION_LIBRARY;
+            if (q) {
+                items = OBJECTION_LIBRARY.filter(o =>
+                    o.tags.some(t => t.includes(q) || q.includes(t)) ||
+                    o.objection.toLowerCase().includes(q) ||
+                    o.say.toLowerCase().includes(q)
+                );
+            }
+            if (!items.length) {
+                list.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:20px;">No match. Try different wording, or browse:</p>';
+                items = OBJECTION_LIBRARY;
+            }
+            let html = '<div style="display:grid;gap:10px;">';
+            items.forEach((o, i) => {
+                html += '<details style="background:var(--card-bg);border:1px solid var(--border-color);border-left:3px solid var(--gold);border-radius:8px;padding:12px;">';
+                html += '<summary style="cursor:pointer;font-size:14px;font-weight:700;color:var(--text-primary);">"' + o.objection + '"</summary>';
+                html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-color);">';
+                html += '<div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">What They Really Mean</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.5;font-style:italic;">' + o.real + '</div></div>';
+                if (o.facts && o.facts.length) {
+                    html += '<div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Facts To Reframe With</div><ul style="margin:0;padding-left:18px;font-size:13px;color:var(--text-primary);line-height:1.5;">';
+                    o.facts.forEach(f => { html += '<li style="margin-bottom:4px;">' + f + '</li>'; });
+                    html += '</ul></div>';
+                }
+                html += '<div style="background:rgba(212,160,23,0.1);border:1px solid rgba(212,160,23,0.3);border-radius:6px;padding:10px;"><div style="font-size:10px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">What To Say</div><div style="font-size:13px;color:var(--text-primary);line-height:1.5;">"' + o.say + '"</div></div>';
+                html += '</div></details>';
+            });
+            html += '</div>';
+            list.innerHTML = html;
+        }
+
+        function closeObjectionHandler() {
+            const modal = document.getElementById('objectionModal');
             if (modal) modal.style.display = 'none';
         }
 
