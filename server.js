@@ -158,62 +158,85 @@ database.initDatabase();
 const DEFAULT_TEMPLATES = [
   // ===== ENGLISH TEMPLATES =====
   { id: 'instant_greeting_en', trigger: 'new_message', lang: 'en', name: 'Instant Greeting (EN)',
-    message: `Hey {first_name}! Thanks for reaching out! This is Gabe from Gabe Moves Metal — I sell at Findlay Chevrolet, the #1 volume dealer west of Texas. What are you looking for today?`,
+    message: `Hey {first_name}, this is Gabe at Findlay Chevy. What are you looking at?`,
     active: true, delay: 0 },
   { id: 'truck_interest_en', trigger: 'keyword', lang: 'en',
     keywords: ['truck', 'silverado', 'colorado', 'sierra', 'tow', 'towing', 'pickup', 'f150', 'ram'],
     name: 'Truck Interest (EN)',
-    message: `Great taste! I work at the #1 volume Chevy dealer west of Texas so we've got a HUGE truck selection. Silverado 1500, 2500HD, or Colorado — I can pull options and pricing right now. What are you looking at?`,
+    message: `Any particular trim on your radar — LT, RST, Trail Boss, ZR2? And is this for work or daily driving?`,
     active: true, delay: 30 },
   { id: 'suv_interest_en', trigger: 'keyword', lang: 'en',
     keywords: ['suv', 'tahoe', 'suburban', 'blazer', 'equinox', 'trailblazer', 'trax', 'traverse', 'family'],
     name: 'SUV Interest (EN)',
-    message: `SUVs are my bread and butter! Whether you want an Equinox, Blazer, Tahoe, or Suburban — I've got them all on the lot. What size are you thinking, and is there a budget range you're working with?`,
+    message: `What size are you leaning toward — something compact like an Equinox or Trax, or three rows like a Traverse or Tahoe?`,
     active: true, delay: 30 },
   { id: 'ev_interest_en', trigger: 'keyword', lang: 'en',
     keywords: ['ev', 'electric', 'equinox ev', 'blazer ev', 'silverado ev', 'hybrid', 'bolt', 'charge'],
     name: 'EV Interest (EN)',
-    message: `Love that you're looking at EVs! Chevy has incredible electric options — the Equinox EV starts under $35K and there are federal tax credits available. Want me to break down the numbers for you?`,
+    message: `Which one caught your eye — Equinox EV, Blazer EV, or the Silverado EV?`,
     active: true, delay: 30 },
   { id: 'trade_in_en', trigger: 'keyword', lang: 'en',
     keywords: ['trade', 'trade-in', 'trade in', 'sell my car', 'selling', 'what is my car worth', 'value'],
     name: 'Trade-In Interest (EN)',
-    message: `Trade values are strong right now! I can get you a quick appraisal — just need the year, make, model, and roughly how many miles. No obligation. Want to set that up?`,
+    message: `Happy to take a look. What's the year, make, model, and rough mileage on your current ride?`,
     active: true, delay: 15 },
   { id: 'price_question_en', trigger: 'keyword', lang: 'en',
     keywords: ['price', 'how much', 'cost', 'payment', 'monthly', 'finance', 'deal', 'discount', 'best price'],
     name: 'Pricing Question (EN)',
-    message: `Great question! We move a lot of metal at Findlay so our prices stay aggressive. Which specific vehicle are you looking at? I'll pull the best numbers I can for you.`,
+    message: `Happy to run numbers — which specific vehicle are you looking at?`,
     active: true, delay: 15 },
   // ===== SPANISH TEMPLATES =====
   { id: 'instant_greeting_es', trigger: 'new_message', lang: 'es', name: 'Saludo Inicial (ES)',
-    message: `¡Hola {first_name}! Gracias por escribirme. Soy Gabe de Gabe Moves Metal — vendo en Findlay Chevrolet, el dealer #1 en volumen al oeste de Texas. ¿En qué te puedo ayudar hoy?`,
+    message: `¡Qué tal {first_name}! Soy Gabe en Findlay Chevy. ¿Qué andas viendo?`,
     active: true, delay: 0 },
   { id: 'truck_interest_es', trigger: 'keyword', lang: 'es',
     keywords: ['troca', 'camioneta', 'silverado', 'colorado', 'pickup', 'remolque', 'jalar'],
     name: 'Interés en Trocas (ES)',
-    message: `¡Buena elección! Trabajo en el dealer Chevy #1 en volumen al oeste de Texas — tenemos una selección enorme de trocas. Silverado 1500, 2500HD, o Colorado. ¿Cuál te interesa? Te puedo dar precios ahorita mismo.`,
+    message: `¿Algún trim en mente — LT, RST, Trail Boss, ZR2? ¿Y es para trabajo o para diario?`,
     active: true, delay: 30 },
   { id: 'suv_interest_es', trigger: 'keyword', lang: 'es',
     keywords: ['suv', 'tahoe', 'suburban', 'blazer', 'equinox', 'familiar', 'familia', 'camioneta grande'],
     name: 'Interés en SUVs (ES)',
-    message: `¡Las SUVs son mi especialidad! Ya sea Equinox, Blazer, Tahoe o Suburban — las tengo todas en el lote. ¿Qué tamaño buscas y cuál es tu presupuesto más o menos?`,
+    message: `¿Qué tamaño buscas — algo compacto como Equinox o Trax, o de tres filas como Traverse o Tahoe?`,
     active: true, delay: 30 },
   { id: 'price_question_es', trigger: 'keyword', lang: 'es',
     keywords: ['precio', 'cuánto', 'cuanto', 'cuesta', 'pago', 'mensual', 'financiar', 'crédito', 'credito', 'enganche'],
     name: 'Pregunta de Precio (ES)',
-    message: `¡Buena pregunta! En Findlay movemos mucho volumen así que nuestros precios son muy competitivos. ¿Qué vehículo te interesa? Te consigo los mejores números que pueda.`,
+    message: `Con gusto te saco números — ¿qué vehículo en específico te interesa?`,
     active: true, delay: 15 },
   { id: 'trade_in_es', trigger: 'keyword', lang: 'es',
     keywords: ['intercambio', 'trade', 'vender mi carro', 'cuánto vale', 'cuanto vale', 'avalúo'],
     name: 'Interés en Trade-In (ES)',
-    message: `¡Los valores de trade-in están muy buenos ahorita! Solo necesito el año, marca, modelo y más o menos cuántas millas tiene. Sin compromiso. ¿Quieres que lo hagamos?`,
+    message: `Claro. ¿Cuál es el año, marca, modelo y más o menos las millas de tu carro actual?`,
     active: true, delay: 15 },
 ];
 
 // Migrate any existing data.json → SQLite, then seed defaults
 database.migrateFromJson();
 database.seedDefaultTemplates(DEFAULT_TEMPLATES);
+
+// One-time copy refresh: if any default template still contains the old
+// heavy-handed "Gabe Moves Metal / #1 volume dealer" phrasing, replace it
+// with the new short copy. Only touches rows that still match the original
+// seed — any template Gabe edited in the UI is left alone.
+try {
+  const staleMarkers = [
+    'Gabe Moves Metal',
+    '#1 volume dealer west of Texas',
+    '#1 volume Chevy dealer west of Texas',
+    'dealer #1 en volumen al oeste de Texas',
+    'Chevy #1 en volumen al oeste de Texas',
+  ];
+  for (const tmpl of DEFAULT_TEMPLATES) {
+    const existing = database.templates.getById ? database.templates.getById(tmpl.id) : null;
+    if (existing && existing.message && staleMarkers.some(m => existing.message.includes(m))) {
+      database.templates.upsert({ ...existing, ...tmpl });
+      console.log(`[Templates] Refreshed stale copy on ${tmpl.id}`);
+    }
+  }
+} catch (e) {
+  console.log('[Templates] Refresh skipped:', e.message);
+}
 
 // saveData() is now a no-op — database writes are immediate
 function saveData() { /* SQLite handles persistence automatically */ }
