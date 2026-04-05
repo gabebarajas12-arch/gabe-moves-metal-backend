@@ -1310,6 +1310,175 @@
             }
         }
 
+        /* ============ MOBILE-FIRST PHONE LAYOUT (≤640px) ============ */
+        /* Gabe sells on the floor — this is where the app actually gets used. */
+        @media (max-width: 640px) {
+            /* Sidebar collapses to a horizontal scrollable top bar */
+            .sidebar {
+                position: sticky;
+                top: 0;
+                width: 100%;
+                height: auto;
+                max-height: none;
+                padding: 8px 0;
+                display: flex;
+                flex-direction: row;
+                overflow-x: auto;
+                overflow-y: hidden;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                z-index: 100;
+                -webkit-overflow-scrolling: touch;
+            }
+            .sidebar .logo { display: none; }
+            .sidebar .nav-section-title {
+                flex-shrink: 0;
+                padding: 6px 10px;
+                font-size: 10px;
+                white-space: nowrap;
+                display: none; /* too noisy in horizontal nav */
+            }
+            .sidebar .nav-item {
+                flex-shrink: 0;
+                padding: 10px 14px;
+                font-size: 13px;
+                white-space: nowrap;
+                border-left: none;
+                border-bottom: 2px solid transparent;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+            }
+            .sidebar .nav-item.active {
+                border-left: none;
+                border-bottom-color: var(--gold);
+            }
+
+            /* Main content gets full width */
+            .main {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            /* Header reflows */
+            .header {
+                padding: 10px 12px;
+            }
+            .header-title { font-size: 15px; }
+            .content { padding: 12px; }
+
+            /* Tap targets: buttons, inputs min 44px height */
+            .btn, button.btn, input[type="button"], input[type="submit"] {
+                min-height: 44px;
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+            input[type="text"], input[type="number"], input[type="tel"], input[type="email"], select, textarea {
+                min-height: 44px;
+                font-size: 16px; /* prevents iOS zoom on focus */
+            }
+
+            /* Compare panel: near-full-screen, minimal padding */
+            #comparePanelOverlay {
+                padding: 6px !important;
+            }
+            #comparePanelOverlay > div {
+                max-width: 100% !important;
+            }
+            /* Any grid with fixed cols that would get squished — force horizontal scroll */
+            #compareContent > div[style*="grid-template-columns:repeat"],
+            #compareContent > div > div[style*="grid-template-columns:repeat"],
+            #compareContent div[style*="grid-template-columns:1fr repeat"] {
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+            /* Vehicle header cards — min 200px each, scroll if needed */
+            #compareContent > div[style*="grid-template-columns:repeat"][style*=", 1fr"] {
+                display: grid !important;
+                grid-auto-flow: column !important;
+                grid-auto-columns: minmax(220px, 1fr) !important;
+                grid-template-columns: none !important;
+                overflow-x: auto !important;
+                scroll-snap-type: x mandatory;
+            }
+            #compareContent > div[style*="grid-template-columns:repeat"][style*=", 1fr"] > * {
+                scroll-snap-align: start;
+            }
+            /* Feature comparison rows (feature name + Y/N per vehicle) */
+            #compareContent div[style*="grid-template-columns:1fr repeat"] {
+                min-width: 100%;
+            }
+            /* Scorecard banner tightens up */
+            #compareContent > div[style*="WHY FINDLAY"],
+            #compareContent > div:first-child {
+                padding: 12px !important;
+            }
+
+            /* Sticker modal */
+            #stickerModal { padding: 6px !important; }
+            #stickerModal > div { max-width: 100% !important; }
+
+            /* Deal calc grid stacks */
+            .calc-grid { grid-template-columns: 1fr !important; }
+            .analytics-grid { grid-template-columns: repeat(2, 1fr) !important; }
+            .deals-grid { grid-template-columns: 1fr !important; }
+
+            /* Stats/pipeline already stack via earlier breakpoints — ensure they do */
+            .stats-grid { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+            .pipeline { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+
+            /* Inventory grid */
+            .inventory-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+                gap: 10px;
+            }
+
+            /* Conversations: single column stack */
+            .conversations-container {
+                grid-template-columns: 1fr !important;
+                grid-template-rows: auto 1fr !important;
+            }
+
+            /* Calendar cells shrink */
+            .cal-header-row, .cal-days-row {
+                font-size: 11px;
+            }
+
+            /* Appointment/SMS modals go near full width */
+            .appt-modal, .modal-content {
+                width: 96% !important;
+                max-width: 96% !important;
+                padding: 16px !important;
+            }
+            .sms-bubble-in, .sms-bubble-out {
+                max-width: 85% !important;
+                font-size: 15px !important;
+            }
+
+            /* Tables get horizontal scroll wrapper behavior */
+            .table {
+                font-size: 12px;
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Dashboard stat cards */
+            .stat-card { padding: 12px; }
+            .stat-value { font-size: 22px; }
+        }
+
+        /* Extra-small phones — squeeze further */
+        @media (max-width: 380px) {
+            .sidebar .nav-item { padding: 8px 10px; font-size: 12px; }
+            .content { padding: 8px; }
+            .header-title { font-size: 14px; }
+            .inventory-grid {
+                grid-template-columns: 1fr 1fr !important;
+            }
+        }
+
         /* Scrollbar styling */
         ::-webkit-scrollbar {
             width: 8px;
