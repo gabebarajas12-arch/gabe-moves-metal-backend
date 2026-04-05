@@ -4803,7 +4803,8 @@
         // Groups current Findlay inventory by (model, trim), pulls window stickers,
         // and shows Gabe a side-by-side of what's standard on each trim so he can
         // answer "what's the difference between an LT and an RS?" in real time.
-        let _trimSheetCache = {}; // { model: { trims: {...}, timestamp } }
+        let _trimSheetCache = {}; // { model: [{ trim, features Set, ... }] }
+        let _trimSheetState = { model: null, mode: 'matrix', selectedTrims: null };
 
         async function showTrimCheatSheet() {
             let modal = document.getElementById('trimSheetModal');
@@ -4838,6 +4839,13 @@
         async function renderTrimCheatSheet(model) {
             const body = document.getElementById('trimSheetBody');
             if (!body) return;
+            _trimSheetState.model = model;
+            // If cached, skip fetch and just re-render
+            if (_trimSheetCache[model]) {
+                _trimSheetState.selectedTrims = _trimSheetCache[model].map(t => t.trim);
+                paintTrimSheet();
+                return;
+            }
             body.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:20px;">Loading window stickers for ' + model + '...</p>';
             const inventory = (window._inventoryCache || []).filter(v =>
                 (v.dealer === 'Findlay' || v.dealerShort === 'Findlay') &&
@@ -4885,14 +4893,141 @@
                 (s.packages || []).forEach(p => (p.features || []).forEach(f => feats.add(f)));
                 return { trim: trimName, count: data.count, price: data.price, vin: data.vin, features: feats, priceFromSticker: s?.pricing?.standardPrice || data.price, image: data.sample.image || data.sample.imageUrl };
             });
-            // Diff: for each trim, features it has that the *previous* (cheaper) trim doesn't
+            // Cache and render via paintTrimSheet
+            _trimSheetCache[model] = trimFeatures;
+            _trimSheetState.selectedTrims = trimFeatures.map(t => t.trim);
+            paintTrimSheet();
+        }
+
+        function toggleTrimSheetMode(mode) {
+            _trimSheetState.mode = mode;
+            paintTrimSheet();
+        }
+
+        function toggleTrimInSelection(trim) {
+            const sel = _trimSheetState.selectedTrims || [];
+            const idx = sel.indexOf(trim);
+            if (idx >= 0) sel.splice(idx, 1);
+            else sel.push(trim);
+            _trimSheetState.selectedTrims = sel;
+            paintTrimSheet();
+        }
+
+        function paintTrimSheet() {
+            const body = document.getElementById('trimSheetBody');
+            if (!body) return;
+            const model = _trimSheetState.model;
+            const allTrimFeatures = _trimSheetCache[model] || [];
+            if (!allTrimFeatures.length) { body.innerHTML = '<p style="color:var(--text-secondary);">No data.</p>'; return; }
+            const selectedTrims = _trimSheetState.selectedTrims && _trimSheetState.selectedTrims.length ? _trimSheetState.selectedTrims : allTrimFeatures.map(t => t.trim);
+            const mode = _trimSheetState.mode || 'matrix';
+
+            // View mode toggle + trim checkboxes
+            let html = '<div style="display:flex;gap:4px;margin-bottom:12px;">';
+            html += '<button onclick="toggleTrimSheetMode(\'matrix\')" class="btn" style="background:' + (mode === 'matrix' ? 'var(--gold)' : 'var(--card-bg)') + ';color:' + (mode === 'matrix' ? '#000' : 'var(--text-primary)') + ';font-size:12px;padding:6px 12px;border:1px solid var(--border-color);">📊 Side-by-Side</button>';
+            html += '<button onclick="toggleTrimSheetMode(\'stacked\')" class="btn" style="background:' + (mode === 'stacked' ? 'var(--gold)' : 'var(--card-bg)') + ';color:' + (mode === 'stacked' ? '#000' : 'var(--text-primary)') + ';font-size:12px;padding:6px 12px;border:1px solid var(--border-color);">📋 Step-Up View</button>';
+            html += '</div>';
+
+            // Trim chips (toggleable)
+            html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border-color);">';
+            html += '<div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;width:100%;margin-bottom:4px;">Showing ' + selectedTrims.length + ' of ' + allTrimFeatures.length + ' trims — tap to toggle</div>';
+            allTrimFeatures.forEach(tf => {
+                const on = selectedTrims.includes(tf.trim);
+                html += '<button onclick="toggleTrimInSelection(\'' + tf.trim.replace(/'/g, "\\'") + '\')" style="padding:6px 12px;background:' + (on ? 'var(--gold)' : 'var(--card-bg)') + ';color:' + (on ? '#000' : 'var(--text-primary)') + ';border:1px solid ' + (on ? 'var(--gold)' : 'var(--border-color)') + ';border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">' + tf.trim + ' <span style="opacity:0.7;font-weight:500;">($' + (tf.priceFromSticker || 0).toLocaleString() + ')</span></button>';
+            });
+            html += '</div>';
+
+            // Filter to selected
+            const trimFeatures = allTrimFeatures.filter(t => selectedTrims.includes(t.trim));
+
+            if (mode === 'matrix') {
+                html += renderTrimMatrix(trimFeatures);
+            } else {
+                html += renderTrimStacked(trimFeatures);
+            }
+            html += '<p style="font-size:10px;color:var(--text-secondary);margin-top:10px;font-style:italic;">Sample VIN per trim taken from lowest-priced unit in stock. Tap any feature for plain-English.</p>';
+            body.innerHTML = html;
+        }
+
+        function renderTrimMatrix(trimFeatures) {
+            // Build full feature list grouped by category, showing which trims have which
+            const allFeats = new Set();
+            trimFeatures.forEach(tf => tf.features.forEach(f => allFeats.add(f)));
+            const featList = [...allFeats];
+            // Only show features that differ between trims — skip features every selected trim has in common
+            // (those are listed separately at the bottom)
+            const differing = featList.filter(f => {
+                const hits = trimFeatures.filter(tf => tf.features.has(f)).length;
+                return hits > 0 && hits < trimFeatures.length;
+            });
+            const sharedAll = featList.filter(f => trimFeatures.every(tf => tf.features.has(f)));
+
+            // Group differing by category
+            const cats = {};
+            differing.forEach(f => {
+                const c = categorizeFeature(f);
+                if (!cats[c]) cats[c] = [];
+                cats[c].push(f);
+            });
+            const catOrder = ['Safety', 'Tech', 'Infotainment', 'Convenience', 'Interior', 'Comfort', 'Seating', 'Exterior', 'Lighting', 'Wheels', 'Powertrain', 'Performance', 'Towing', 'Other'];
+            const sortedCats = Object.keys(cats).sort((a, b) => {
+                const ai = catOrder.indexOf(a); const bi = catOrder.indexOf(b);
+                return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+            });
+
+            const cols = trimFeatures.length;
+            let html = '';
+
+            // Header row with trim names + prices + images
+            html += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border-color);border-radius:10px;">';
+            html += '<table style="width:100%;border-collapse:collapse;min-width:' + (260 + cols * 120) + 'px;">';
+            html += '<thead><tr style="background:var(--card-bg);">';
+            html += '<th style="text-align:left;padding:12px;font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;position:sticky;left:0;background:var(--card-bg);z-index:2;border-right:1px solid var(--border-color);">Feature</th>';
+            trimFeatures.forEach(tf => {
+                html += '<th style="padding:10px 8px;text-align:center;min-width:110px;border-left:1px solid var(--border-color);">';
+                if (tf.image) html += '<img src="' + tf.image + '" style="width:90px;height:56px;object-fit:cover;border-radius:4px;display:block;margin:0 auto 6px auto;" onerror="this.style.display=\'none\'">';
+                html += '<div style="font-size:13px;font-weight:800;color:var(--gold);">' + tf.trim + '</div>';
+                html += '<div style="font-size:10px;color:var(--text-secondary);">$' + (tf.priceFromSticker || 0).toLocaleString() + '</div>';
+                html += '<div style="font-size:9px;color:var(--text-secondary);">' + tf.count + ' in stock</div>';
+                html += '</th>';
+            });
+            html += '</tr></thead><tbody>';
+
+            // Rows by category
+            sortedCats.forEach(cat => {
+                html += '<tr><td colspan="' + (cols + 1) + '" style="background:rgba(212,160,23,0.08);padding:8px 12px;font-size:11px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;border-top:1px solid var(--border-color);">' + cat + ' (' + cats[cat].length + ')</td></tr>';
+                cats[cat].sort().forEach((f, fi) => {
+                    const safe = f.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const hasSpotlight = findFeatureSpotlight(f) !== null;
+                    const bg = fi % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)';
+                    html += '<tr style="background:' + bg + ';">';
+                    html += '<td onclick="showFeatureSpotlight(\'' + safe + '\')" style="padding:8px 12px;font-size:12px;color:var(--text-primary);cursor:pointer;position:sticky;left:0;background:var(--dark-bg);z-index:1;border-right:1px solid var(--border-color);border-top:1px solid rgba(255,255,255,0.04);">' + f + (hasSpotlight ? ' <span style="color:var(--gold);font-size:9px;">ℹ️</span>' : '') + '</td>';
+                    trimFeatures.forEach(tf => {
+                        const has = tf.features.has(f);
+                        html += '<td style="padding:8px;text-align:center;font-size:16px;border-left:1px solid var(--border-color);border-top:1px solid rgba(255,255,255,0.04);">' + (has ? '<span style="color:var(--gold);font-weight:700;">✓</span>' : '<span style="color:#444;">—</span>') + '</td>';
+                    });
+                    html += '</tr>';
+                });
+            });
+            html += '</tbody></table></div>';
+
+            // Shared-by-all footer (collapsed)
+            if (sharedAll.length) {
+                html += '<details style="margin-top:12px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;overflow:hidden;">';
+                html += '<summary style="cursor:pointer;padding:10px 14px;font-size:12px;font-weight:700;color:#4CAF50;">✓ ' + sharedAll.length + ' features every selected trim shares — tap to see</summary>';
+                html += '<div style="padding:4px 14px 14px 14px;font-size:11px;color:var(--text-secondary);line-height:1.8;">' + sharedAll.sort().join(' · ') + '</div>';
+                html += '</details>';
+            }
+            return html;
+        }
+
+        function renderTrimStacked(trimFeatures) {
+            // Original stacked step-up view
             const rows = trimFeatures.map((tf, idx) => {
                 const prevFeats = idx === 0 ? new Set() : trimFeatures[idx - 1].features;
                 const added = [...tf.features].filter(f => !prevFeats.has(f)).sort();
-                const carried = [...tf.features].filter(f => prevFeats.has(f));
-                return { ...tf, added, carried };
+                return { ...tf, added };
             });
-
             let html = '<div style="display:grid;gap:12px;">';
             rows.forEach((row, idx) => {
                 const badge = idx === 0 ? 'STARTS AT' : 'STEP UP +';
@@ -4905,20 +5040,53 @@
                 if (row.image) html += '<img src="' + row.image + '" style="width:140px;height:90px;object-fit:cover;border-radius:6px;" onerror="this.style.display=\'none\'">';
                 html += '</div>';
                 if (row.added.length) {
-                    html += '<div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">' + (idx === 0 ? 'Standard on this trim (' + row.added.length + ')' : 'What ' + row.trim + ' adds (' + row.added.length + ')') + '</div>';
-                    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
-                    row.added.slice(0, 40).forEach(f => {
-                        const safe = f.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                        html += '<div onclick="showFeatureSpotlight(\'' + safe + '\')" style="padding:3px 8px;background:rgba(212,160,23,0.08);border:1px solid rgba(212,160,23,0.25);border-radius:4px;font-size:10px;color:var(--gold);cursor:pointer;">' + f + '</div>';
+                    // Group by category for scannability
+                    const cats = {};
+                    row.added.forEach(f => {
+                        const c = categorizeFeature(f);
+                        if (!cats[c]) cats[c] = [];
+                        cats[c].push(f);
                     });
-                    if (row.added.length > 40) html += '<div style="padding:3px 8px;font-size:10px;color:var(--text-secondary);">+' + (row.added.length - 40) + ' more</div>';
+                    // Sort categories by a logical walkaround order, then by count
+                    const catOrder = ['Safety', 'Tech', 'Infotainment', 'Convenience', 'Interior', 'Comfort', 'Seating', 'Exterior', 'Lighting', 'Wheels', 'Powertrain', 'Performance', 'Towing', 'Other'];
+                    const sortedCats = Object.keys(cats).sort((a, b) => {
+                        const ai = catOrder.indexOf(a); const bi = catOrder.indexOf(b);
+                        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                    });
+                    const heading = idx === 0 ? 'Standard Equipment' : 'What ' + row.trim + ' Adds';
+                    const isBase = idx === 0;
+                    html += '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.06);padding-top:12px;">';
+                    html += '<div style="font-size:13px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;">' + heading + '</div>';
+                    html += '<div style="font-size:11px;color:var(--text-secondary);">' + row.added.length + ' feature' + (row.added.length === 1 ? '' : 's') + '</div>';
                     html += '</div>';
+
+                    // For base trim with lots of features, default-collapse sections to reduce wall-of-text
+                    // For step-up trims, default-open since the lists are shorter
+                    sortedCats.forEach((cat, ci) => {
+                        const feats = cats[cat].sort();
+                        const shouldCollapse = isBase && feats.length > 4;
+                        const detailOpen = !shouldCollapse ? ' open' : '';
+                        html += '<details' + detailOpen + ' style="margin-bottom:8px;background:rgba(255,255,255,0.02);border-radius:6px;overflow:hidden;">';
+                        html += '<summary style="cursor:pointer;padding:8px 12px;font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;list-style:none;display:flex;justify-content:space-between;align-items:center;">';
+                        html += '<span>' + cat + '</span>';
+                        html += '<span style="font-size:10px;color:var(--text-secondary);font-weight:600;">' + feats.length + ' ▸</span>';
+                        html += '</summary>';
+                        html += '<div style="padding:4px 12px 12px 12px;display:flex;flex-direction:column;gap:4px;">';
+                        feats.forEach(f => {
+                            const safe = f.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                            const hasSpotlight = findFeatureSpotlight(f) !== null;
+                            html += '<div onclick="showFeatureSpotlight(\'' + safe + '\')" style="padding:7px 10px;background:rgba(212,160,23,0.06);border:1px solid rgba(212,160,23,0.18);border-radius:5px;font-size:12px;color:var(--text-primary);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;" title="Tap for plain-English">';
+                            html += '<span>' + f + '</span>';
+                            if (hasSpotlight) html += '<span style="font-size:10px;color:var(--gold);font-weight:700;flex-shrink:0;">ℹ️</span>';
+                            html += '</div>';
+                        });
+                        html += '</div></details>';
+                    });
                 }
                 html += '</div>';
             });
             html += '</div>';
-            html += '<p style="font-size:10px;color:var(--text-secondary);margin-top:10px;font-style:italic;">Sample VIN per trim taken from lowest-priced unit in stock. Tap any feature for plain-English.</p>';
-            body.innerHTML = html;
+            return html;
         }
 
         function closeTrimCheatSheet() {
