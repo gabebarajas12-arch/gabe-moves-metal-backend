@@ -388,8 +388,16 @@ async function handleMessage(event, platform) {
     const lead = database.leads.getById(convo.leadId);
     if (lead && !lead.language) database.leads.update(lead.id, { language: detectedLang });
 
-    // 1. If this is the first message, send instant greeting in detected language
-    if (database.conversations.getMessageCount(convo.id, 'customer') === 1) {
+    // ---- AUTO-REPLY: ONE MESSAGE ONLY ----
+    // Rule: only ever send ONE auto-reply per customer turn, and only on their
+    // very first message to the page. Everything after that is Gabe's job to
+    // reply to personally. NEVER auto-dump inventory, prices, or stock numbers
+    // — this app is a talking-points tool for face-to-face selling, not a
+    // price-pushing bot. That stays off the wire on purpose.
+    const isFirstCustomerMessage = database.conversations.getMessageCount(convo.id, 'customer') === 1;
+    const botHasNotRepliedYet = database.conversations.getNonCustomerMessageCount(convo.id) === 0;
+
+    if (isFirstCustomerMessage && botHasNotRepliedYet) {
       const allTemplates = database.templates.getAll();
       const greeting = allTemplates.find(t =>
         t.trigger === 'new_message' && t.active && t.lang === detectedLang
@@ -406,48 +414,18 @@ async function handleMessage(event, platform) {
             timestamp: new Date().toISOString(),
             templateUsed: greeting.name,
           });
-        }, greeting.delay * 1000);
+        }, (greeting.delay || 0) * 1000);
       }
-    }
 
-    // 2. Check for keyword-matched templates
-    const keywordTemplate = findKeywordTemplate(messageText);
-    if (keywordTemplate && database.conversations.getNonCustomerMessageCount(convo.id) <= 1) {
-      const reply = keywordTemplate.message.replace(/\{first_name\}/g, firstName);
-      setTimeout(() => {
-        sendMessage(senderId, reply, platform);
-        database.conversations.addMessage(convo.id, {
-          id: generateId(),
-          from: 'bot',
-          text: reply,
-          timestamp: new Date().toISOString(),
-          templateUsed: keywordTemplate.name,
-        });
-
-        // Update lead interest based on keyword match
+      // Still capture interest on the lead record (internal only — never sent to customer)
+      const detectedInterest = detectInterest(messageText);
+      if (detectedInterest) {
         const leadForInterest = database.leads.getById(convo.leadId);
         if (leadForInterest) {
-          database.leads.update(leadForInterest.id, { interest: detectInterest(messageText) || leadForInterest.interest });
-        }
-      }, (keywordTemplate.delay || 30) * 1000);
-    }
-
-    // 2.5. Inventory matching — send matching vehicles from the lot
-    const detectedInterest = detectInterest(messageText);
-    if (detectedInterest) {
-      const matches = inventoryModule.matchInventory(detectedInterest, { maxResults: 3 });
-      if (matches.length > 0) {
-        const inventoryMsg = inventoryModule.formatInventoryMessage(matches, firstName);
-        setTimeout(() => {
-          sendMessage(senderId, inventoryMsg, platform);
-          database.conversations.addMessage(convo.id, {
-            id: generateId(),
-            from: 'bot',
-            text: inventoryMsg,
-            timestamp: new Date().toISOString(),
-            templateUsed: 'Inventory Match',
+          database.leads.update(leadForInterest.id, {
+            interest: detectedInterest || leadForInterest.interest,
           });
-        }, 60 * 1000); // Send 60 seconds after, so it feels natural after the keyword reply
+        }
       }
     }
 
@@ -648,8 +626,14 @@ async function handleWhatsAppMessage(msg, value) {
 
   const firstName = contactName.split(' ')[0] || 'there';
 
-  // First message → send greeting
-  if (database.conversations.getMessageCount(convo.id, 'customer') === 1) {
+  // ---- AUTO-REPLY: ONE MESSAGE ONLY (matches Messenger rule) ----
+  // Send exactly one greeting on the first customer message. No keyword
+  // cascade, no auto-inventory, no pricing. Everything past the greeting is
+  // Gabe's job to reply to by hand.
+  const isFirstCustomerMessage = database.conversations.getMessageCount(convo.id, 'customer') === 1;
+  const botHasNotRepliedYet = database.conversations.getNonCustomerMessageCount(convo.id) === 0;
+
+  if (isFirstCustomerMessage && botHasNotRepliedYet) {
     const waTemplates = database.templates.getAll();
     const greeting = waTemplates.find(t =>
       t.trigger === 'new_message' && t.active && t.lang === detectedLang
@@ -666,42 +650,18 @@ async function handleWhatsAppMessage(msg, value) {
           timestamp: new Date().toISOString(),
           templateUsed: greeting.name,
         });
-      }, greeting.delay * 1000);
+      }, (greeting.delay || 0) * 1000);
     }
-  }
 
-  // Keyword-matched auto-reply
-  const keywordTemplate = findKeywordTemplate(messageText);
-  if (keywordTemplate && database.conversations.getNonCustomerMessageCount(convo.id) <= 1) {
-    const reply = keywordTemplate.message.replace(/\{first_name\}/g, firstName);
-    setTimeout(() => {
-      sendWhatsAppMessage(from, reply);
-      database.conversations.addMessage(convo.id, {
-        id: generateId(),
-        from: 'bot',
-        text: reply,
-        timestamp: new Date().toISOString(),
-        templateUsed: keywordTemplate.name,
-      });
-    }, (keywordTemplate.delay || 30) * 1000);
-  }
-
-  // Inventory matching
-  const detectedInterest = detectInterest(messageText);
-  if (detectedInterest) {
-    const matches = inventoryModule.matchInventory(detectedInterest, { maxResults: 3 });
-    if (matches.length > 0) {
-      const inventoryMsg = inventoryModule.formatInventoryMessage(matches, firstName);
-      setTimeout(() => {
-        sendWhatsAppMessage(from, inventoryMsg);
-        database.conversations.addMessage(convo.id, {
-          id: generateId(),
-          from: 'bot',
-          text: inventoryMsg,
-          timestamp: new Date().toISOString(),
-          templateUsed: 'Inventory Match',
+    // Silently capture interest on the lead record (internal only — never sent)
+    const detectedInterest = detectInterest(messageText);
+    if (detectedInterest) {
+      const leadForInterest = database.leads.getById(convo.leadId);
+      if (leadForInterest) {
+        database.leads.update(leadForInterest.id, {
+          interest: detectedInterest || leadForInterest.interest,
         });
-      }, 60 * 1000);
+      }
     }
   }
 
