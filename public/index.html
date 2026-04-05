@@ -4708,6 +4708,94 @@
             return 'Other';
         }
 
+        // ============ FEATURE SPOTLIGHT CARDS ============
+        // Plain-English explanations Gabe can hand his phone to the customer for.
+        // Each entry: keywords (match fragments, lowercase), title, what, why, demo (how to show it on the lot)
+        const FEATURE_SPOTLIGHT = [
+            { keys:['super cruise'], icon:'🛣️', title:'Super Cruise', what:'Hands-free driving on over 750,000 miles of compatible highways across the US and Canada.', why:'You can take your hands off the wheel on long trips. A camera watches your eyes to keep you attentive. It\'s the only true hands-free system GM offers — Tesla Autopilot still requires your hands on the wheel.', demo:'Open the map on the infotainment screen — the blue roads are where Super Cruise works.' },
+            { keys:['hd surround vision','surround vision','360','hd vision'], icon:'📷', title:'HD Surround Vision', what:'Four cameras stitched together into a top-down bird\'s-eye view of the vehicle.', why:'Parking in tight spots becomes effortless — you can see curbs, pedestrians, and obstacles you\'d never see with mirrors alone. Huge for parallel parking and pulling into a garage.', demo:'Put it in reverse — the 360 view comes up automatically.' },
+            { keys:['adaptive cruise','acc'], icon:'🚗', title:'Adaptive Cruise Control', what:'Cruise control that automatically slows down and speeds up to keep a set distance from the car in front of you.', why:'On road trips or in traffic you stop riding the brake. It\'ll bring you to a complete stop and take off again.', demo:'Set cruise on the highway, come up on slower traffic — you\'ll feel it back off on its own.' },
+            { keys:['lane keep','lane departure','lane assist'], icon:'🛣️', title:'Lane Keep Assist', what:'Gently steers the vehicle back into the lane if you start to drift without signaling.', why:'If you get distracted or drowsy, it nudges you back. Not a replacement for paying attention — but a real safety net.', demo:'' },
+            { keys:['blind spot','side blind','lane change alert'], icon:'⚠️', title:'Blind Spot Monitor', what:'A light in the mirror that warns you when another vehicle is in your blind spot.', why:'Changing lanes on the freeway becomes safer — especially for bigger SUVs and trucks where blind spots are huge.', demo:'Look at the driver side mirror — see that little amber indicator? It lights up when something is beside you.' },
+            { keys:['rear cross traffic','cross traffic alert'], icon:'🔄', title:'Rear Cross Traffic Alert', what:'Warns you when a car is coming from the side while you\'re backing out of a spot.', why:'Parking lots are where most fender-benders happen. This catches cars you literally cannot see over the trunk.', demo:'' },
+            { keys:['automatic emergency braking','forward collision','auto brake','front ped'], icon:'🛑', title:'Automatic Emergency Braking', what:'If the car detects an imminent collision and you haven\'t reacted, it slams the brakes for you.', why:'It\'s the last line of defense — it can reduce the severity of a crash or prevent it entirely. Insurance companies give discounts for this.', demo:'' },
+            { keys:['teen driver'], icon:'👨‍🎓', title:'Teen Driver', what:'A second set of keys that mutes the audio until seatbelts are on, caps top speed, and gives you a report card of how your teen drove.', why:'Peace of mind for parents of new drivers. You can see their hardest brake, max speed, and how many alerts the car gave them.', demo:'' },
+            { keys:['wireless charging','qi'], icon:'🔋', title:'Wireless Charging', what:'A pad in the center console that charges your phone without plugging in.', why:'No cables dangling. Just drop your phone down and it charges.', demo:'Set your phone on the pad — you\'ll see the charging indicator.' },
+            { keys:['wireless apple carplay','wireless android auto','wireless carplay','wireless auto'], icon:'📱', title:'Wireless Apple CarPlay / Android Auto', what:'Your phone mirrors to the screen automatically when you get in — no cable needed.', why:'This is underrated. Every time you get in the car, your maps, music, and texts just appear. No fumbling for a cord.', demo:'Pair your phone once — after that, it connects every time you start the truck.' },
+            { keys:['bose'], icon:'🔊', title:'Bose Premium Audio', what:'Upgraded speaker system tuned by Bose — usually 7 to 10 speakers including a subwoofer.', why:'If you listen to music or podcasts at all in the car, the difference is night and day vs the standard system.', demo:'Put on any song — you\'ll hear the subwoofer.' },
+            { keys:['heated steering','heated wheel'], icon:'🔥', title:'Heated Steering Wheel', what:'The steering wheel itself warms up at the touch of a button.', why:'Vegas mornings in winter — nobody wants to grab a cold wheel. Two minutes and it\'s toasty.', demo:'' },
+            { keys:['heated front seat','heated seat','heated driver'], icon:'🔥', title:'Heated Front Seats', what:'The driver and passenger seats have heating elements built in.', why:'Cold morning comfort. Also good for back stiffness.', demo:'' },
+            { keys:['ventilated seat','cooled seat'], icon:'❄️', title:'Ventilated Seats', what:'Fans built into the seat pull air through perforated leather to keep you cool.', why:'Vegas summers. Enough said. This is one of those features you don\'t think you need until you have it, then you can\'t live without it.', demo:'' },
+            { keys:['memory seat','driver memory','memory package'], icon:'💺', title:'Memory Seats', what:'Saves your exact seat, mirror, and steering column position to a button.', why:'If you share the vehicle with a spouse, one button and the whole car adjusts back to your settings.', demo:'' },
+            { keys:['panoramic','pano roof','sunroof','moonroof'], icon:'☀️', title:'Panoramic Sunroof', what:'Large glass roof that opens or tilts — much bigger than a standard sunroof.', why:'Makes the cabin feel twice as big and lets in a ton of light. Great for Vegas sunsets.', demo:'Hit the button overhead — watch how far it opens.' },
+            { keys:['power liftgate','hands free liftgate','hands-free liftgate','kick activated'], icon:'🛄', title:'Hands-Free Power Liftgate', what:'Wave your foot under the rear bumper and the tailgate opens by itself.', why:'Hands full of groceries or kids in your arms — no juggling. Huge daily-use feature.', demo:'I\'ll show you — step back while holding your fob.' },
+            { keys:['trailer','tow package','max trailer','trailering'], icon:'🚛', title:'Trailering Package', what:'Factory tow hitch, wiring, trailer brake controller, and transmission cooler — everything you need to pull a trailer safely.', why:'If you ever plan to tow anything — boat, camper, UTV — this is thousands cheaper to get from the factory than to add later.', demo:'' },
+            { keys:['multipro tailgate','multi-flex tailgate','multi-pro'], icon:'🔧', title:'MultiPro Tailgate', what:'A tailgate with six different positions — it folds into a step, a workstation, a load stop, and more.', why:'The only tailgate like it in the industry. Makes loading and working out of the bed way easier.', demo:'Let me show you all six positions — it\'s wild.' },
+            { keys:['power running boards','power steps','retractable steps'], icon:'🪜', title:'Power Retractable Running Boards', what:'Running boards that drop down when you open the door and tuck back up when you close it.', why:'Easier to get in and out without the mud/snow/clearance issues of fixed running boards.', demo:'' },
+            { keys:['hill descent'], icon:'⛰️', title:'Hill Descent Control', what:'Lets you crawl down a steep hill at a set slow speed without touching the brake.', why:'Off-road or steep driveways — the truck handles braking so you just steer.', demo:'' },
+            { keys:['z71'], icon:'🏞️', title:'Z71 Off-Road Package', what:'Skid plates, off-road tuned shocks, hill descent, all-terrain tires, and a 2-speed transfer case.', why:'Real off-road capability from the factory with warranty. Not just a sticker package.', demo:'' },
+            { keys:['magnetic ride','magneride'], icon:'🧲', title:'Magnetic Ride Control', what:'Shocks that adjust their stiffness 1,000 times per second using magnetic fluid.', why:'Smooth ride when cruising, firm ride when cornering. It\'s the same tech used in Corvettes and Cadillacs.', demo:'' },
+            { keys:['head up','head-up display','hud'], icon:'🎯', title:'Head-Up Display', what:'Speed, navigation, and warnings projected onto the windshield in your line of sight.', why:'You never have to look down at the gauges. Safer and once you have it you miss it in any other car.', demo:'' },
+            { keys:['rear camera mirror','camera mirror','inside rear mirror'], icon:'🪞', title:'Rear Camera Mirror', what:'The rearview mirror can flip between a normal mirror and a live camera feed from behind.', why:'When the back seat is full of kids or cargo, the camera view gives you a clear unobstructed look out the back.', demo:'Flip this little tab on the mirror — watch it switch to camera mode.' },
+            { keys:['wifi','wi-fi hotspot','4g lte'], icon:'📶', title:'Built-In Wi-Fi Hotspot', what:'The vehicle has its own cellular connection and can act as a hotspot for up to 7 devices.', why:'Kids stream on road trips, you can work from the car. Way more reliable than phone tethering.', demo:'' },
+            { keys:['remote start'], icon:'🔑', title:'Remote Start', what:'Start the engine from your key fob or phone before you get in.', why:'Cool the interior in summer or warm it in winter before you ever touch the door handle.', demo:'' },
+            { keys:['onstar'], icon:'🆘', title:'OnStar', what:'Push a button and get connected to a live person for directions, emergency help, or stolen vehicle tracking.', why:'Automatic crash response — if airbags deploy, OnStar calls you first and sends help if you don\'t answer.', demo:'' },
+            { keys:['led headlight','led lighting','ipm headlight'], icon:'💡', title:'LED Headlights', what:'Full LED headlight system — brighter, whiter, and lasts the life of the vehicle.', why:'Way better visibility at night than halogens. Also lights up wider at the edges of the road.', demo:'' },
+            { keys:['safety alert seat','seat vibration'], icon:'📳', title:'Safety Alert Seat', what:'The driver seat vibrates on the left or right to warn you of danger on that side.', why:'Quieter than a beep — you feel it instead of hearing it. Great for distracted moments.', demo:'' },
+        ];
+
+        function findFeatureSpotlight(featureName) {
+            if (!featureName) return null;
+            const f = featureName.toLowerCase();
+            let best = null;
+            let bestScore = 0;
+            for (const entry of FEATURE_SPOTLIGHT) {
+                for (const k of entry.keys) {
+                    if (f.includes(k)) {
+                        const score = k.length; // longer match wins
+                        if (score > bestScore) { bestScore = score; best = entry; }
+                    }
+                }
+            }
+            return best;
+        }
+
+        function showFeatureSpotlight(featureName) {
+            const entry = findFeatureSpotlight(featureName);
+            let modal = document.getElementById('featureSpotlightModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'featureSpotlightModal';
+                modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;display:none;align-items:center;justify-content:center;padding:20px;';
+                modal.onclick = function(e) { if (e.target === modal) closeFeatureSpotlight(); };
+                modal.innerHTML = '<div id="featureSpotlightCard" style="background:var(--dark-bg);border:2px solid var(--gold);border-radius:16px;max-width:480px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.6);"></div>';
+                document.body.appendChild(modal);
+            }
+            const card = document.getElementById('featureSpotlightCard');
+            if (entry) {
+                card.innerHTML =
+                    '<button onclick="closeFeatureSpotlight()" style="position:absolute;top:12px;right:12px;background:transparent;border:none;color:var(--text-secondary);font-size:24px;cursor:pointer;line-height:1;">✕</button>' +
+                    '<div style="font-size:42px;margin-bottom:8px;">' + (entry.icon || '✨') + '</div>' +
+                    '<h2 style="color:var(--gold);font-size:22px;font-weight:800;margin-bottom:4px;">' + entry.title + '</h2>' +
+                    '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;">Matched: ' + featureName + '</div>' +
+                    '<div style="margin-bottom:14px;"><div style="font-size:11px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">What It Is</div><div style="font-size:14px;color:var(--text-primary);line-height:1.5;">' + entry.what + '</div></div>' +
+                    '<div style="margin-bottom:' + (entry.demo ? '14' : '0') + 'px;"><div style="font-size:11px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Why You\'ll Love It</div><div style="font-size:14px;color:var(--text-primary);line-height:1.5;">' + entry.why + '</div></div>' +
+                    (entry.demo ? '<div style="background:rgba(212,160,23,0.1);border:1px solid rgba(212,160,23,0.3);border-radius:8px;padding:12px;"><div style="font-size:11px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Show & Tell</div><div style="font-size:13px;color:var(--text-primary);line-height:1.5;font-style:italic;">' + entry.demo + '</div></div>' : '');
+            } else {
+                card.innerHTML =
+                    '<button onclick="closeFeatureSpotlight()" style="position:absolute;top:12px;right:12px;background:transparent;border:none;color:var(--text-secondary);font-size:24px;cursor:pointer;line-height:1;">✕</button>' +
+                    '<div style="font-size:42px;margin-bottom:8px;">📋</div>' +
+                    '<h2 style="color:var(--gold);font-size:20px;font-weight:800;margin-bottom:12px;">' + featureName + '</h2>' +
+                    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.5;">No plain-English explanation saved for this feature yet. If this comes up a lot with customers, let me know and I\'ll add it to the spotlight library.</div>';
+            }
+            modal.style.display = 'flex';
+        }
+
+        function closeFeatureSpotlight() {
+            const modal = document.getElementById('featureSpotlightModal');
+            if (modal) modal.style.display = 'none';
+        }
+
         // ============ CLEAN (CUSTOMER-FACING) VIEW STATE ============
         // When true, the compare panel hides internal notes, objection handlers,
         // days-on-lot, and dealer-internal talking points so Gabe can hand his phone to a customer.
@@ -5041,7 +5129,7 @@
                         html += `<div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">${category}</div>`;
                         html += `<div style="display:flex;flex-wrap:wrap;gap:6px;">`;
                         features.forEach(item => {
-                            html += `<div style="padding:5px 12px;background:rgba(212,160,23,0.1);border:1px solid rgba(212,160,23,0.3);border-radius:6px;font-size:12px;color:var(--gold);font-weight:600;">✓ ${item.feature}</div>`;
+                            html += `<div onclick="showFeatureSpotlight('${item.feature.replace(/'/g,"\\'")}')" style="padding:5px 12px;background:rgba(212,160,23,0.1);border:1px solid rgba(212,160,23,0.3);border-radius:6px;font-size:12px;color:var(--gold);font-weight:600;cursor:pointer;" title="Tap for plain-English explanation">✓ ${item.feature} <span style="opacity:0.5;font-size:10px;">ℹ️</span></div>`;
                         });
                         html += `</div></div>`;
                     });
@@ -5093,7 +5181,7 @@
 
                         features.forEach((item, fi) => {
                             const bg = fi % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
-                            html += `<div style="padding:5px 8px;background:${bg};border-top:1px solid var(--border-color);">${item.feature}</div>`;
+                            html += `<div onclick="showFeatureSpotlight('${item.feature.replace(/'/g,"\\'")}')" style="padding:5px 8px;background:${bg};border-top:1px solid var(--border-color);cursor:pointer;" title="Tap for plain-English explanation">${item.feature}</div>`;
                             item.hasIt.forEach((has, vi) => {
                                 html += `<div style="padding:5px 4px;background:${bg};text-align:center;border-top:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:16px;">`;
                                 html += has ? '<span style="color:var(--gold);font-weight:700;">✓</span>' : '<span style="color:#555;">—</span>';
