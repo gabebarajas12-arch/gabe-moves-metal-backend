@@ -4539,15 +4539,17 @@
 
         function filterCurrentInventory() {
             let vehicles = currentInvDealer === 'findlay' ? (window._inventoryCache || []) : (window._compInventoryCache || []);
-            // On the Findlay tab, only show Chevys — trade-ins from other makes are noise
-            if (currentInvDealer === 'findlay') {
-                vehicles = vehicles.filter(isChevy);
-            }
             const condition = document.getElementById('filterCondition')?.value || '';
             const modelFilter = document.getElementById('filterModel')?.value || '';
             const minPrice = parseFloat(document.getElementById('filterMinPrice')?.value) || 0;
             const maxPrice = parseFloat(document.getElementById('filterMaxPrice')?.value) || Infinity;
             const search = (document.getElementById('matchInterest')?.value || '').toLowerCase();
+
+            // Chevy-only kicks in ONLY when Condition = New on the Findlay tab.
+            // Used can legitimately include trade-ins of any make, so leave those alone.
+            if (currentInvDealer === 'findlay' && condition.toLowerCase() === 'new') {
+                vehicles = vehicles.filter(isChevy);
+            }
 
             // Cascade: model dropdown should only show models available in the current condition filter.
             // If condition=New is picked, the model dropdown should only list models that have New units.
