@@ -2068,11 +2068,21 @@
                     <!-- Compare Panel (slides up when comparing) -->
                     <div id="comparePanelOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;overflow-y:auto;padding:20px;">
                         <div style="max-width:1200px;margin:0 auto;">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                                <h2 style="font-size:20px;font-weight:700;color:var(--gold);">Vehicle Comparison</h2>
-                                <button class="btn" style="background:var(--card-bg);" onclick="closeComparePanel()">Close</button>
+                            <div id="compareHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px;flex-wrap:wrap;">
+                                <h2 id="compareTitle" style="font-size:20px;font-weight:700;color:var(--gold);">Vehicle Comparison</h2>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <button id="cleanViewToggle" class="btn" style="background:var(--card-bg);border:1px solid var(--border-color);font-size:12px;" onclick="toggleCompareCleanMode()" title="Hide internal notes & objection handlers so you can hand your phone to the customer">
+                                        <span id="cleanViewIcon">👁</span> <span id="cleanViewLabel">Show Customer</span>
+                                    </button>
+                                    <button class="btn" style="background:var(--card-bg);" onclick="closeComparePanel()">Close</button>
+                                </div>
                             </div>
                             <div id="compareContent" style="display:grid;gap:16px;"></div>
+                            <div id="compareCleanFooter" style="display:none;margin-top:20px;padding:16px;border-top:2px solid var(--gold);text-align:center;">
+                                <div style="font-size:16px;font-weight:800;color:var(--gold);letter-spacing:1px;">FINDLAY CHEVROLET</div>
+                                <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">#1 Volume Dealer West of Texas</div>
+                                <div id="compareCleanContact" style="font-size:13px;color:var(--text-primary);margin-top:8px;font-weight:600;"></div>
+                            </div>
                         </div>
                     </div>
 
@@ -4698,6 +4708,43 @@
             return 'Other';
         }
 
+        // ============ CLEAN (CUSTOMER-FACING) VIEW STATE ============
+        // When true, the compare panel hides internal notes, objection handlers,
+        // days-on-lot, and dealer-internal talking points so Gabe can hand his phone to a customer.
+        let compareCleanMode = false;
+        function toggleCompareCleanMode() {
+            compareCleanMode = !compareCleanMode;
+            // Update button label/icon
+            const icon = document.getElementById('cleanViewIcon');
+            const label = document.getElementById('cleanViewLabel');
+            const title = document.getElementById('compareTitle');
+            const footer = document.getElementById('compareCleanFooter');
+            const overlay = document.getElementById('comparePanelOverlay');
+            if (compareCleanMode) {
+                if (icon) icon.textContent = '👤';
+                if (label) label.textContent = 'My View';
+                if (title) { title.textContent = 'Your Comparison'; title.style.color = 'var(--text-primary)'; }
+                if (footer) {
+                    footer.style.display = 'block';
+                    // Populate with user contact info if present
+                    const contact = document.getElementById('compareCleanContact');
+                    if (contact) {
+                        const name = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) ? currentUser.name : 'Gabe Barajas';
+                        contact.textContent = name + ' · Sales Consultant';
+                    }
+                }
+                if (overlay) overlay.style.background = 'rgba(10,10,20,0.95)';
+            } else {
+                if (icon) icon.textContent = '👁';
+                if (label) label.textContent = 'Show Customer';
+                if (title) { title.textContent = 'Vehicle Comparison'; title.style.color = 'var(--gold)'; }
+                if (footer) footer.style.display = 'none';
+                if (overlay) overlay.style.background = 'rgba(0,0,0,0.8)';
+            }
+            // Re-render the content so internal sections are actually removed from DOM
+            if (compareList.length >= 2) showComparePanel();
+        }
+
         async function showComparePanel() {
             if (compareList.length < 2) { alert('Select at least 2 vehicles to compare'); return; }
             const overlay = document.getElementById('comparePanelOverlay');
@@ -4833,10 +4880,14 @@
                 // Always-on advantages
                 findlayAdvantages.push({ label: '#1 Volume Dealer', detail: 'West of Texas' });
 
-                // FINDLAY ADVANTAGE BANNER
+                // FINDLAY ADVANTAGE BANNER — header text softens when showing the customer
+                const bannerTitle = compareCleanMode ? 'Why This One' : 'WHY FINDLAY';
+                const bannerSubtitle = compareCleanMode
+                    ? `Compared to similar units at ${vsLabel}`
+                    : `vs ${vsLabel} · ${otherIndices.length} competitor${otherIndices.length > 1 ? 's' : ''}`;
                 html += `<div style="background:linear-gradient(135deg,rgba(212,160,23,0.12),rgba(212,160,23,0.04));border:2px solid var(--gold);border-radius:12px;padding:16px;margin-bottom:16px;">`;
-                html += `<div style="font-size:18px;font-weight:800;color:var(--gold);margin-bottom:4px;">WHY FINDLAY</div>`;
-                html += `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">vs ${vsLabel} · ${otherIndices.length} competitor${otherIndices.length > 1 ? 's' : ''}</div>`;
+                html += `<div style="font-size:18px;font-weight:800;color:var(--gold);margin-bottom:4px;">${bannerTitle}</div>`;
+                html += `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">${bannerSubtitle}</div>`;
 
                 // Advantage chips — only wins
                 html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">`;
@@ -4847,60 +4898,65 @@
                 });
                 html += `</div>`;
 
-                // Talking points — lead with strengths
-                html += `<div style="border-top:1px solid var(--gold);padding-top:12px;">`;
-                html += `<div style="font-weight:700;font-size:13px;color:var(--gold);margin-bottom:6px;">Lead With:</div>`;
-                html += `<ul style="margin:0;padding-left:18px;font-size:13px;color:var(--text-primary);line-height:1.8;">`;
+                // Talking points — lead with strengths.
+                // In Clean (customer-facing) mode, skip Gabe's internal "Lead With" / "If They Push Back"
+                // sections since those are sales ammo, not something to show the customer.
+                if (!compareCleanMode) {
+                    html += `<div style="border-top:1px solid var(--gold);padding-top:12px;">`;
+                    html += `<div style="font-weight:700;font-size:13px;color:var(--gold);margin-bottom:6px;">Lead With:</div>`;
+                    html += `<ul style="margin:0;padding-left:18px;font-size:13px;color:var(--text-primary);line-height:1.8;">`;
 
-                if (prices[findlayIdx] > 0 && cheapestComp > 0 && prices[findlayIdx] < cheapestComp) {
-                    const diff = cheapestComp - prices[findlayIdx];
-                    const vsAll = otherIndices.length > 1 ? ` vs every competitor` : '';
-                    html += `<li><strong>"We're $${diff.toLocaleString()} less${vsAll}"</strong> — cheapest comp is $${cheapestComp.toLocaleString()}, we're at $${prices[findlayIdx].toLocaleString()}</li>`;
-                }
-                if (findlayExclusiveFeatures.length > 0) {
-                    const nobodyElse = otherIndices.length > 1 ? ' nobody else has' : " they don't have";
-                    html += `<li><strong>"Ours comes with ${findlayExclusiveFeatures.length} features${nobodyElse}"</strong> — ${findlayExclusiveFeatures.slice(0, 5).join(', ')}${findlayExclusiveFeatures.length > 5 ? ` +${findlayExclusiveFeatures.length - 5} more` : ''}</li>`;
-                }
-                if (mileages[findlayIdx] > 0 && lowestMilesComp > 0 && mileages[findlayIdx] < lowestMilesComp) {
-                    html += `<li><strong>"${(lowestMilesComp - mileages[findlayIdx]).toLocaleString()} fewer miles"</strong> — even against the lowest-mileage competitor</li>`;
-                }
-                html += `<li><strong>"#1 volume dealer west of Texas"</strong> — volume means better pricing, bigger service dept, faster parts</li>`;
-
-                // Objection handling — if ANY competitor has an edge somewhere
-                const objections = [];
-                if (cheapestComp > 0 && prices[findlayIdx] > cheapestComp) {
-                    const diff = prices[findlayIdx] - cheapestComp;
-                    const cheapestCompIdx = otherIndices.find(i => prices[i] === cheapestComp);
-                    const cheapestCompName = cheapestCompIdx != null ? (selected[cheapestCompIdx].dealerShort || selected[cheapestCompIdx].dealer) : 'them';
-                    let handle = `${cheapestCompName} is $${diff.toLocaleString()} cheaper`;
+                    if (prices[findlayIdx] > 0 && cheapestComp > 0 && prices[findlayIdx] < cheapestComp) {
+                        const diff = cheapestComp - prices[findlayIdx];
+                        const vsAll = otherIndices.length > 1 ? ` vs every competitor` : '';
+                        html += `<li><strong>"We're $${diff.toLocaleString()} less${vsAll}"</strong> — cheapest comp is $${cheapestComp.toLocaleString()}, we're at $${prices[findlayIdx].toLocaleString()}</li>`;
+                    }
                     if (findlayExclusiveFeatures.length > 0) {
-                        handle += ` — but we have ${findlayExclusiveFeatures.length} features they don't (${findlayExclusiveFeatures.slice(0,3).join(', ')})`;
+                        const nobodyElse = otherIndices.length > 1 ? ' nobody else has' : " they don't have";
+                        html += `<li><strong>"Ours comes with ${findlayExclusiveFeatures.length} features${nobodyElse}"</strong> — ${findlayExclusiveFeatures.slice(0, 5).join(', ')}${findlayExclusiveFeatures.length > 5 ? ` +${findlayExclusiveFeatures.length - 5} more` : ''}</li>`;
                     }
-                    if (diff < 2000) {
-                        handle += `. That's less than $${Math.round(diff/60)}/mo over 60 months for the better-equipped unit.`;
+                    if (mileages[findlayIdx] > 0 && lowestMilesComp > 0 && mileages[findlayIdx] < lowestMilesComp) {
+                        html += `<li><strong>"${(lowestMilesComp - mileages[findlayIdx]).toLocaleString()} fewer miles"</strong> — even against the lowest-mileage competitor</li>`;
                     }
-                    objections.push(handle);
-                }
-                if (otherExclusiveFeatures.length > 0 && otherExclusiveFeatures.length > findlayExclusiveFeatures.length) {
-                    objections.push(`Competitors combined have ${otherExclusiveFeatures.length} features we don't (${otherExclusiveFeatures.slice(0,3).join(', ')}). Check if customer actually uses those — often they don't.`);
-                }
-                if (daysArr[findlayIdx] > 60) {
-                    objections.push(`Ours has been here ${daysArr[findlayIdx]} days — use this as leverage. Management wants it gone, room to negotiate.`);
-                }
-                if (oldestCompDays > 60) {
-                    const agedIdx = otherIndices.find(i => daysArr[i] === oldestCompDays);
-                    const agedName = agedIdx != null ? (selected[agedIdx].dealerShort || selected[agedIdx].dealer) : 'they';
-                    objections.push(`${agedName} sat ${oldestCompDays} days — they're motivated. If customer is cross-shopping, remind them everyone wants to move aged units.`);
-                }
+                    html += `<li><strong>"#1 volume dealer west of Texas"</strong> — volume means better pricing, bigger service dept, faster parts</li>`;
 
-                if (objections.length > 0) {
-                    html += `</ul>`;
-                    html += `<div style="font-weight:700;font-size:13px;color:var(--text-secondary);margin:10px 0 6px;">If They Push Back:</div>`;
-                    html += `<ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.8;font-style:italic;">`;
-                    objections.forEach(o => html += `<li>${o}</li>`);
-                }
+                    // Objection handling — if ANY competitor has an edge somewhere
+                    const objections = [];
+                    if (cheapestComp > 0 && prices[findlayIdx] > cheapestComp) {
+                        const diff = prices[findlayIdx] - cheapestComp;
+                        const cheapestCompIdx = otherIndices.find(i => prices[i] === cheapestComp);
+                        const cheapestCompName = cheapestCompIdx != null ? (selected[cheapestCompIdx].dealerShort || selected[cheapestCompIdx].dealer) : 'them';
+                        let handle = `${cheapestCompName} is $${diff.toLocaleString()} cheaper`;
+                        if (findlayExclusiveFeatures.length > 0) {
+                            handle += ` — but we have ${findlayExclusiveFeatures.length} features they don't (${findlayExclusiveFeatures.slice(0,3).join(', ')})`;
+                        }
+                        if (diff < 2000) {
+                            handle += `. That's less than $${Math.round(diff/60)}/mo over 60 months for the better-equipped unit.`;
+                        }
+                        objections.push(handle);
+                    }
+                    if (otherExclusiveFeatures.length > 0 && otherExclusiveFeatures.length > findlayExclusiveFeatures.length) {
+                        objections.push(`Competitors combined have ${otherExclusiveFeatures.length} features we don't (${otherExclusiveFeatures.slice(0,3).join(', ')}). Check if customer actually uses those — often they don't.`);
+                    }
+                    if (daysArr[findlayIdx] > 60) {
+                        objections.push(`Ours has been here ${daysArr[findlayIdx]} days — use this as leverage. Management wants it gone, room to negotiate.`);
+                    }
+                    if (oldestCompDays > 60) {
+                        const agedIdx = otherIndices.find(i => daysArr[i] === oldestCompDays);
+                        const agedName = agedIdx != null ? (selected[agedIdx].dealerShort || selected[agedIdx].dealer) : 'they';
+                        objections.push(`${agedName} sat ${oldestCompDays} days — they're motivated. If customer is cross-shopping, remind them everyone wants to move aged units.`);
+                    }
 
-                html += `</ul></div></div>`;
+                    if (objections.length > 0) {
+                        html += `</ul>`;
+                        html += `<div style="font-weight:700;font-size:13px;color:var(--text-secondary);margin:10px 0 6px;">If They Push Back:</div>`;
+                        html += `<ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.8;font-style:italic;">`;
+                        objections.forEach(o => html += `<li>${o}</li>`);
+                    }
+
+                    html += `</ul></div>`;
+                }
+                html += `</div>`;
 
             } else if (hasFindlay && !isVsCompetitor) {
                 // Comparing two Findlay vehicles (helping customer choose)
