@@ -4534,7 +4534,7 @@
             const overlay = document.getElementById('comparePanelOverlay');
             overlay.style.display = 'block';
             const content = document.getElementById('compareContent');
-            content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Decoding VINs and building comparison... takes a few seconds</p>';
+            content.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px;">Reading window stickers and building comparison...</p>';
 
           try {
             // Gather vehicle data from all caches
@@ -4552,11 +4552,21 @@
                 return;
             }
 
-            // Decode VINs — with error handling per VIN
-            const decoded = await Promise.all(selected.map(v => decodeVIN(v.vin).catch(e => {
-                console.error('VIN decode error for', v.vin, e);
-                return {};
-            })));
+            // Parse window stickers for all VINs (server-side, much richer than NHTSA)
+            let stickers = [];
+            try {
+                const vinList = selected.map(v => v.vin).join(',');
+                const stickerRes = await fetch(`${API_BASE}/api/sticker/parse?vins=${vinList}`, {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const stickerData = await stickerRes.json();
+                stickers = stickerData.stickers || [];
+            } catch (e) {
+                console.error('Sticker parse error:', e);
+                stickers = selected.map(() => ({ standardFeatures: [], packages: [], standaloneOptions: [], pricing: {}, allFeatures: [] }));
+            }
+            // Also decode VINs for basic spec data (drivetrain, engine, etc.)
+            const decoded = await Promise.all(selected.map(v => decodeVIN(v.vin).catch(() => ({}))));
             const cols = selected.length;
 
             // Identify Findlay vehicles
@@ -4564,66 +4574,25 @@
             const hasFindlay = findlayIdx >= 0;
             const isVsCompetitor = hasFindlay && selected.some(v => v.dealer !== 'Findlay' && v.dealerShort !== 'Findlay');
 
-            // Parse numbers
-            const prices = selected.map(v => parseFloat(String(v.price || '0').replace(/[^0-9.]/g,'')) || 0);
-            const msrps = selected.map(v => parseFloat(String(v.msrp || '0').replace(/[^0-9.]/g,'')) || 0);
+            // Parse numbers — prefer sticker pricing (MSRP breakdown) over dealer feed
+            const stickerPricing = stickers.map(s => s?.pricing || {});
+            const prices = selected.map((v, i) => stickerPricing[i].totalPrice || parseFloat(String(v.price || '0').replace(/[^0-9.]/g,'')) || 0);
+            const msrps = selected.map((v, i) => stickerPricing[i].standardPrice || parseFloat(String(v.msrp || '0').replace(/[^0-9.]/g,'')) || 0);
+            const optionTotals = stickers.map(s => s?.pricing?.totalOptions || 0);
             const mileages = selected.map(v => parseInt(v.mileage) || 0);
             const daysArr = selected.map(v => parseInt(v.daysOnLot) || 0);
 
-            // Build features per vehicle — VIN decode ONLY (manufacturer data, not dealer websites)
-            // VIN decode is the source of truth — dealer sites are often wrong
-            const VIN_FEATURE_KEYS = [
-                { key: 'Backup Camera', label: 'Backup Camera', cat: 'Safety Tech' },
-                { key: 'Blind Spot Warning', label: 'Blind Spot Monitor', cat: 'Safety Tech' },
-                { key: 'Lane Departure Warning', label: 'Lane Departure Warning', cat: 'Safety Tech' },
-                { key: 'Lane Keep Assist', label: 'Lane Keep Assist', cat: 'Safety Tech' },
-                { key: 'Forward Collision Warning', label: 'Forward Collision Warning', cat: 'Safety Tech' },
-                { key: 'Adaptive Cruise Control (ACC)', label: 'Adaptive Cruise Control', cat: 'Safety Tech' },
-                { key: 'Automatic Emergency Braking (AEB)', label: 'Auto Emergency Braking', cat: 'Safety Tech' },
-                { key: 'Pedestrian Automatic Emergency Braking (PAEB)', label: 'Pedestrian Auto Braking', cat: 'Safety Tech' },
-                { key: 'Rear Cross Traffic Alert', label: 'Rear Cross Traffic Alert', cat: 'Safety Tech' },
-                { key: 'Parking Assist', label: 'Parking Assist', cat: 'Safety Tech' },
-                { key: 'Traction Control', label: 'Traction Control', cat: 'Safety Tech' },
-                { key: 'Electronic Stability Control (ESC)', label: 'Stability Control', cat: 'Safety Tech' },
-                { key: 'Anti-lock Braking System (ABS)', label: 'ABS', cat: 'Safety Tech' },
-                { key: 'Daytime Running Light (DRL)', label: 'Daytime Running Lights', cat: 'Safety Tech' },
-                { key: 'Headlamp Light Source', label: null, cat: 'Safety Tech' }, // parsed below
-                { key: 'Turbo', label: 'Turbo Engine', cat: 'Performance' },
-                { key: 'Keyless Ignition', label: 'Push Button Start', cat: 'Convenience' },
-                { key: 'SAE Automation Level', label: null, cat: 'Technology' }, // parsed below
-                { key: 'Semiautomatic Headlamp Beam Switching', label: 'Auto High Beams', cat: 'Technology' },
-                { key: 'Adaptive Driving Beam (ADB)', label: 'Adaptive Headlights', cat: 'Technology' },
-                { key: 'Top Speed (MPH)', label: null, cat: 'Performance' },
-            ];
-
+            // Build features per vehicle from WINDOW STICKER data (the real source of truth)
+            // Sticker data has: standardFeatures[], packages[{name, price, features[]}], standaloneOptions[]
             const vehicleFeatures = selected.map((v, i) => {
+                const sticker = stickers[i] || {};
                 const feats = new Set();
-                // Use VIN decode as the sole source of truth
-                VIN_FEATURE_KEYS.forEach(vf => {
-                    const val = decoded[i][vf.key];
-                    if (val && val !== 'Not Applicable' && val.toLowerCase() !== 'no' && val !== '0') {
-                        if (vf.label) {
-                            feats.add(vf.label);
-                        } else if (vf.key === 'Headlamp Light Source') {
-                            if (val.toLowerCase().includes('led')) feats.add('LED Headlights');
-                        }
-                    }
+                // Add all sticker features (standard + package + standalone options)
+                (sticker.allFeatures || []).forEach(f => {
+                    // Normalize: title case, trim
+                    let clean = f.replace(/\s+/g, ' ').trim();
+                    if (clean.length > 3) feats.add(clean);
                 });
-                // Drivetrain from VIN
-                const drive = decoded[i]['Drive Type'] || '';
-                if (drive.match(/4WD|4x4/i)) feats.add('4WD');
-                else if (drive.match(/AWD|All.Wheel/i)) feats.add('AWD');
-                // Engine type
-                const disp = decoded[i]['Displacement (L)'] || '';
-                const cyl = decoded[i]['Engine Number of Cylinders'] || '';
-                if (disp && cyl) feats.add(`${disp}L ${cyl}-Cyl Engine`);
-                // Airbag config
-                const sideAir = decoded[i]['Side Air Bag Locations'] || '';
-                if (sideAir && sideAir !== 'Not Applicable') feats.add('Side Airbags');
-                const curtainAir = decoded[i]['Curtain Air Bag Locations'] || '';
-                if (curtainAir && curtainAir !== 'Not Applicable') feats.add('Curtain Airbags');
-                const kneeAir = decoded[i]['Knee Air Bag Locations'] || '';
-                if (kneeAir && kneeAir !== 'Not Applicable') feats.add('Knee Airbags');
                 return feats;
             });
 
@@ -4764,19 +4733,25 @@
                 const price = prices[i];
                 const msrp = msrps[i];
                 const priceStr = price ? '$' + price.toLocaleString() : 'Call';
-                const trim = decoded[i]['Trim'] || v.trim || '';
+                const sticker = stickers[i] || {};
+                const trim = sticker.trim || decoded[i]['Trim'] || v.trim || '';
+                const stickerColor = sticker.exteriorColor || v.exteriorColor || '';
+                const stickerEngine = sticker.engine || '';
                 const mileage = mileages[i] ? mileages[i].toLocaleString() + ' mi' : '';
                 const imgSrc = v.image || v.imageUrl || '';
+                const pkgCount = (sticker.packages || []).length;
+                const optTotal = optionTotals[i];
 
                 html += `<div style="background:var(--card-bg);border-radius:12px;overflow:hidden;border:2px solid ${isFindlay ? 'var(--gold)' : 'var(--border-color)'};">
                     ${isFindlay ? '<div style="background:var(--gold);color:#000;text-align:center;font-size:11px;font-weight:700;padding:3px;">OUR VEHICLE</div>' : `<div style="background:var(--border-color);text-align:center;font-size:11px;font-weight:700;padding:3px;color:var(--text-secondary);">${v.dealerShort || v.dealer || 'Competitor'}</div>`}
                     ${imgSrc ? `<img src="${imgSrc}" style="width:100%;height:130px;object-fit:cover;" onerror="this.style.display='none'">` : ''}
                     <div style="padding:12px;">
                         <div style="font-weight:700;font-size:14px;${isFindlay ? 'color:var(--gold);' : ''}">${v.year} ${v.make || ''} ${v.model || ''}${trim && !(v.model || '').includes(trim) ? ' ' + trim : ''}</div>
+                        ${stickerColor ? `<div style="font-size:11px;color:var(--text-secondary);">${stickerColor}</div>` : ''}
                         <div style="font-size:18px;font-weight:700;color:${isFindlay ? 'var(--gold)' : 'var(--text-primary)'};margin:4px 0;">${priceStr}</div>
-                        ${msrp && msrp !== price ? `<div style="font-size:11px;color:var(--text-secondary);">MSRP: $${msrp.toLocaleString()} ${msrp > price ? `<span style="color:#4CAF50;font-weight:600;">Save $${(msrp - price).toLocaleString()}</span>` : ''}</div>` : ''}
+                        ${optTotal > 0 ? `<div style="font-size:11px;color:var(--text-secondary);">Base $${msrps[i].toLocaleString()} + $${optTotal.toLocaleString()} options${pkgCount > 0 ? ' (' + pkgCount + ' pkg' + (pkgCount > 1 ? 's' : '') + ')' : ''}</div>` : ''}
                         <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">
-                            ${v.condition || ''} ${mileage ? '· ' + mileage : ''} · ${featureWins[i]} exclusive features
+                            ${stickerEngine ? stickerEngine + ' · ' : ''}${v.condition || ''} ${mileage ? '· ' + mileage : ''}
                             <br>Stock: ${v.stockNumber || v.stock || 'N/A'} · VIN: ...${(v.vin||'').slice(-6)}
                             ${daysArr[i] ? `<br><span style="color:${daysArr[i] > 60 ? '#f44336' : daysArr[i] > 30 ? 'var(--warning)' : '#4CAF50'};">${daysArr[i]} days on lot</span>` : ''}
                         </div>
@@ -4884,6 +4859,86 @@
                         </div>
                     </details>`;
                 }
+            }
+
+            // ============ PACKAGES & PRICE BREAKDOWN ============
+            const hasPackageData = stickers.some(s => s && (s.packages?.length > 0 || s.pricing?.standardPrice));
+            if (hasPackageData) {
+                html += `<div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1px solid var(--border-color);margin-bottom:16px;">`;
+                html += `<h3 style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:4px;">Price Breakdown — Why The Difference</h3>`;
+                html += `<p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">From the GM window sticker — what each vehicle was optioned with.</p>`;
+
+                // Price breakdown table
+                html += `<div style="display:grid;grid-template-columns:140px repeat(${cols}, 1fr);gap:0;font-size:12px;margin-bottom:12px;">`;
+                // Base price row
+                html += `<div style="padding:8px 12px;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border-color);">Base MSRP</div>`;
+                stickers.forEach((s, i) => {
+                    const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
+                    html += `<div style="padding:8px;text-align:center;border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);${isFindlay ? 'color:var(--gold);font-weight:700;' : ''}">$${(s?.pricing?.standardPrice || 0).toLocaleString()}</div>`;
+                });
+
+                // Package rows — show ALL packages from ALL vehicles
+                const allPackageNames = new Set();
+                stickers.forEach(s => (s?.packages || []).forEach(p => allPackageNames.add(p.name)));
+
+                [...allPackageNames].forEach(pkgName => {
+                    html += `<div style="padding:6px 12px;font-weight:600;font-size:11px;color:var(--text-primary);border-bottom:1px solid var(--border-color);">${pkgName}</div>`;
+                    stickers.forEach((s, i) => {
+                        const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
+                        const pkg = (s?.packages || []).find(p => p.name === pkgName);
+                        if (pkg) {
+                            html += `<div style="padding:6px 8px;text-align:center;border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:11px;${isFindlay ? 'color:var(--gold);' : 'color:#4CAF50;'}">$${pkg.price.toLocaleString()}<br><span style="font-size:10px;color:var(--text-secondary);">${pkg.features.length} features</span></div>`;
+                        } else {
+                            html += `<div style="padding:6px 8px;text-align:center;border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:11px;color:#555;">Not included</div>`;
+                        }
+                    });
+                });
+
+                // Standalone options
+                const allStandaloneNames = new Set();
+                stickers.forEach(s => (s?.standaloneOptions || []).forEach(o => allStandaloneNames.add(o.name)));
+                [...allStandaloneNames].forEach(optName => {
+                    // Skip generic noise
+                    if (optName.length < 5) return;
+                    html += `<div style="padding:6px 12px;font-size:11px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);">${optName}</div>`;
+                    stickers.forEach((s, i) => {
+                        const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
+                        const opt = (s?.standaloneOptions || []).find(o => o.name === optName);
+                        html += `<div style="padding:6px 8px;text-align:center;border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);font-size:11px;">${opt ? '$' + opt.price.toLocaleString() : '<span style="color:#555;">—</span>'}</div>`;
+                    });
+                });
+
+                // Total options + total price rows
+                html += `<div style="padding:8px 12px;font-weight:700;color:var(--text-primary);border-bottom:1px solid var(--border-color);background:rgba(255,255,255,0.03);">Total Options</div>`;
+                stickers.forEach((s, i) => {
+                    const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
+                    html += `<div style="padding:8px;text-align:center;font-weight:700;border-bottom:1px solid var(--border-color);border-left:1px solid var(--border-color);background:rgba(255,255,255,0.03);${isFindlay ? 'color:var(--gold);' : ''}">$${(s?.pricing?.totalOptions || 0).toLocaleString()}</div>`;
+                });
+                html += `<div style="padding:8px 12px;font-weight:800;color:var(--gold);background:rgba(212,160,23,0.08);">Sticker Price</div>`;
+                stickers.forEach((s, i) => {
+                    const isFindlay = selected[i].dealer === 'Findlay' || selected[i].dealerShort === 'Findlay';
+                    const tp = s?.pricing?.totalPrice || 0;
+                    html += `<div style="padding:8px;text-align:center;font-weight:800;font-size:14px;border-left:1px solid var(--border-color);background:rgba(212,160,23,0.08);${isFindlay ? 'color:var(--gold);' : 'color:var(--text-primary);'}">$${tp.toLocaleString()}</div>`;
+                });
+
+                // Price difference callout
+                if (cols === 2 && prices[0] > 0 && prices[1] > 0) {
+                    const diff = Math.abs(prices[0] - prices[1]);
+                    const cheaperIdx = prices[0] < prices[1] ? 0 : 1;
+                    const cheaperName = selected[cheaperIdx].dealerShort || selected[cheaperIdx].dealer;
+                    const optDiff = Math.abs(optionTotals[0] - optionTotals[1]);
+                    const moreOptIdx = optionTotals[0] > optionTotals[1] ? 0 : 1;
+                    const moreOptName = selected[moreOptIdx].dealerShort || selected[moreOptIdx].dealer;
+
+                    html += `<div style="margin-top:12px;padding:10px;background:rgba(212,160,23,0.08);border-radius:8px;font-size:12px;color:var(--text-primary);line-height:1.6;">`;
+                    html += `<strong>Bottom line:</strong> ${cheaperName}'s is <strong>$${diff.toLocaleString()} less</strong> on the sticker.`;
+                    if (optDiff > 0) {
+                        html += ` ${moreOptName} has <strong>$${optDiff.toLocaleString()} more in options</strong> — that's where the price gap comes from.`;
+                    }
+                    html += `</div>`;
+                }
+
+                html += `</div>`;
             }
 
             // ============ SPEC DIFFERENCES (VIN) ============

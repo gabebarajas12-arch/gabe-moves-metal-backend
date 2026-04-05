@@ -4912,6 +4912,126 @@ function parseVehicleTitle(title) {
   return { year, make, model, trim };
 }
 
+// ==================== WINDOW STICKER PARSER ====================
+const stickerCache = {}; // VIN -> parsed sticker data
+
+async function parseWindowSticker(vin) {
+  if (stickerCache[vin]) return stickerCache[vin];
+
+  try {
+    const url = `https://cws.gm.com/vs-cws/vehshop/v2/vehicle/windowsticker?vin=${vin}`;
+    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
+
+    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+    const buf = new Uint8Array(response.data);
+    const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+    const page = await doc.getPage(1);
+    const content = await page.getTextContent();
+    const text = content.items.map(i => i.str).join(' ');
+
+    const result = { vin, standardFeatures: [], packages: [], standaloneOptions: [], pricing: {}, allFeatures: [] };
+
+    // Vehicle header
+    const hm = text.match(/(20\d{2})\s+(\w[\w\s]*?)\s+([\dA-Z]{2,4})\s+EXTERIOR:\s*(.*?)\s+(?:INTERIOR|ENGINE)/);
+    if (hm) { result.year = hm[1]; result.model = hm[2].trim(); result.trim = hm[3].trim(); result.exteriorColor = hm[4].trim(); }
+
+    const intMatch = text.match(/INTERIOR:\s*(.*?)\s+(?:ENGINE|TRANSMISSION)/);
+    if (intMatch) result.interiorColor = intMatch[1].trim();
+
+    const engMatch = text.match(/ENGINE,\s*(.*?)\s+TRANSMISSION/);
+    if (engMatch) result.engine = engMatch[1].trim();
+
+    const transMatch = text.match(/TRANSMISSION,\s*(.*?)(?:\s{2}|$)/);
+    if (transMatch) result.transmission = transMatch[1].trim();
+
+    // Standard features - all bullets before OPTIONS & PRICING
+    const optionsIdx = text.indexOf('OPTIONS & PRICING');
+    const bulletParts = text.split('•');
+    let searchFrom = 0;
+
+    bulletParts.forEach((part, i) => {
+      if (i === 0) return;
+      const pos = text.indexOf('•' + part.substring(0, 20), searchFrom);
+      searchFrom = pos > 0 ? pos + 1 : searchFrom;
+
+      let feat = part.replace(/\s+/g, ' ').trim();
+      feat = feat.replace(/\s+\d{1,3}(?:,\d{3})*\.\d{2}.*$/s, '').trim();
+      feat = feat.replace(/\s+(MANUFACTURER'S|STANDARD VEHICLE|TOTAL |OPTIONS &|DESTINATION).*$/s, '').trim();
+      if (feat.match(/^(ITEMS FEATURED|WHICHEVER COMES|SEE CHEVROLET)/)) return;
+
+      if (feat.length > 3 && pos < optionsIdx) {
+        // Skip warranty/legal boilerplate
+        if (!feat.match(/^\d+ YEAR/) && !feat.match(/^FIRST MAINTENANCE/) && !feat.match(/^CHEVY$/) && !feat.match(/ONSTAR BASICS/) && !feat.match(/SIRIUSXM.*TERMS/)) {
+          result.standardFeatures.push(feat);
+        }
+      }
+    });
+
+    // Parse OPTIONS section
+    if (optionsIdx > 0) {
+      const totalOptIdx = text.indexOf('TOTAL OPTIONS');
+      const optText = text.substring(optionsIdx, totalOptIdx > 0 ? totalOptIdx : text.length);
+
+      // Find all priced line items
+      const itemRegex = /([A-Z][A-Z\s&/,'():-]+?)\s{2,}(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+      const lineItems = [];
+      let im;
+      while ((im = itemRegex.exec(optText)) !== null) {
+        let name = im[1].trim().replace(/:$/, '').replace(/^.*SHOWN\)\s*/, '');
+        lineItems.push({ name, price: parseFloat(im[2].replace(/,/g, '')), startIdx: im.index, endIdx: im.index + im[0].length });
+      }
+
+      lineItems.forEach((item, i) => {
+        const nextItemStart = i < lineItems.length - 1 ? lineItems[i + 1].startIdx : optText.length;
+        const between = optText.substring(item.endIdx, nextItemStart);
+        const features = (between.match(/•\s*([^•]+)/g) || []).map(b => {
+          let f = b.replace(/^•\s*/, '').replace(/\s+/g, ' ').trim();
+          f = f.replace(/\s+\d{1,3}(?:,\d{3})*\.\d{2}.*$/s, '').trim();
+          return f;
+        }).filter(f => f.length > 3);
+
+        if (item.name.includes('PACKAGE') || features.length > 1) {
+          result.packages.push({ name: item.name, price: item.price, features });
+        } else {
+          result.standaloneOptions.push({ name: item.name, price: item.price });
+        }
+      });
+    }
+
+    // Pricing
+    const sp = {
+      standardPrice: text.match(/STANDARD VEHICLE PRICE\s+.?([\d,]+\.\d{2})/),
+      totalOptions: text.match(/TOTAL OPTIONS\s+.?([\d,]+\.\d{2})/),
+      totalPrice: text.match(/TOTAL VEHICLE PRICE.?\s+.?([\d,]+\.\d{2})/),
+      destination: text.match(/DESTINATION CHARGE\s+([\d,]+\.\d{2})/),
+    };
+    Object.entries(sp).forEach(([k, m]) => { if (m) result.pricing[k] = parseFloat(m[1].replace(/,/g, '')); });
+
+    // Build allFeatures for comparison
+    result.allFeatures = [...result.standardFeatures];
+    result.packages.forEach(pkg => {
+      pkg.features.forEach(f => result.allFeatures.push(f));
+    });
+    result.standaloneOptions.forEach(opt => result.allFeatures.push(opt.name));
+
+    stickerCache[vin] = result;
+    console.log(`[Sticker] Parsed ${vin}: ${result.standardFeatures.length} std features, ${result.packages.length} packages, $${result.pricing.totalPrice || '?'}`);
+    return result;
+  } catch (err) {
+    console.error(`[Sticker] Error parsing ${vin}:`, err.message);
+    return { vin, error: err.message, standardFeatures: [], packages: [], standaloneOptions: [], pricing: {}, allFeatures: [] };
+  }
+}
+
+// API: Parse window sticker for one or more VINs
+app.get('/api/sticker/parse', requireAuth, async (req, res) => {
+  const vins = (req.query.vins || '').split(',').filter(Boolean);
+  if (vins.length === 0) return res.status(400).json({ error: 'Provide ?vins=VIN1,VIN2' });
+
+  const results = await Promise.all(vins.map(vin => parseWindowSticker(vin.trim())));
+  res.json({ stickers: results });
+});
+
 // API: Scrape all competitors
 app.post('/api/competitors/scrape', requireAuth, async (req, res) => {
   const results = await Promise.allSettled([
