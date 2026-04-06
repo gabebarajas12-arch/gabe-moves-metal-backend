@@ -3656,8 +3656,8 @@
 
                 let messagesHTML = '';
                 (conv.messages || []).forEach(msg => {
-                    const isFromBot = msg.senderType === 'bot';
-                    const isFromSalesman = msg.senderId === currentUser.id;
+                    const isFromBot = msg.from === 'bot' || msg.senderType === 'bot';
+                    const isFromSalesman = msg.from === 'salesman' || msg.senderId === currentUser.id;
                     const messageClass = isFromSalesman ? 'message-salesman' : (isFromBot ? 'message-bot' : 'message-customer');
 
                     messagesHTML += `
@@ -3771,8 +3771,8 @@
 
                 let messagesHTML = '';
                 (conv.messages || []).forEach(msg => {
-                    const isFromBot = msg.senderType === 'bot';
-                    const isFromSalesman = msg.senderId === currentUser?.id;
+                    const isFromBot = msg.from === 'bot' || msg.senderType === 'bot';
+                    const isFromSalesman = msg.from === 'salesman' || msg.senderId === currentUser?.id;
                     const messageClass = isFromSalesman ? 'message-salesman' : (isFromBot ? 'message-bot' : 'message-customer');
                     messagesHTML += `
                         <div class="message ${messageClass}">
@@ -4001,8 +4001,8 @@
 
                 let messagesHTML = '';
                 (conv.messages || []).forEach(msg => {
-                    const isFromBot = msg.senderType === 'bot';
-                    const isFromSalesman = msg.senderId === currentUser?.id;
+                    const isFromBot = msg.from === 'bot' || msg.senderType === 'bot';
+                    const isFromSalesman = msg.from === 'salesman' || msg.senderId === currentUser?.id;
                     const messageClass = isFromSalesman ? 'message-salesman' : (isFromBot ? 'message-bot' : 'message-customer');
                     messagesHTML += `
                         <div class="message ${messageClass}">
