@@ -1317,6 +1317,15 @@
             }
         }
 
+        /* ============ MOBILE HAMBURGER MENU ============ */
+        /* Hidden on desktop, visible on mobile */
+        .mobile-menu-btn {
+            display: none;
+        }
+        .mobile-nav-overlay {
+            display: none;
+        }
+
         /* ============ MOBILE-FIRST PHONE LAYOUT (≤640px) ============ */
         /* Gabe sells on the floor — this is where the app actually gets used. */
         @media (max-width: 640px) {
@@ -1359,6 +1368,134 @@
             .sidebar .nav-item.active {
                 border-left: none;
                 border-bottom-color: var(--gold);
+            }
+
+            /* Hide the horizontal sidebar nav — replaced by hamburger */
+            .sidebar {
+                display: none !important;
+            }
+
+            /* Hamburger button — fixed top-left */
+            .mobile-menu-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: fixed;
+                top: 8px;
+                left: 8px;
+                z-index: 200;
+                width: 44px;
+                height: 44px;
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                cursor: pointer;
+                color: var(--gold);
+                font-size: 22px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            }
+            .mobile-menu-btn:active {
+                background: var(--gold);
+                color: #000;
+            }
+
+            /* Full-screen overlay */
+            .mobile-nav-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0,0,0,0.6);
+                z-index: 300;
+            }
+            .mobile-nav-overlay.open {
+                display: flex;
+            }
+
+            /* Slide-in drawer */
+            .mobile-nav-drawer {
+                width: 260px;
+                max-width: 75vw;
+                height: 100vh;
+                background: var(--card-bg);
+                display: flex;
+                flex-direction: column;
+                overflow-y: auto;
+                animation: slideIn 0.2s ease-out;
+            }
+            @keyframes slideIn {
+                from { transform: translateX(-100%); }
+                to { transform: translateX(0); }
+            }
+
+            .mobile-nav-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 16px;
+                border-bottom: 2px solid var(--gold);
+            }
+            .mobile-nav-title {
+                font-size: 14px;
+                font-weight: 700;
+                letter-spacing: 1px;
+                color: var(--gold);
+            }
+            .mobile-nav-close {
+                background: none;
+                border: none;
+                color: var(--text-secondary);
+                font-size: 22px;
+                cursor: pointer;
+                padding: 4px 8px;
+            }
+
+            .mobile-nav-items {
+                flex: 1;
+                padding: 8px 0;
+            }
+            .mobile-nav-item {
+                padding: 14px 20px;
+                font-size: 15px;
+                color: var(--text-secondary);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                border-left: 3px solid transparent;
+                min-height: 48px;
+            }
+            .mobile-nav-item:active,
+            .mobile-nav-item.active {
+                color: var(--gold);
+                border-left-color: var(--gold);
+                background: rgba(212, 160, 23, 0.08);
+            }
+
+            .mobile-nav-footer {
+                padding: 16px;
+                border-top: 1px solid var(--border-color);
+                text-align: center;
+                font-size: 11px;
+                color: var(--text-secondary);
+            }
+            .mobile-nav-logout {
+                margin-top: 12px;
+                padding: 8px 20px;
+                background: transparent;
+                border: 1px solid var(--border-color);
+                color: var(--text-secondary);
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                width: 100%;
+            }
+
+            /* Offset main content for the hamburger button */
+            .header {
+                padding-left: 56px !important;
             }
 
             /* Main content gets full width */
@@ -1836,6 +1973,29 @@
     </div>
 
     <div class="container" id="appContainer" style="display:none;">
+        <!-- Mobile hamburger menu button -->
+        <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()">
+            <span class="hamburger-icon">☰</span>
+        </button>
+
+        <!-- Mobile nav overlay -->
+        <div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileMenu()">
+            <div class="mobile-nav-drawer" onclick="event.stopPropagation()">
+                <div class="mobile-nav-header">
+                    <span class="mobile-nav-title">GABE MOVES METAL</span>
+                    <button class="mobile-nav-close" onclick="closeMobileMenu()">✕</button>
+                </div>
+                <div class="mobile-nav-items" id="mobileNavItems">
+                    <!-- Populated by JS -->
+                </div>
+                <div class="mobile-nav-footer">
+                    <p><strong>Findlay Chevrolet</strong></p>
+                    <p>#1 Volume Dealer West of Texas</p>
+                    <button onclick="doLogout()" class="mobile-nav-logout">Log Out</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="logo">
@@ -3156,6 +3316,47 @@
                     switchPage(page);
                 });
             });
+            // Build mobile nav items from sidebar nav
+            buildMobileNav();
+        }
+
+        /* ---- Mobile hamburger menu ---- */
+        function buildMobileNav() {
+            const container = document.getElementById('mobileNavItems');
+            if (!container) return;
+            container.innerHTML = '';
+            document.querySelectorAll('.sidebar .nav-item').forEach(item => {
+                const page = item.dataset.page;
+                const label = item.querySelector('span')?.textContent || page;
+                const div = document.createElement('div');
+                div.className = 'mobile-nav-item' + (item.classList.contains('active') ? ' active' : '');
+                div.dataset.page = page;
+                div.textContent = label;
+                div.addEventListener('click', () => {
+                    switchPage(page);
+                    closeMobileMenu();
+                    // Update active state
+                    container.querySelectorAll('.mobile-nav-item').forEach(n => n.classList.remove('active'));
+                    div.classList.add('active');
+                });
+                container.appendChild(div);
+            });
+        }
+
+        function toggleMobileMenu() {
+            const overlay = document.getElementById('mobileNavOverlay');
+            overlay.classList.toggle('open');
+            // Sync active states
+            const activePage = document.querySelector('.nav-item.active')?.dataset?.page;
+            if (activePage) {
+                document.querySelectorAll('.mobile-nav-item').forEach(n => {
+                    n.classList.toggle('active', n.dataset.page === activePage);
+                });
+            }
+        }
+
+        function closeMobileMenu() {
+            document.getElementById('mobileNavOverlay').classList.remove('open');
         }
 
         function setupEventListeners() {
