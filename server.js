@@ -3873,6 +3873,30 @@ app.post('/api/deals', (req, res) => {
     billedFunded: (req.body.billedFunded || '').toUpperCase(),
     dealFlag: (req.body.dealFlag || '').toUpperCase(),
     dealStatus: (req.body.dealStatus || '').toUpperCase(),
+    // Gross breakdown
+    frontGross: parseFloat(req.body.frontGross) || 0,
+    backGross: parseFloat(req.body.backGross) || 0,
+    // Trade-in
+    tradeVehicle: req.body.tradeVehicle || '',
+    tradeACV: parseFloat(req.body.tradeACV) || 0,
+    tradeAllowance: parseFloat(req.body.tradeAllowance) || 0,
+    tradePayoff: parseFloat(req.body.tradePayoff) || 0,
+    tradeEquity: parseFloat(req.body.tradeEquity) || 0,
+    // Finance
+    lender: req.body.lender || '',
+    financeType: (req.body.financeType || '').toUpperCase(),
+    rate: parseFloat(req.body.rate) || 0,
+    term: parseInt(req.body.term) || 0,
+    payment: parseFloat(req.body.payment) || 0,
+    downPayment: parseFloat(req.body.downPayment) || 0,
+    sellingPrice: parseFloat(req.body.sellingPrice) || 0,
+    reserve: parseFloat(req.body.reserve) || 0,
+    // F&I Products
+    warranty: parseFloat(req.body.warranty) || 0,
+    gap: parseFloat(req.body.gap) || 0,
+    maintPlan: parseFloat(req.body.maintPlan) || 0,
+    otherProducts: parseFloat(req.body.otherProducts) || 0,
+    notes: req.body.notes || '',
   };
   data.deals.push(deal);
   recalcMonth(data, deal.month);

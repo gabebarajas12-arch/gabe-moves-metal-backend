@@ -2179,6 +2179,8 @@
                                         <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">N/U</th>
                                         <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Split</th>
                                         <th style="padding:10px 8px;text-align:right;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Gross</th>
+                                        <th style="padding:10px 8px;text-align:right;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Front</th>
+                                        <th style="padding:10px 8px;text-align:right;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Back</th>
                                         <th style="padding:10px 8px;text-align:right;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Comm</th>
                                         <th style="padding:10px 8px;text-align:right;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Spiff</th>
                                         <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text-secondary);font-size:10px;text-transform:uppercase;">Status</th>
@@ -2944,7 +2946,7 @@
 
     <!-- Deal Modal -->
     <div class="modal" id="dealModal" style="display:none;">
-        <div class="modal-content" style="max-width:560px;">
+        <div class="modal-content" style="max-width:620px;max-height:85vh;overflow-y:auto;">
             <div class="modal-header">
                 <span id="dealModalTitle">Add New Deal</span>
                 <span class="modal-close" onclick="closeDealModal()">✕</span>
@@ -2982,6 +2984,49 @@
                 <div class="form-group"><label class="form-label">Deal Status</label>
                     <select class="form-select" id="dealStatus"><option value="">--</option><option value="FUNDED">Funded</option><option value="PAID">Paid</option><option value="PENDING">Pending</option></select>
                 </div>
+
+                <!-- Front / Back Gross -->
+                <div style="grid-column:1/-1;border-top:1px solid var(--border-color);margin-top:6px;padding-top:10px;">
+                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gold);letter-spacing:1px;">Gross Breakdown</span>
+                </div>
+                <div class="form-group"><label class="form-label">Front Gross</label><input type="number" step="0.01" class="form-input" id="dealFrontGross" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Back Gross</label><input type="number" step="0.01" class="form-input" id="dealBackGross" placeholder="0.00"></div>
+
+                <!-- Trade-In Section -->
+                <div style="grid-column:1/-1;border-top:1px solid var(--border-color);margin-top:6px;padding-top:10px;">
+                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gold);letter-spacing:1px;">Trade-In</span>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Trade Vehicle</label><input type="text" class="form-input" id="dealTradeVehicle" placeholder="e.g. 2019 Honda Accord EX"></div>
+                <div class="form-group"><label class="form-label">Trade ACV</label><input type="number" step="0.01" class="form-input" id="dealTradeACV" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Trade Allowance</label><input type="number" step="0.01" class="form-input" id="dealTradeAllowance" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Trade Payoff</label><input type="number" step="0.01" class="form-input" id="dealTradePayoff" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Trade Equity</label><input type="number" step="0.01" class="form-input" id="dealTradeEquity" placeholder="0.00" readonly style="background:var(--bg-primary);"></div>
+
+                <!-- Finance Section -->
+                <div style="grid-column:1/-1;border-top:1px solid var(--border-color);margin-top:6px;padding-top:10px;">
+                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gold);letter-spacing:1px;">Finance</span>
+                </div>
+                <div class="form-group"><label class="form-label">Lender</label><input type="text" class="form-input" id="dealLender" placeholder="e.g. GM Financial"></div>
+                <div class="form-group"><label class="form-label">Finance Type</label>
+                    <select class="form-select" id="dealFinanceType"><option value="">--</option><option value="RETAIL">Retail</option><option value="LEASE">Lease</option><option value="CASH">Cash</option></select>
+                </div>
+                <div class="form-group"><label class="form-label">Rate %</label><input type="number" step="0.01" class="form-input" id="dealRate" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Term (mos)</label><input type="number" class="form-input" id="dealTerm" placeholder="e.g. 72"></div>
+                <div class="form-group"><label class="form-label">Monthly Payment</label><input type="number" step="0.01" class="form-input" id="dealPayment" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Down Payment</label><input type="number" step="0.01" class="form-input" id="dealDownPayment" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Selling Price</label><input type="number" step="0.01" class="form-input" id="dealSellingPrice" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Reserve</label><input type="number" step="0.01" class="form-input" id="dealReserve" placeholder="0.00"></div>
+
+                <!-- Warranty / Products -->
+                <div style="grid-column:1/-1;border-top:1px solid var(--border-color);margin-top:6px;padding-top:10px;">
+                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gold);letter-spacing:1px;">F&I Products</span>
+                </div>
+                <div class="form-group"><label class="form-label">Warranty</label><input type="number" step="0.01" class="form-input" id="dealWarranty" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">GAP</label><input type="number" step="0.01" class="form-input" id="dealGAP" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Maint. Plan</label><input type="number" step="0.01" class="form-input" id="dealMaintPlan" placeholder="0.00"></div>
+                <div class="form-group"><label class="form-label">Other Products</label><input type="number" step="0.01" class="form-input" id="dealOtherProducts" placeholder="0.00"></div>
+                <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Notes</label><textarea class="form-input" id="dealNotes" rows="2" placeholder="Any extra deal notes..." style="resize:vertical;"></textarea></div>
+
                 <div style="grid-column:1/-1;text-align:right;margin-top:8px;">
                     <button type="button" class="btn btn-secondary" onclick="closeDealModal()" style="margin-right:8px;">Cancel</button>
                     <button type="submit" class="btn" style="background:var(--gold);color:#000;font-weight:700;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;">Save Deal</button>
@@ -7067,7 +7112,7 @@
 
                 const tbody = document.getElementById('dealsTableBody');
                 if (dealsListCache.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-secondary);">No deals this month. Click "+ New Deal" to add one.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-secondary);">No deals this month. Click "+ New Deal" to add one.</td></tr>';
                     return;
                 }
                 tbody.innerHTML = dealsListCache.map(d => {
@@ -7076,11 +7121,13 @@
                     return `<tr style="border-bottom:1px solid var(--border-color);transition:background 0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'">
                         <td style="padding:10px 8px;white-space:nowrap;">${fmtDate(d.date)}</td>
                         <td style="padding:10px 8px;font-family:monospace;font-size:11px;">${d.dealNumber || ''}</td>
-                        <td style="padding:10px 8px;font-weight:600;">${d.vehicle || ''}</td>
+                        <td style="padding:10px 8px;font-weight:600;" title="${d.tradeVehicle ? 'Trade: '+d.tradeVehicle+' | ACV: $'+(d.tradeACV||0)+' | Payoff: $'+(d.tradePayoff||0) : 'No trade'}">${d.vehicle || ''}${d.tradeVehicle ? ' <span style="font-size:9px;color:var(--gold);" title="Has trade-in">&#x21C4;</span>' : ''}</td>
                         <td style="padding:10px 8px;">${d.customerName || ''}</td>
                         <td style="padding:10px 8px;text-align:center;"><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${d.newUsed==='NEW'?'rgba(79,195,247,0.15)':'rgba(206,147,216,0.15)'};color:${d.newUsed==='NEW'?'#4fc3f7':'#ce93d8'}">${d.newUsed||''}</span></td>
                         <td style="padding:10px 8px;text-align:center;">${d.splitAmount === 0.5 ? '<span style="font-size:10px;color:#ffa726;">½ '+( d.splitWith||'')+'</span>' : '<span style="font-size:10px;color:#81c784;">Full</span>'}</td>
                         <td style="padding:10px 8px;text-align:right;color:${grossColor};font-weight:600;">${fmt$(d.totalGross)}</td>
+                        <td style="padding:10px 8px;text-align:right;font-size:11px;color:var(--text-secondary);">${d.frontGross ? fmt$(d.frontGross) : '-'}</td>
+                        <td style="padding:10px 8px;text-align:right;font-size:11px;color:var(--text-secondary);">${d.backGross ? fmt$(d.backGross) : '-'}</td>
                         <td style="padding:10px 8px;text-align:right;color:#ffd54f;font-weight:600;">${fmt$(d.commission)}</td>
                         <td style="padding:10px 8px;text-align:right;">${d.dealSpiff ? fmt$(d.dealSpiff) : '-'}${d.spiffPaid === 'PENDING' ? ' <span style="color:#ffa726;font-size:9px;">PEND</span>' : ''}</td>
                         <td style="padding:10px 8px;text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${statusColor}22;color:${statusColor};font-weight:600;">${d.dealStatus||'--'}</span></td>
@@ -7093,7 +7140,7 @@
                 }).join('');
             } catch(e) {
                 console.error('Error loading deals:', e);
-                document.getElementById('dealsTableBody').innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:#ef5350;">Error loading deals</td></tr>';
+                document.getElementById('dealsTableBody').innerHTML = '<tr><td colspan="13" style="text-align:center;padding:40px;color:#ef5350;">Error loading deals</td></tr>';
             }
         }
 
@@ -7119,6 +7166,30 @@
             document.getElementById('dealBilledFunded').value = deal?.billedFunded || '';
             document.getElementById('dealFlag').value = deal?.dealFlag || '';
             document.getElementById('dealStatus').value = deal?.dealStatus || '';
+            // Gross breakdown
+            document.getElementById('dealFrontGross').value = deal?.frontGross || '';
+            document.getElementById('dealBackGross').value = deal?.backGross || '';
+            // Trade-in
+            document.getElementById('dealTradeVehicle').value = deal?.tradeVehicle || '';
+            document.getElementById('dealTradeACV').value = deal?.tradeACV || '';
+            document.getElementById('dealTradeAllowance').value = deal?.tradeAllowance || '';
+            document.getElementById('dealTradePayoff').value = deal?.tradePayoff || '';
+            document.getElementById('dealTradeEquity').value = deal?.tradeEquity || '';
+            // Finance
+            document.getElementById('dealLender').value = deal?.lender || '';
+            document.getElementById('dealFinanceType').value = deal?.financeType || '';
+            document.getElementById('dealRate').value = deal?.rate || '';
+            document.getElementById('dealTerm').value = deal?.term || '';
+            document.getElementById('dealPayment').value = deal?.payment || '';
+            document.getElementById('dealDownPayment').value = deal?.downPayment || '';
+            document.getElementById('dealSellingPrice').value = deal?.sellingPrice || '';
+            document.getElementById('dealReserve').value = deal?.reserve || '';
+            // F&I Products
+            document.getElementById('dealWarranty').value = deal?.warranty || '';
+            document.getElementById('dealGAP').value = deal?.gap || '';
+            document.getElementById('dealMaintPlan').value = deal?.maintPlan || '';
+            document.getElementById('dealOtherProducts').value = deal?.otherProducts || '';
+            document.getElementById('dealNotes').value = deal?.notes || '';
             document.getElementById('dealModal').style.display = 'flex';
         }
 
@@ -7126,6 +7197,15 @@
             document.getElementById('dealModal').style.display = 'none';
             editingDealId = null;
         }
+
+        // Auto-calculate trade equity = ACV - payoff
+        ['dealTradeACV','dealTradePayoff'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', () => {
+                const acv = parseFloat(document.getElementById('dealTradeACV').value) || 0;
+                const payoff = parseFloat(document.getElementById('dealTradePayoff').value) || 0;
+                document.getElementById('dealTradeEquity').value = (acv - payoff).toFixed(2);
+            });
+        });
 
         async function saveDeal(e) {
             e.preventDefault();
@@ -7150,6 +7230,30 @@
                 billedFunded: document.getElementById('dealBilledFunded').value,
                 dealFlag: document.getElementById('dealFlag').value,
                 dealStatus: document.getElementById('dealStatus').value,
+                // Gross breakdown
+                frontGross: parseFloat(document.getElementById('dealFrontGross').value) || 0,
+                backGross: parseFloat(document.getElementById('dealBackGross').value) || 0,
+                // Trade-in
+                tradeVehicle: document.getElementById('dealTradeVehicle').value,
+                tradeACV: parseFloat(document.getElementById('dealTradeACV').value) || 0,
+                tradeAllowance: parseFloat(document.getElementById('dealTradeAllowance').value) || 0,
+                tradePayoff: parseFloat(document.getElementById('dealTradePayoff').value) || 0,
+                tradeEquity: parseFloat(document.getElementById('dealTradeEquity').value) || 0,
+                // Finance
+                lender: document.getElementById('dealLender').value,
+                financeType: document.getElementById('dealFinanceType').value,
+                rate: parseFloat(document.getElementById('dealRate').value) || 0,
+                term: parseInt(document.getElementById('dealTerm').value) || 0,
+                payment: parseFloat(document.getElementById('dealPayment').value) || 0,
+                downPayment: parseFloat(document.getElementById('dealDownPayment').value) || 0,
+                sellingPrice: parseFloat(document.getElementById('dealSellingPrice').value) || 0,
+                reserve: parseFloat(document.getElementById('dealReserve').value) || 0,
+                // F&I Products
+                warranty: parseFloat(document.getElementById('dealWarranty').value) || 0,
+                gap: parseFloat(document.getElementById('dealGAP').value) || 0,
+                maintPlan: parseFloat(document.getElementById('dealMaintPlan').value) || 0,
+                otherProducts: parseFloat(document.getElementById('dealOtherProducts').value) || 0,
+                notes: document.getElementById('dealNotes').value,
             };
             try {
                 const url = editingDealId ? `${API_BASE}/api/deals/${editingDealId}` : `${API_BASE}/api/deals`;
