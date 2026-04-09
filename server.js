@@ -32,6 +32,9 @@ const uploadStorage = multer.diskStorage({
 });
 const upload = multer({ storage: uploadStorage, limits: { fileSize: 10 * 1024 * 1024 } });
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -75,7 +78,9 @@ const CONFIG = {
 
 // ==================== AUTHENTICATION ====================
 // Set CRM_PASSWORD in Render env vars. Default for local dev only.
-const CRM_PASSWORD = process.env.CRM_PASSWORD || 'gabemovesmetal2026';
+const CRM_PASSWORD_RAW = process.env.CRM_PASSWORD || 'gabemovesmetal2026';
+// Pre-hash the password at startup so we never compare plain text
+const CRM_PASSWORD_HASH = bcrypt.hashSync(CRM_PASSWORD_RAW, 10);
 
 // Active sessions (token → { createdAt, expiresAt })
 const sessions = new Map();
@@ -96,13 +101,13 @@ function isValidSession(token) {
   return true;
 }
 
-// Extract token from Authorization header or query param
+// Extract token from Authorization header only (no query params — those leak in logs)
 function getToken(req) {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.slice(7);
   }
-  return req.query.token || null;
+  return null;
 }
 
 // Auth middleware — protects all /api/* routes
@@ -115,15 +120,46 @@ function requireAuth(req, res, next) {
 }
 
 // ==================== MIDDLEWARE ====================
-app.use(cors());
+// Security headers (XSS, clickjacking, HSTS, etc.)
+app.use(helmet({
+  contentSecurityPolicy: false, // relaxed for inline scripts in SPA
+  crossOriginEmbedderPolicy: false,
+}));
+
+// CORS — only allow requests from the app itself
+const ALLOWED_ORIGINS = [
+  'https://gabe-moves-metal.onrender.com',
+  'http://localhost:3000',
+];
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow same-origin requests (no origin header) and whitelisted origins
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
+
+// Rate limiting on login — 5 attempts per minute per IP
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: { success: false, error: 'Too many login attempts. Try again in a minute.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf.toString(); } }));
 // Serve frontend — 'public' is a subfolder of the backend repo on Render
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ==================== AUTH ROUTES (public) ====================
-app.post('/auth/login', (req, res) => {
+app.post('/auth/login', loginLimiter, (req, res) => {
   const { password } = req.body;
-  if (password === CRM_PASSWORD) {
+  if (password && bcrypt.compareSync(password, CRM_PASSWORD_HASH)) {
     const token = generateToken();
     sessions.set(token, {
       createdAt: Date.now(),
