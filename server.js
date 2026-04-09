@@ -45,13 +45,16 @@ const database = require("./database"); // SQLite persistent storage
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust first proxy (Render/Cloudflare) so rate-limiter sees real client IPs
+app.set('trust proxy', 1);
+
 // ==================== CONFIG ====================
 // These values come from your Meta Developer App (see setup guide)
 const CONFIG = {
   META_APP_ID: process.env.META_APP_ID || '1934914437118814',
-  META_APP_SECRET: process.env.META_APP_SECRET || 'YOUR_APP_SECRET',
-  META_PAGE_ACCESS_TOKEN: process.env.META_PAGE_ACCESS_TOKEN || 'YOUR_PAGE_ACCESS_TOKEN',
-  META_VERIFY_TOKEN: process.env.META_VERIFY_TOKEN || 'gabe_moves_metal_2025',
+  META_APP_SECRET: process.env.META_APP_SECRET || '',
+  META_PAGE_ACCESS_TOKEN: process.env.META_PAGE_ACCESS_TOKEN || '',
+  META_VERIFY_TOKEN: process.env.META_VERIFY_TOKEN || '',
   PAGE_ID: process.env.PAGE_ID || '61575074716398',
   IG_ACCOUNT_ID: process.env.IG_ACCOUNT_ID || '17841401044727929',
   WEBHOOK_URL: process.env.WEBHOOK_URL || 'https://gabe-moves-metal.onrender.com/webhook',
@@ -60,7 +63,7 @@ const CONFIG = {
   WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || 'YOUR_WA_PHONE_NUMBER_ID',
   WHATSAPP_BUSINESS_ACCOUNT_ID: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '1972990456955920',
   WHATSAPP_PHONE_NUMBER: '17024163741', // Gabe's number in E.164 format
-  WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || 'gabe_moves_metal_wa_2026',
+  WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || '',
   // TikTok Content Posting API (apply at developers.tiktok.com → Content Posting API)
   TIKTOK_ACCESS_TOKEN: process.env.TIKTOK_ACCESS_TOKEN || '',
   TIKTOK_CLIENT_KEY: process.env.TIKTOK_CLIENT_KEY || '',
@@ -77,14 +80,43 @@ const CONFIG = {
 };
 
 // ==================== AUTHENTICATION ====================
-// Set CRM_PASSWORD in Render env vars. Default for local dev only.
-const CRM_PASSWORD_RAW = process.env.CRM_PASSWORD || 'gabemovesmetal2026';
+// CRM_PASSWORD MUST be set in Render env vars — server refuses to start without it
+const CRM_PASSWORD_RAW = process.env.CRM_PASSWORD;
+if (!CRM_PASSWORD_RAW) {
+  console.error('❌ FATAL: CRM_PASSWORD environment variable is not set. Server cannot start without it.');
+  console.error('   Set it in Render → Environment → Add CRM_PASSWORD');
+  if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+    process.exit(1);
+  } else {
+    console.warn('⚠️  DEV MODE: Using temporary dev password. NEVER use this in production.');
+  }
+}
 // Pre-hash the password at startup so we never compare plain text
-const CRM_PASSWORD_HASH = bcrypt.hashSync(CRM_PASSWORD_RAW, 10);
+const CRM_PASSWORD_HASH = bcrypt.hashSync(CRM_PASSWORD_RAW || 'localdev_only_temp', 10);
 
-// Active sessions (token → { createdAt, expiresAt })
+// Active sessions (token → { createdAt, expiresAt }) — persisted to disk
+const SESSIONS_FILE = path.join(__dirname, '.sessions.json');
 const sessions = new Map();
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// Load saved sessions on startup
+try {
+  if (fs.existsSync(SESSIONS_FILE)) {
+    const saved = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+    const now = Date.now();
+    for (const [tok, sess] of Object.entries(saved)) {
+      if (sess.expiresAt > now) sessions.set(tok, sess); // skip expired
+    }
+    console.log(`[Auth] Restored ${sessions.size} active session(s)`);
+  }
+} catch (e) { console.warn('[Auth] Could not restore sessions:', e.message); }
+
+function persistSessions() {
+  try {
+    const obj = Object.fromEntries(sessions);
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(obj), { mode: 0o600 }); // owner-only perms
+  } catch (e) { console.warn('[Auth] Could not persist sessions:', e.message); }
+}
 
 function generateToken() {
   return crypto.randomBytes(32).toString('hex');
@@ -96,6 +128,7 @@ function isValidSession(token) {
   if (!session) return false;
   if (Date.now() > session.expiresAt) {
     sessions.delete(token);
+    persistSessions();
     return false;
   }
   return true;
@@ -165,6 +198,7 @@ app.post('/auth/login', loginLimiter, (req, res) => {
       createdAt: Date.now(),
       expiresAt: Date.now() + SESSION_DURATION,
     });
+    persistSessions();
     return res.json({ success: true, token, expiresIn: SESSION_DURATION });
   }
   return res.status(401).json({ success: false, error: 'Wrong password.' });
@@ -172,7 +206,7 @@ app.post('/auth/login', loginLimiter, (req, res) => {
 
 app.post('/auth/logout', (req, res) => {
   const token = getToken(req);
-  if (token) sessions.delete(token);
+  if (token) { sessions.delete(token); persistSessions(); }
   return res.json({ success: true });
 });
 
@@ -285,8 +319,10 @@ app.get('/webhook', (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  // Accept both Facebook/Instagram and WhatsApp verify tokens
-  if (mode === 'subscribe' && (token === CONFIG.META_VERIFY_TOKEN || token === CONFIG.WHATSAPP_VERIFY_TOKEN)) {
+  // Accept both Facebook/Instagram and WhatsApp verify tokens (reject if tokens aren't configured)
+  const metaOk = CONFIG.META_VERIFY_TOKEN && token === CONFIG.META_VERIFY_TOKEN;
+  const waOk = CONFIG.WHATSAPP_VERIFY_TOKEN && token === CONFIG.WHATSAPP_VERIFY_TOKEN;
+  if (mode === 'subscribe' && (metaOk || waOk)) {
     console.log('[Webhook] Verified');
     return res.status(200).send(challenge);
   }
@@ -304,7 +340,7 @@ app.post('/webhook', async (req, res) => {
   const body = req.body;
 
   // Verify signature (security)
-  if (CONFIG.META_APP_SECRET !== 'YOUR_APP_SECRET') {
+  if (CONFIG.META_APP_SECRET) {
     const signature = req.headers['x-hub-signature-256'];
     if (signature) {
       const expected = 'sha256=' + crypto.createHmac('sha256', CONFIG.META_APP_SECRET).update(req.rawBody).digest('hex');
@@ -3763,23 +3799,79 @@ app.post('/data-deletion', (req, res) => {
 });
 
 
-// ==================== DEALS TRACKER (SECURE) ====================
+// ==================== DEALS TRACKER (SECURE + ENCRYPTED) ====================
 // All deal data behind requireAuth — must be logged in to access
-const DEALS_FILE = path.join(__dirname, 'deals.json');
+// Data encrypted at rest using AES-256-GCM (key derived from DEALS_ENCRYPTION_KEY env var)
+const DEALS_FILE = path.join(__dirname, 'deals.enc');
+const DEALS_FILE_LEGACY = path.join(__dirname, 'deals.json'); // old unencrypted file
+
+// Derive a 32-byte key from the env var using SHA-256
+function getDealsKey() {
+  const raw = process.env.DEALS_ENCRYPTION_KEY;
+  if (!raw) return null;
+  return crypto.createHash('sha256').update(raw).digest();
+}
+
+function encryptData(plaintext) {
+  const key = getDealsKey();
+  if (!key) return null;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const tag = cipher.getAuthTag().toString('hex');
+  return iv.toString('hex') + ':' + tag + ':' + encrypted;
+}
+
+function decryptData(blob) {
+  const key = getDealsKey();
+  if (!key) return null;
+  const [ivHex, tagHex, encHex] = blob.split(':');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+  let decrypted = decipher.update(encHex, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
+
+const DEALS_DEFAULT = { deals: [], monthlyStats: [], totals: [], yearTotal: {}, lists: {}, nextId: 1, employeeNumber: '' };
 
 function loadDeals() {
   try {
+    // Try encrypted file first
     if (fs.existsSync(DEALS_FILE)) {
-      return JSON.parse(fs.readFileSync(DEALS_FILE, 'utf8'));
+      const blob = fs.readFileSync(DEALS_FILE, 'utf8');
+      const json = decryptData(blob);
+      if (json) return JSON.parse(json);
+      console.error('[Deals] Could not decrypt deals.enc — wrong key?');
+    }
+    // Fall back to legacy unencrypted file (auto-migrate on next save)
+    if (fs.existsSync(DEALS_FILE_LEGACY)) {
+      console.log('[Deals] Found legacy deals.json — will encrypt on next save');
+      return JSON.parse(fs.readFileSync(DEALS_FILE_LEGACY, 'utf8'));
     }
   } catch (e) {
     console.error('Error loading deals:', e.message);
   }
-  return { deals: [], monthlyStats: [], totals: [], yearTotal: {}, lists: {}, nextId: 1, employeeNumber: '' };
+  return { ...DEALS_DEFAULT };
 }
 
 function saveDeals(data) {
-  fs.writeFileSync(DEALS_FILE, JSON.stringify(data, null, 2));
+  const json = JSON.stringify(data, null, 2);
+  const key = getDealsKey();
+  if (key) {
+    const blob = encryptData(json);
+    fs.writeFileSync(DEALS_FILE, blob, { mode: 0o600 });
+    // Remove legacy unencrypted file after successful encrypted write
+    if (fs.existsSync(DEALS_FILE_LEGACY)) {
+      fs.unlinkSync(DEALS_FILE_LEGACY);
+      console.log('[Deals] Migrated deals.json → deals.enc (encrypted)');
+    }
+  } else {
+    // No encryption key set — fall back to plain JSON (warn in logs)
+    console.warn('[Deals] ⚠️ DEALS_ENCRYPTION_KEY not set — saving unencrypted. Set it in Render env vars.');
+    fs.writeFileSync(DEALS_FILE_LEGACY, json);
+  }
 }
 
 // Recalculate monthly stats from deal data
@@ -4814,8 +4906,8 @@ let competitorInventory = {
 // ---- Algolia-based scraper for DealerInspire sites (Fairway & Henderson) ----
 // DealerInspire uses Algolia for inventory search. The HTML is client-rendered,
 // so we hit the Algolia API directly for full inventory data.
-const ALGOLIA_APP_ID = 'V3ZOVI2QFZ';
-const ALGOLIA_API_KEY = 'ec7553dd56e6d4c8bb447a0240e7aab3';
+const ALGOLIA_APP_ID = process.env.ALGOLIA_APP_ID || '';
+const ALGOLIA_API_KEY = process.env.ALGOLIA_API_KEY || '';
 
 async function scrapeDealerInspire(name, indexName, dealerLabel, dealerShort, siteUrl) {
   try {

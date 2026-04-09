@@ -2,4 +2,7 @@ node_modules/
 .env
 data.json
 inventory.json
+deals.json
+deals.enc
+.sessions.json
 *.log
