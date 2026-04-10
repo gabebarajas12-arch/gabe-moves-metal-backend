@@ -20,9 +20,9 @@ const path = require('path');
 
 // ==================== ALGOLIA API CONFIG ====================
 const ALGOLIA_CONFIG = {
-  APP_ID: process.env.ALGOLIA_APP_ID || '2591J46P8G',
-  API_KEY: process.env.ALGOLIA_API_KEY || '78311e75e16dd6273d6b00cd6c21db3c',
-  INDEX: process.env.ALGOLIA_INDEX || 'findlaychevrolet_production_inventory',
+  APP_ID: process.env.FINDLAY_ALGOLIA_APP_ID || '2591J46P8G',
+  API_KEY: process.env.FINDLAY_ALGOLIA_API_KEY || '78311e75e16dd6273d6b00cd6c21db3c',
+  INDEX: process.env.FINDLAY_ALGOLIA_INDEX || 'findlaychevrolet_production_inventory',
   get BASE_URL() {
     return `https://${this.APP_ID}-1.algolia.net/1/indexes/${this.INDEX}/query`;
   },
