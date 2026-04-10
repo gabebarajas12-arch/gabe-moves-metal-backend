@@ -178,6 +178,7 @@ app.use(cors({
 
 // Rate limiting on login — 5 attempts per minute per IP
 const loginLimiter = rateLimit({
+  keyGenerator: (req) => req.headers['cf-connecting-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip,
   windowMs: 60 * 1000,
   max: 5,
   message: { success: false, error: 'Too many login attempts. Try again in a minute.' },
@@ -192,7 +193,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ==================== AUTH ROUTES (public) ====================
 app.post('/auth/login', loginLimiter, (req, res) => {
   const { password } = req.body;
-  if (password && bcrypt.compareSync(password, CRM_PASSWORD_HASH)) {
+  if (password && typeof password === 'string' && bcrypt.compareSync(password, CRM_PASSWORD_HASH)) {
     const token = generateToken();
     sessions.set(token, {
       createdAt: Date.now(),
