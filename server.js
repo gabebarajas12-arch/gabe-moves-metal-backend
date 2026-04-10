@@ -216,6 +216,13 @@ app.get('/auth/check', (req, res) => {
   return res.json({ authenticated: isValidSession(token) });
 });
 
+// -- Inventory health check (no auth, diagnostic only) --
+app.get('/health/inventory', (req, res) => {
+  const count = inventoryModule.getInventoryCount();
+  const lastScraped = inventoryModule.getLastScraped();
+  res.json({ count, lastScraped, nodeVersion: process.version, uptime: Math.round(process.uptime()) });
+});
+
 // ==================== PROTECT API ROUTES ====================
 // Webhook & public pages are NOT protected (Meta needs access)
 // All /api/* routes require authentication
@@ -1183,13 +1190,6 @@ app.post('/api/templates', (req, res) => {
   const template = { id: generateId(), ...req.body };
   database.templates.create(template);
   res.json(template);
-});
-
-// -- Inventory health check (no auth, count only) --
-app.get('/api/inventory-health', (req, res) => {
-  const count = inventoryModule.getInventoryCount();
-  const lastScraped = inventoryModule.getLastScraped();
-  res.json({ count, lastScraped, nodeVersion: process.version, uptime: Math.round(process.uptime()) });
 });
 
 // -- Inventory --
