@@ -178,9 +178,9 @@ app.use(cors({
 
 // Rate limiting on login — 5 attempts per minute per IP
 const loginLimiter = rateLimit({
-  keyGenerator: (req) => req.headers['cf-connecting-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip,
   windowMs: 60 * 1000,
   max: 5,
+  keyGenerator: (req) => req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip,
   message: { success: false, error: 'Too many login attempts. Try again in a minute.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -1183,6 +1183,13 @@ app.post('/api/templates', (req, res) => {
   const template = { id: generateId(), ...req.body };
   database.templates.create(template);
   res.json(template);
+});
+
+// -- Inventory health check (no auth, count only) --
+app.get('/api/inventory-health', (req, res) => {
+  const count = inventoryModule.getInventoryCount();
+  const lastScraped = inventoryModule.getLastScraped();
+  res.json({ count, lastScraped, nodeVersion: process.version, uptime: Math.round(process.uptime()) });
 });
 
 // -- Inventory --
